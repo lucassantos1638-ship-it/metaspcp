@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Loader2, Lock, User, Building2, Mail, ArrowRight } from 'lucide-react'
 import logoMetaPCP from '@/assets/logo-metapcp.png'
-import fundoLogin from '@/assets/fundo-login.png'
+import bgSlideLogin from '@/assets/bg-slide-login.png'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/integrations/supabase/client'
@@ -102,14 +102,8 @@ export default function Login() {
       {/* Left Side - Hero / Image */}
       {/* Left Side - Hero / Image */}
       <div className="hidden lg:flex lg:w-3/5 bg-[#0a192f] relative items-center justify-center overflow-hidden">
-        {/* Imagem de fundo de produção têxtil com sobreposição azul escura */}
-        <div className="absolute inset-0 bg-contain bg-no-repeat bg-center" style={{ backgroundImage: `url(${fundoLogin})` }}></div>
-        <div className="absolute inset-0 bg-[#0a192f] opacity-90"></div>
-
-        {/* Conteúdo Centralizado */}
-        <div className="relative z-10 p-12 text-white max-w-2xl text-center">
-          <h2 className="text-4xl font-bold mb-4 leading-tight tracking-wide">Gestão Inteligente para sua Indústria</h2>
-        </div>
+        {/* Imagem de fundo sem sobreposição e sem texto adicional */}
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${bgSlideLogin})` }}></div>
       </div>
 
       {/* Right Side - Auth Forms */}
