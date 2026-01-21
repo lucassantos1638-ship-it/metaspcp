@@ -1,0 +1,208 @@
+﻿
+> vite_react_shadcn_ts@0.0.0 lint
+> eslint .
+
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\acompanhamento\CardPedido.tsx
+  10:13  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\acompanhamento\DetalhesPedido.tsx
+  355:49  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  403:41  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\auth\ResetEmergencia.tsx
+  55:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\configuracoes\ExclusaoLotes.tsx
+  18:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  70:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\configuracoes\ExclusaoPedidos.tsx
+  18:52  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  87:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\configuracoes\GerenciarColaboradores.tsx
+   21:64  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   22:62  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  130:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  148:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\configuracoes\GerenciarEtapas.tsx
+   16:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   53:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   79:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   97:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  114:30  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\configuracoes\GerenciarGestores.tsx
+   25:52  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   26:66  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  165:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  176:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\configuracoes\GerenciarSubetapas.tsx
+   17:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   72:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   98:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  116:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  133:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  236:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\metas\CadastroMetaDialog.tsx
+  68:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  99:57  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\metas\DashboardDesempenho.tsx
+  65:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  71:41  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  89:74  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\metas\ListaMetas.tsx
+   47:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   70:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  120:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\previsao\DetalhamentoProduto.tsx
+   20:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   74:49  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  105:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\previsao\ResumoPrevisao.tsx
+  7:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\previsao\SelecaoProdutoQuantidade.tsx
+  23:62  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\producao\DialogFinalizarAtividade.tsx
+  19:13  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\producao\ListaAtividadesEmAberto.tsx
+  19:66  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  50:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\produtos\CadastroProdutoDialog.tsx
+   52:40  error    Unexpected any. Specify a different type                                                                                            @typescript-eslint/no-explicit-any
+   53:46  error    Unexpected any. Specify a different type                                                                                            @typescript-eslint/no-explicit-any
+   67:6   warning  React Hook useEffect has missing dependencies: 'carregarEtapas' and 'gerarSku'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+   93:31  error    Unexpected any. Specify a different type                                                                                            @typescript-eslint/no-explicit-any
+   93:46  error    Unexpected any. Specify a different type                                                                                            @typescript-eslint/no-explicit-any
+  187:21  error    Unexpected any. Specify a different type                                                                                            @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\produtos\DetalhesProduto.tsx
+  187:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  277:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\relatorios\RelatorioColaborador.tsx
+   80:33    error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  159:561   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  161:383   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  161:1097  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  163:556   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\ui\badge.tsx
+  29:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\ui\button.tsx
+  47:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\ui\command.tsx
+  24:11  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\ui\form.tsx
+  129:10  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\ui\navigation-menu.tsx
+  111:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\ui\sidebar.tsx
+  636:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\ui\sonner.tsx
+  27:19  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\ui\textarea.tsx
+  5:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\components\ui\toggle.tsx
+  37:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\contexts\AuthContext.tsx
+    5:39  error    Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+    9:38  error    Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  123:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\hooks\useAcompanhamentoPedidos.ts
+  280:57  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  281:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\hooks\usePrevisaoProducao.ts
+   77:57  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   80:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   86:73  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  105:55  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  186:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\pages\Checkout.tsx
+   47:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  117:71  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\pages\Dashboard.tsx
+  130:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  131:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  154:47  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  155:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\pages\Login.tsx
+  33:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\pages\Lotes.tsx
+   47:13  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  131:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\pages\PrevisaoProducao.tsx
+  25:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  38:77  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\pages\Registro.tsx
+  136:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\pages\gestor\GestaoUsuarios.tsx
+   32:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   98:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  153:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  162:53  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\pages\super-admin\DashboardEmpresas.tsx
+   24:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   25:60  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   56:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   79:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  107:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  183:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  188:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  222:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  248:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\src\pages\super-admin\PerfilSuperAdmin.tsx
+  46:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\supabase\functions\logout\index.ts
+  44:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\supabase\functions\process-checkout\index.ts
+  87:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\supabase\functions\register-empresa\index.ts
+  246:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\supabase\functions\update-password\index.ts
+  112:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\supabase\functions\update-user-password\index.ts
+  74:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Micro\Desktop\sistemas\meta pcp arquivos\meta-pcp-supabase-main\tailwind.config.ts
+  116:13  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+Ô£û 107 problems (98 errors, 9 warnings)
+

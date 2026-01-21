@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 210 25% 98%;
+    --foreground: 215 25% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+
+    --primary: 210 85% 35%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 190 75% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 20% 94%;
+    --muted-foreground: 215 15% 45%;
+
+    --accent: 190 75% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 145 65% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 35 90% 55%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 20% 88%;
+    --input: 215 20% 88%;
+    --ring: 210 85% 35%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 210 30% 96%;
+    --sidebar-foreground: 215 25% 15%;
+    --sidebar-primary: 210 85% 35%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 25% 90%;
+    --sidebar-accent-foreground: 215 25% 15%;
+    --sidebar-border: 215 20% 88%;
+    --sidebar-ring: 210 85% 35%;
+  }
+
+  .dark {
+    --background: 215 30% 10%;
+    --foreground: 210 25% 95%;
+
+    --card: 215 28% 14%;
+    --card-foreground: 210 25% 95%;
+
+    --popover: 215 28% 14%;
+    --popover-foreground: 210 25% 95%;
+
+    --primary: 210 85% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 190 75% 40%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 215 25% 20%;
+    --muted-foreground: 215 15% 60%;
+
+    --accent: 190 75% 40%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 145 65% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 35 90% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 65% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 25% 22%;
+    --input: 215 25% 22%;
+    --ring: 210 85% 45%;
+
+    --sidebar-background: 215 32% 12%;
+    --sidebar-foreground: 210 25% 90%;
+    --sidebar-primary: 210 85% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 28% 18%;
+    --sidebar-accent-foreground: 210 25% 90%;
+    --sidebar-border: 215 25% 22%;
+    --sidebar-ring: 210 85% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom scrollbar for sidebar */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #e2e8f0;
+  /* slata-200 */
+  border-radius: 20px;
+}
