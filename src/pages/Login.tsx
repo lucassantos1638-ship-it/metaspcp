@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Loader2, Lock, User, Building2, Mail, ArrowRight } from 'lucide-react'
 import logoMetaPCP from '@/assets/logo-metapcp.png'
+import fundoLogin from '@/assets/fundo-login.png'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/integrations/supabase/client'
@@ -102,7 +103,7 @@ export default function Login() {
       {/* Left Side - Hero / Image */}
       <div className="hidden lg:flex lg:w-3/5 bg-[#0a192f] relative items-center justify-center overflow-hidden">
         {/* Imagem de fundo de produção têxtil com sobreposição azul escura */}
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1616423640778-28d1b53229bd?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center"></div>
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${fundoLogin})` }}></div>
         <div className="absolute inset-0 bg-[#0a192f] opacity-90"></div>
 
         {/* Conteúdo Centralizado */}
