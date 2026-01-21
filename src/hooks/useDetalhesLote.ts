@@ -24,7 +24,6 @@ export function useDetalhesLote(loteId: string | null) {
       if (loteError) throw loteError;
 
       // 2. Buscar TODAS as etapas e subetapas possíveis para essa empresa
-      // Isso é necessário para mostrar etapas que ainda não começaram
       const { data: todasEtapas } = await supabase
         .from("etapas")
         .select(`
@@ -35,6 +34,38 @@ export function useDetalhesLote(loteId: string | null) {
         `)
         .eq("empresa_id", lote.empresa_id)
         .order("ordem");
+
+      // 2.1 Buscar configuração de etapas do produto (se houver)
+      const { data: produtoEtapas } = await supabase
+        .from("produto_etapas")
+        .select("etapa_id, subetapa_id")
+        .eq("produto_id", lote.produto_id);
+
+      // 2.2 Filtrar etapas baseadas no produto
+      let etapasFiltradas = todasEtapas || [];
+
+      if (produtoEtapas && produtoEtapas.length > 0) {
+        etapasFiltradas = etapasFiltradas.filter(etapa =>
+          produtoEtapas.some(pe => pe.etapa_id === etapa.id)
+        );
+
+        // Opcional: Filtrar subetapas se necessário, mas geralmente exibir a etapa já filtra o fluxo principal.
+        // Se quisermos ser estritos com subetapas:
+        etapasFiltradas = etapasFiltradas.map(etapa => {
+          const configsDaEtapa = produtoEtapas.filter(pe => pe.etapa_id === etapa.id);
+          const temRestricaoSubetapa = configsDaEtapa.some(pe => pe.subetapa_id !== null);
+
+          if (temRestricaoSubetapa) {
+            return {
+              ...etapa,
+              subetapas: etapa.subetapas.filter(sub =>
+                configsDaEtapa.some(pe => pe.subetapa_id === sub.id)
+              )
+            };
+          }
+          return etapa;
+        });
+      }
 
       // 3. Buscar produções do lote
       const { data: producoes, error: producoesError } = await supabase
@@ -53,7 +84,7 @@ export function useDetalhesLote(loteId: string | null) {
       const progressoPorEtapa = agruparPorEtapa(
         (producoes || []) as any[],
         lote.quantidade_total,
-        todasEtapas || []
+        etapasFiltradas
       );
 
       // Calcular tempo total trabalhado (soma de tudo que já foi contabilizado)
