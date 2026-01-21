@@ -103,7 +103,7 @@ export default function Login() {
       {/* Left Side - Hero / Image */}
       <div className="hidden lg:flex lg:w-3/5 bg-[#0a192f] relative items-center justify-center overflow-hidden">
         {/* Imagem de fundo de produção têxtil com sobreposição azul escura */}
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${fundoLogin})` }}></div>
+        <div className="absolute inset-0 bg-contain bg-no-repeat bg-center" style={{ backgroundImage: `url(${fundoLogin})` }}></div>
         <div className="absolute inset-0 bg-[#0a192f] opacity-90"></div>
 
         {/* Conteúdo Centralizado */}
