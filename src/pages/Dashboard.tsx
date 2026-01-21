@@ -4,10 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button"; // Added Button
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { FullscreenWrapper } from "@/components/ui/fullscreen-wrapper";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
+import { useAuth } from "@/contexts/AuthContext";
+import { RankingClassico } from "@/components/dashboard/RankingClassico";
+import { RankingModerno } from "@/components/dashboard/RankingModerno";
+import { RankingListaModerno } from "@/components/dashboard/RankingListaModerno";
+import { LayoutTemplate, Loader2, Maximize } from "lucide-react";
+import { toast } from "sonner"; // Assuming toast is used
 
 interface AtividadeDesempenho {
   nome: string;
@@ -46,10 +53,36 @@ const getEmojiPorFaixa = (percentual: number) => {
 };
 
 const Dashboard = () => {
+  const { user, refreshProfile } = useAuth();
   const empresaId = useEmpresaId();
   const dataAtual = new Date();
   const mesAtualFormatado = `${dataAtual.getFullYear()}-${String(dataAtual.getMonth() + 1).padStart(2, "0")}`;
   const [mesAno, setMesAno] = useState(mesAtualFormatado);
+  const [isUpdatingStyle, setIsUpdatingStyle] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleEstiloRanking = async () => {
+    if (!user) return;
+    setIsUpdatingStyle(true);
+    const novoEstilo = user.preferencia_ranking === 'moderno' ? 'classico' : 'moderno';
+
+    try {
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ preferencia_ranking: novoEstilo })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      await refreshProfile();
+      toast.success(`Estilo alterado para ${novoEstilo === 'moderno' ? 'Moderno' : 'Clássico'}`);
+    } catch (error) {
+      console.error("Erro ao atualizar estilo", error);
+      toast.error("Erro ao salvar preferência");
+    } finally {
+      setIsUpdatingStyle(false);
+    }
+  };
 
   // Buscar configuração da velocidade do scroll e estilo
   const { data: config } = useQuery({
@@ -285,14 +318,75 @@ const Dashboard = () => {
   );
 
   return (
-    <FullscreenWrapper title="Ranking Geral de Metas">
+    <FullscreenWrapper
+      title="Ranking Geral de Metas"
+      open={isFullscreen}
+      onOpenChange={setIsFullscreen}
+      trigger={null}
+      renderFullscreen={() => (
+        <div className="flex flex-col h-full justify-center lg:justify-between gap-4 py-8">
+          {/* Header Compacto */}
+          <div className="text-center shrink-0">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-800">Ranking Geral de Metas</h1>
+            <p className="text-sm text-muted-foreground">{mesAno}</p>
+          </div>
+
+          {/* Top 3 Compacto */}
+          <div className="flex-1 flex items-end justify-center min-h-[350px] overflow-visible">
+            {user?.preferencia_ranking === 'moderno' ? (
+              <RankingModerno top3={top3} compact={true} />
+            ) : (
+              <RankingClassico top3={top3} />
+            )}
+          </div>
+
+          {/* Lista Horizontal Fixed Height */}
+          {restante.length > 0 && (
+            <div className="shrink-0 h-[240px] w-full">
+              {user?.preferencia_ranking === 'moderno' ? (
+                <RankingListaModerno restante={restante} />
+              ) : (
+                <div className="overflow-auto h-full">
+                  {estiloLista === 'lista_rolante' ? renderListaRolante() : renderGridCards()}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    >
       <div className="space-y-8">
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center justify-between flex-wrap gap-4 relative z-50 bg-background/80 backdrop-blur-sm p-2 rounded-lg sticky top-0">
           <div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-2">Ranking Geral de Metas</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Ranking Geral de Metas</h1>
             <p className="text-sm sm:text-base text-muted-foreground">Desempenho mensal dos colaboradores</p>
           </div>
-          <div className="w-full sm:w-auto">
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsFullscreen(true)}
+              title="Tela cheia"
+            >
+              <Maximize className="h-4 w-4" />
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={toggleEstiloRanking}
+              disabled={isUpdatingStyle}
+              title="Clique para alternar o estilo"
+              className="flex items-center gap-2 min-w-[140px]"
+            >
+              {isUpdatingStyle ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <LayoutTemplate className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">
+                {user?.preferencia_ranking === 'moderno' ? 'Visual Novo' : 'Visual Clássico'}
+              </span>
+            </Button>
             <Input
               type="month"
               value={mesAno}
@@ -313,100 +407,36 @@ const Dashboard = () => {
         ) : (
           <>
             {/* Pódio dos Top 3 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-              {/* 2º Lugar */}
-              {top3[1] && (
-                <Card className="border-2 border-gray-400 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-                  <CardHeader className="text-center pb-2">
-                    <div className="text-4xl sm:text-5xl md:text-6xl mb-2">🥈</div>
-                    <CardTitle className="text-lg sm:text-xl md:text-2xl">{top3[1].colaborador.nome}</CardTitle>
-
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="text-center">
-                      <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary">
-                        {top3[1].totalPercentual.toFixed(1)}%
-                      </span>
-                    </div>
-                    <Badge className="w-full justify-center text-sm sm:text-base py-2">
-                      {getStatusEmoji(top3[1].totalPercentual)} {getStatusText(top3[1].totalPercentual)}
-                    </Badge>
-                    <Progress value={Math.min(top3[1].totalPercentual, 100)} className="h-3" />
-                    {top3[1].atividades.length > 0 && (
-                      <p className="text-xs text-muted-foreground text-center">
-                        {top3[1].atividades.map(a => a.nome).join(", ")}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* 1º Lugar */}
-              {top3[0] && (
-                <Card className="border-4 border-yellow-500 bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-950 dark:to-yellow-900 shadow-2xl md:transform md:scale-110">
-                  <CardHeader className="text-center pb-2">
-                    <div className="text-4xl sm:text-6xl md:text-7xl mb-2">🥇</div>
-                    <CardTitle className="text-xl sm:text-2xl md:text-3xl">{top3[0].colaborador.nome}</CardTitle>
-
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="text-center">
-                      <span className="text-3xl sm:text-4xl md:text-5xl font-bold text-primary">
-                        {top3[0].totalPercentual.toFixed(1)}%
-                      </span>
-                    </div>
-                    <Badge className="w-full justify-center text-base sm:text-lg py-2">
-                      {getStatusEmoji(top3[0].totalPercentual)} {getStatusText(top3[0].totalPercentual)}
-                    </Badge>
-                    <Progress value={Math.min(top3[0].totalPercentual, 100)} className="h-4" />
-                    {top3[0].atividades.length > 0 && (
-                      <p className="text-xs text-muted-foreground text-center">
-                        {top3[0].atividades.map(a => a.nome).join(", ")}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* 3º Lugar */}
-              {top3[2] && (
-                <Card className="border-2 border-orange-600 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900">
-                  <CardHeader className="text-center pb-2">
-                    <div className="text-4xl sm:text-5xl md:text-6xl mb-2">🥉</div>
-                    <CardTitle className="text-lg sm:text-xl md:text-2xl">{top3[2].colaborador.nome}</CardTitle>
-
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="text-center">
-                      <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary">
-                        {top3[2].totalPercentual.toFixed(1)}%
-                      </span>
-                    </div>
-                    <Badge className="w-full justify-center text-sm sm:text-base py-2">
-                      {getStatusEmoji(top3[2].totalPercentual)} {getStatusText(top3[2].totalPercentual)}
-                    </Badge>
-                    <Progress value={Math.min(top3[2].totalPercentual, 100)} className="h-3" />
-                    {top3[2].atividades.length > 0 && (
-                      <p className="text-xs text-muted-foreground text-center">
-                        {top3[2].atividades.map(a => a.nome).join(", ")}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+            {user?.preferencia_ranking === 'moderno' ? (
+              <RankingModerno top3={top3} />
+            ) : (
+              <RankingClassico top3={top3} />
+            )}
 
             {/* Lista Animada dos Demais Colaboradores */}
             {restante.length > 0 && (
-              <Card className="p-4 sm:p-6">
+              <Card className={cn("p-4 sm:p-6",
+                user?.preferencia_ranking === 'moderno' ? "bg-transparent border-none shadow-none" : ""
+              )}>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl sm:text-2xl font-bold">Demais Colaboradores</h2>
+                  <h2 className={cn("text-xl sm:text-2xl font-bold",
+                    user?.preferencia_ranking === 'moderno' ? "text-gray-800" : ""
+                  )}>
+                    Demais Colaboradores
+                  </h2>
                   <Badge variant="outline" className="text-sm">
-                    {estiloLista === 'lista_rolante' ? '📜 Vertical ⬇️' : '🎴 Horizontal ➡️'}
+                    {user?.preferencia_ranking === 'moderno'
+                      ? '✨ Carrossel'
+                      : (estiloLista === 'lista_rolante' ? '📜 Vertical ⬇️' : '🎴 Horizontal ➡️')
+                    }
                   </Badge>
                 </div>
 
-                {estiloLista === 'lista_rolante' ? renderListaRolante() : renderGridCards()}
+                {user?.preferencia_ranking === 'moderno' ? (
+                  <RankingListaModerno restante={restante} />
+                ) : (
+                  estiloLista === 'lista_rolante' ? renderListaRolante() : renderGridCards()
+                )}
               </Card>
             )}
           </>

@@ -11,19 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Package, Search, Eye, Trash2, FileSpreadsheet } from "lucide-react";
-import { useProdutos, useToggleAtivoProduto, useExcluirProduto } from "@/hooks/useProdutos";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { Plus, Package, Search, Pencil, FileSpreadsheet } from "lucide-react";
+import { useProdutos, useToggleAtivoProduto } from "@/hooks/useProdutos";
 import CadastroProdutoDialog from "@/components/produtos/CadastroProdutoDialog";
 import ImportarProdutosDialog from "@/components/produtos/ImportarProdutosDialog";
 import DetalhesProduto from "@/components/produtos/DetalhesProduto";
@@ -37,7 +26,6 @@ export default function Produtos() {
 
   const { data: produtos, isLoading } = useProdutos();
   const toggleAtivo = useToggleAtivoProduto();
-  const excluirProduto = useExcluirProduto();
 
   const produtosFiltrados = produtos?.filter((p) => {
     const matchBusca =
@@ -65,16 +53,9 @@ export default function Produtos() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">Produtos</h1>
-            {produtos && (
-              <Badge variant="secondary" className="mt-1">
-                {produtos.length} {produtos.length === 1 ? 'produto' : 'produtos'}
-              </Badge>
-            )}
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight">Produtos</h1>
           <p className="text-muted-foreground">
-            Gerencie produtos e suas etapas de produção
+            Gerencie itens e configurações de produção
           </p>
         </div>
         <div className="flex gap-2">
@@ -131,16 +112,23 @@ export default function Produtos() {
               </TableHeader>
               <TableBody>
                 {produtosFiltrados.map((produto) => (
-                  <TableRow key={produto.id} className="h-8">
-                    <TableCell className="py-1 font-mono text-xs">{produto.sku}</TableCell>
-                    <TableCell
-                      className="py-1 font-medium text-sm cursor-pointer hover:underline text-primary"
-                      onClick={() => setProdutoSelecionado(produto.id)}
-                    >
+                  <TableRow
+                    key={produto.id}
+                    className="h-8 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => setProdutoSelecionado(produto.id)}
+                  >
+                    <TableCell className="py-1 font-mono text-xs text-muted-foreground">{produto.sku}</TableCell>
+                    <TableCell className="py-1 font-medium text-sm">
                       {produto.nome}
                     </TableCell>
                     <TableCell className="py-1">
-                      <Badge variant={produto.ativo ? "default" : "secondary"} className="h-5 text-[10px] px-1.5">
+                      <Badge
+                        variant={produto.ativo ? "default" : "secondary"}
+                        className={`h-5 text-[10px] px-1.5 ${produto.ativo
+                          ? "bg-green-100 text-green-700 hover:bg-green-100/80 border-green-200"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-100/80 border-gray-200"
+                          }`}
+                      >
                         {produto.ativo ? "Ativo" : "Inativo"}
                       </Badge>
                     </TableCell>
@@ -148,54 +136,15 @@ export default function Produtos() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6"
-                        onClick={() => setProdutoSelecionado(produto.id)}
-                        title="Ver Detalhes"
+                        className="h-8 w-8 text-primary hover:text-primary/80"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setProdutoSelecionado(produto.id);
+                        }}
+                        title="Editar Produto"
                       >
-                        <Eye className="h-3 w-3" />
+                        <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                        onClick={() =>
-                          toggleAtivo.mutate({ id: produto.id, ativo: !produto.ativo })
-                        }
-                        title={produto.ativo ? "Desativar" : "Ativar"}
-                      >
-                        {produto.ativo ? (
-                          <span className="text-xs text-green-600 font-bold">ON</span>
-                        ) : (
-                          <span className="text-xs text-red-500 font-bold">OFF</span>
-                        )}
-                      </Button>
-
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive/80">
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir produto?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Tem certeza que deseja excluir <strong>{produto.nome}</strong>?
-                              <br />
-                              Essa ação não pode ser desfeita.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              onClick={() => excluirProduto.mutate(produto.id)}
-                            >
-                              Sim, excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
                     </TableCell>
                   </TableRow>
                 ))}

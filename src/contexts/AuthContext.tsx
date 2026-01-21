@@ -48,6 +48,7 @@ interface User {
   empresa_id?: string | null
   empresa_nome?: string // Added for display
   permissoes: string[] | 'all'
+  preferencia_ranking?: string
 }
 
 interface AuthContextType {
@@ -56,6 +57,7 @@ interface AuthContextType {
   isLoading: boolean
   login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  refreshProfile: () => Promise<void>
   temPermissao: (tela: string) => boolean
   isGestor: boolean
 }
@@ -96,11 +98,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: userData.role,
           empresa_id: userData.empresa_id,
           empresa_nome: userData.empresas?.nome,
-          permissoes: userData.permissoes
+          permissoes: userData.permissoes,
+          preferencia_ranking: userData.preferencia_ranking || 'moderno'
         });
       }
     } catch (err) {
       console.error('Exception fetching profile', err);
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (user?.id) {
+      await fetchUserProfile(user.id);
     }
   };
 
@@ -194,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         logout,
+        refreshProfile,
         temPermissao,
         isGestor,
       }}
