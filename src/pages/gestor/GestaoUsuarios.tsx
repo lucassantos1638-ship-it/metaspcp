@@ -67,8 +67,6 @@ export default function GestaoUsuarios() {
         .from('usuarios')
         .select(`
             *,
-            user_roles(role),
-            permissoes_telas(tela),
             colaboradores(nome)
             `)
         .eq('empresa_id', user.empresa_id)
@@ -164,9 +162,9 @@ export default function GestaoUsuarios() {
       password: '', // Password usually empty on edit
       nome_completo: usuario.nome_completo,
       email: usuario.email || '',
-      role: usuario.user_roles[0]?.role || 'colaborador',
+      role: usuario.role || 'colaborador',
       colaborador_id: usuario.colaborador_id || '',
-      permissoes: usuario.permissoes_telas?.map((p: any) => p.tela) || [],
+      permissoes: usuario.permissoes || [],
       empresa_id: usuario.empresa_id || ''
     })
     setDialogOpen(true)
@@ -366,11 +364,11 @@ export default function GestaoUsuarios() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 {usuario.nome_completo}
-                <span className={`text-xs px-2 py-1 rounded ${usuario.user_roles?.[0]?.role === 'gestor'
+                <span className={`text-xs px-2 py-1 rounded ${usuario.role === 'gestor'
                   ? 'bg-primary/10 text-primary'
                   : 'bg-muted text-muted-foreground'
                   }`}>
-                  {usuario.user_roles?.[0]?.role === 'gestor' ? 'Gestor' : 'Colaborador'}
+                  {usuario.role === 'gestor' ? 'Gestor' : 'Colaborador'}
                 </span>
               </CardTitle>
               <CardDescription>@{usuario.username}</CardDescription>
@@ -382,12 +380,12 @@ export default function GestaoUsuarios() {
                 </p>
               )}
 
-              {usuario.user_roles?.[0]?.role === 'colaborador' && (
+              {usuario.role === 'colaborador' && (
                 <div>
                   <p className="text-sm font-medium mb-2">
-                    Telas permitidas: {usuario.permissoes_telas?.length || 0}
+                    Telas permitidas: {usuario.permissoes?.length || 0}
                   </p>
-                  {usuario.permissoes_telas?.length === 0 && (
+                  {usuario.permissoes?.length === 0 && (
                     <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
                       ⚠️ Sem acesso a nenhuma tela
                     </p>

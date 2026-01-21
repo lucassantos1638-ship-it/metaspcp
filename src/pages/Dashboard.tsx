@@ -6,14 +6,14 @@ import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button"; // Added Button
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { FullscreenWrapper } from "@/components/ui/fullscreen-wrapper";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
 import { useAuth } from "@/contexts/AuthContext";
 import { RankingClassico } from "@/components/dashboard/RankingClassico";
 import { RankingModerno } from "@/components/dashboard/RankingModerno";
 import { RankingListaModerno } from "@/components/dashboard/RankingListaModerno";
-import { LayoutTemplate, Loader2, Maximize } from "lucide-react";
+import { Calendar as CalendarIcon, Maximize } from "lucide-react";
 import { toast } from "sonner"; // Assuming toast is used
 
 interface AtividadeDesempenho {
@@ -60,6 +60,7 @@ const Dashboard = () => {
   const [mesAno, setMesAno] = useState(mesAtualFormatado);
   const [isUpdatingStyle, setIsUpdatingStyle] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const toggleEstiloRanking = async () => {
     if (!user) return;
@@ -324,32 +325,27 @@ const Dashboard = () => {
       onOpenChange={setIsFullscreen}
       trigger={null}
       renderFullscreen={() => (
-        <div className="flex flex-col h-full justify-center lg:justify-between gap-4 py-8">
-          {/* Header Compacto */}
-          <div className="text-center shrink-0">
+        <div className="fixed inset-0 w-screen h-screen bg-background flex flex-col items-center justify-between py-8 overflow-hidden">
+          {/* Header Compacto - Topo */}
+          <div className="text-center shrink-0 z-10">
             <h1 className="text-3xl font-bold tracking-tight text-gray-800">Ranking Geral de Metas</h1>
-            <p className="text-sm text-muted-foreground">{mesAno}</p>
+            <p className="text-sm text-muted-foreground capitalize">
+              {new Date(parseInt(mesAno.split("-")[0]), parseInt(mesAno.split("-")[1]) - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+            </p>
           </div>
 
-          {/* Top 3 Compacto */}
-          <div className="flex-1 flex items-end justify-center min-h-[350px] overflow-visible">
-            {user?.preferencia_ranking === 'moderno' ? (
-              <RankingModerno top3={top3} compact={true} />
-            ) : (
-              <RankingClassico top3={top3} />
-            )}
+          {/* Top 3 Centralizado e Aumentado */}
+          {/* Wrapper com largura fixa para garantir layout desktop, depois zoom */}
+          <div className="flex-1 flex items-center justify-center w-full relative overflow-visible">
+            <div style={{ zoom: '1.45' }} className="w-[1024px] flex justify-center">
+              <RankingModerno top3={top3} compact={false} />
+            </div>
           </div>
 
-          {/* Lista Horizontal Fixed Height */}
+          {/* Lista Horizontal Fixed Height - Rodape */}
           {restante.length > 0 && (
-            <div className="shrink-0 h-[240px] w-full">
-              {user?.preferencia_ranking === 'moderno' ? (
-                <RankingListaModerno restante={restante} />
-              ) : (
-                <div className="overflow-auto h-full">
-                  {estiloLista === 'lista_rolante' ? renderListaRolante() : renderGridCards()}
-                </div>
-              )}
+            <div className="shrink-0 h-[160px] w-screen max-w-[100vw] overflow-hidden bg-background/50 backdrop-blur-sm mb-8">
+              <RankingListaModerno restante={restante} />
             </div>
           )}
         </div>
@@ -371,28 +367,26 @@ const Dashboard = () => {
               <Maximize className="h-4 w-4" />
             </Button>
 
-            <Button
-              variant="outline"
-              onClick={toggleEstiloRanking}
-              disabled={isUpdatingStyle}
-              title="Clique para alternar o estilo"
-              className="flex items-center gap-2 min-w-[140px]"
-            >
-              {isUpdatingStyle ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <LayoutTemplate className="h-4 w-4" />
-              )}
-              <span className="hidden sm:inline">
-                {user?.preferencia_ranking === 'moderno' ? 'Visual Novo' : 'Visual Clássico'}
-              </span>
-            </Button>
-            <Input
-              type="month"
-              value={mesAno}
-              onChange={(e) => setMesAno(e.target.value)}
-              className="w-full sm:w-[200px]"
-            />
+            <div className="relative w-full sm:w-[200px]">
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left font-normal"
+                onClick={() => dateInputRef.current?.showPicker()}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                <span className="capitalize">
+                  {new Date(parseInt(mesAno.split("-")[0]), parseInt(mesAno.split("-")[1]) - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                </span>
+              </Button>
+              <input
+                ref={dateInputRef}
+                type="month"
+                value={mesAno}
+                onChange={(e) => setMesAno(e.target.value)}
+                className="absolute inset-0 w-0 h-0 opacity-0 pointer-events-none"
+                style={{ visibility: 'hidden' }}
+              />
+            </div>
           </div>
         </div>
 
@@ -407,36 +401,19 @@ const Dashboard = () => {
         ) : (
           <>
             {/* Pódio dos Top 3 */}
-            {user?.preferencia_ranking === 'moderno' ? (
-              <RankingModerno top3={top3} />
-            ) : (
-              <RankingClassico top3={top3} />
-            )}
+            {/* Pódio dos Top 3 */}
+            <RankingModerno top3={top3} />
 
             {/* Lista Animada dos Demais Colaboradores */}
             {restante.length > 0 && (
-              <Card className={cn("p-4 sm:p-6",
-                user?.preferencia_ranking === 'moderno' ? "bg-transparent border-none shadow-none" : ""
-              )}>
+              <Card className="p-4 sm:p-6 bg-transparent border-none shadow-none">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className={cn("text-xl sm:text-2xl font-bold",
-                    user?.preferencia_ranking === 'moderno' ? "text-gray-800" : ""
-                  )}>
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
                     Demais Colaboradores
                   </h2>
-                  <Badge variant="outline" className="text-sm">
-                    {user?.preferencia_ranking === 'moderno'
-                      ? '✨ Carrossel'
-                      : (estiloLista === 'lista_rolante' ? '📜 Vertical ⬇️' : '🎴 Horizontal ➡️')
-                    }
-                  </Badge>
                 </div>
 
-                {user?.preferencia_ranking === 'moderno' ? (
-                  <RankingListaModerno restante={restante} />
-                ) : (
-                  estiloLista === 'lista_rolante' ? renderListaRolante() : renderGridCards()
-                )}
+                <RankingListaModerno restante={restante} />
               </Card>
             )}
           </>

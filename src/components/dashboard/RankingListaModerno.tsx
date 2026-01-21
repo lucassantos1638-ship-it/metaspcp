@@ -40,33 +40,33 @@ export function RankingListaModerno({ restante }: RankingListaModernoProps) {
                     {restante.map((item, idx) => (
                         <div
                             key={`${item.colaborador.id}-${idx}`}
-                            className="relative w-[300px] bg-white rounded-2xl p-6 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300 shadow-sm border border-gray-100 hover:shadow-xl"
+                            className="relative w-[220px] bg-white rounded-xl p-3 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300 shadow-sm border border-gray-100 hover:shadow-lg"
                         >
                             {/* Header: Posicao e Status Dot */}
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-4xl font-black text-gray-200">
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-2xl font-black text-gray-200">
                                         {String(item.posicao).padStart(2, '0')}
                                     </span>
                                 </div>
-                                <div className={`w-3 h-3 rounded-full ${item.totalPercentual >= 100 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-400'}`} />
+                                <div className={`w-2 h-2 rounded-full ${item.totalPercentual >= 100 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-400'}`} />
                             </div>
 
                             {/* Infos */}
-                            <div className="mb-4">
-                                <div className="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-1">Colaborador</div>
-                                <h4 className="font-bold text-lg text-gray-800 line-clamp-1 group-hover:text-amber-600 transition-colors">
+                            <div className="mb-2">
+                                <div className="text-[8px] uppercase font-bold text-gray-400 tracking-wider mb-0.5">Colaborador</div>
+                                <h4 className="font-bold text-sm text-gray-800 line-clamp-1 group-hover:text-amber-600 transition-colors">
                                     {item.colaborador.nome}
                                 </h4>
                             </div>
 
                             {/* Progress */}
-                            <div className="space-y-2">
+                            <div className="space-y-1">
                                 <div className="flex justify-between items-end">
-                                    <span className="text-3xl font-black text-gray-800">{item.totalPercentual.toFixed(1)}%</span>
+                                    <span className="text-xl font-black text-gray-800">{item.totalPercentual.toFixed(1)}%</span>
                                 </div>
 
-                                <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-1 w-full bg-gray-100 rounded-full overflow-hidden">
                                     <div
                                         className="h-full bg-amber-500 rounded-full transition-all duration-500 ease-out"
                                         style={{ width: `${Math.min(item.totalPercentual, 100)}%` }}
@@ -75,11 +75,11 @@ export function RankingListaModerno({ restante }: RankingListaModernoProps) {
                             </div>
 
                             {/* Footer */}
-                            <div className="border-t border-gray-50 mt-4 pt-3 flex justify-between items-center">
-                                <p className="text-[10px] text-gray-400 truncate max-w-[180px]">
+                            <div className="border-t border-gray-50 mt-2 pt-2 flex justify-between items-center">
+                                <p className="text-[8px] text-gray-400 truncate max-w-[140px]">
                                     {item.atividades.map(a => a.nome).join(", ")}
                                 </p>
-                                <User className="w-4 h-4 text-gray-300" />
+                                <User className="w-3 h-3 text-gray-300" />
                             </div>
                         </div>
                     ))}

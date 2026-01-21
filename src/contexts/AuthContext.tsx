@@ -150,16 +150,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.session) {
         setSessionToken(data.session.access_token)
-        // Fetch full profile
+        // Fetch full profile to get permissions
         await fetchUserProfile(data.user.id)
-        navigate('/')
+
+        // --- SMART REDIRECT LOGIC ---
+        // Need to wait for user state to update or use the fetched data directly
+        const { data: userProfile } = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (userProfile) {
+          const perms = userProfile.permissoes || [];
+          const role = userProfile.role;
+
+          if (role === 'super_admin' || role === 'gestor') {
+            navigate('/');
+          } else if (perms.includes('dashboard')) {
+            navigate('/');
+          } else if (perms.includes('producao')) {
+            navigate('/producao');
+          } else if (perms.includes('lotes')) {
+            navigate('/lotes');
+          } else if (perms.includes('pedidos')) {
+            navigate('/acompanhamento-colaboradores');
+          } else if (perms.includes('produtos')) {
+            navigate('/produtos');
+          } else if (perms.includes('metas')) {
+            navigate('/metas');
+          } else {
+            // Fallback if no specific permission matches major routes
+            navigate('/');
+          }
+        } else {
+          navigate('/');
+        }
       }
 
       if (error) throw error
 
-      if (data.user) {
-        setSessionToken(data.session.access_token)
-        navigate('/')
+      // Fallback for unlikely case where session is missing but user exists
+      if (data.user && !data.session) {
+        setSessionToken(null) // Should force relogin or handle confirmation
+        navigate('/login')
       }
 
     } catch (error) {

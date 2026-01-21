@@ -8,12 +8,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { nome, email, username, cpf, cnpj, telefone, senha } = await req.json()
+    const { nome, nome_responsavel, email, username, cpf, cnpj, telefone, senha } = await req.json()
 
-    console.log('Dados recebidos:', { nome, email, username, cpf, cnpj, telefone })
+    console.log('Dados recebidos:', { nome, nome_responsavel, email, username, cpf, cnpj, telefone })
 
     // Validações básicas
-    if (!nome || !email || !username || !telefone || !senha) {
+    if (!nome || !nome_responsavel || !email || !username || !telefone || !senha) {
       console.error('Campos obrigatórios faltando')
       return new Response(
         JSON.stringify({ error: 'Todos os campos são obrigatórios' }),
@@ -176,7 +176,7 @@ Deno.serve(async (req) => {
       .from('usuarios')
       .insert({
         username: username,
-        nome_completo: nome,
+        nome_completo: nome_responsavel,
         email: email,
         password_hash: passwordHash,
         empresa_id: empresa.id,

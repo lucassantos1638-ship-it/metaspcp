@@ -54,10 +54,9 @@ const GerenciarGestores = () => {
         .from("usuarios")
         .select(`
             *,
-            user_roles!inner(role),
             empresas(nome)
           `)
-        .eq("user_roles.role", "gestor")
+        .eq("role", "gestor")
         .order("nome_completo");
 
       // Se NÃO for super_admin, filtrar apenas da sua empresa

@@ -15,6 +15,7 @@ export default function Registro() {
   const [tipoDocumento, setTipoDocumento] = useState<'cpf' | 'cnpj'>('cpf')
   const [formData, setFormData] = useState({
     nome: '',
+    nome_responsavel: '',
     email: '',
     username: '',
     cpf: '',
@@ -75,7 +76,7 @@ export default function Registro() {
 
     try {
       // Validações
-      if (!formData.nome || !formData.email || !formData.username || !formData.telefone || !formData.senha) {
+      if (!formData.nome || !formData.nome_responsavel || !formData.email || !formData.username || !formData.telefone || !formData.senha) {
         toast.error('Preencha todos os campos obrigatórios')
         return
       }
@@ -115,6 +116,7 @@ export default function Registro() {
       const { data, error } = await supabase.functions.invoke('register-empresa', {
         body: {
           nome: formData.nome,
+          nome_responsavel: formData.nome_responsavel,
           email: formData.email,
           username: formData.username,
           cpf: tipoDocumento === 'cpf' ? formData.cpf : null,
@@ -159,6 +161,18 @@ export default function Registro() {
                 name="nome"
                 placeholder="Minha Empresa Ltda"
                 value={formData.nome}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="nome_responsavel">Nome do Responsável *</Label>
+              <Input
+                id="nome_responsavel"
+                name="nome_responsavel"
+                placeholder="Seu Nome Completo"
+                value={formData.nome_responsavel}
                 onChange={handleInputChange}
                 required
               />

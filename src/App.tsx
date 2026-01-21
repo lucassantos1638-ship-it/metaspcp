@@ -57,7 +57,7 @@ const App = () => (
               <Route
                 path="/"
                 element={
-                  <ProtectedRoute requiredPermission="/">
+                  <ProtectedRoute requiredPermission="dashboard">
                     <Dashboard />
                   </ProtectedRoute>
                 }
@@ -66,7 +66,7 @@ const App = () => (
               <Route
                 path="/produtos"
                 element={
-                  <ProtectedRoute requiredPermission="/produtos">
+                  <ProtectedRoute requiredPermission="produtos">
                     <Produtos />
                   </ProtectedRoute>
                 }
@@ -75,7 +75,7 @@ const App = () => (
               <Route
                 path="/producao"
                 element={
-                  <ProtectedRoute requiredPermission="/producao">
+                  <ProtectedRoute requiredPermission="producao">
                     <Producao />
                   </ProtectedRoute>
                 }
@@ -84,7 +84,7 @@ const App = () => (
               <Route
                 path="/lotes"
                 element={
-                  <ProtectedRoute requiredPermission="/lotes">
+                  <ProtectedRoute requiredPermission="lotes">
                     <Lotes />
                   </ProtectedRoute>
                 }
@@ -93,7 +93,7 @@ const App = () => (
               <Route
                 path="/lotes/:id"
                 element={
-                  <ProtectedRoute requiredPermission="/lotes">
+                  <ProtectedRoute requiredPermission="lotes">
                     <DetalhesLote />
                   </ProtectedRoute>
                 }
@@ -102,7 +102,7 @@ const App = () => (
               <Route
                 path="/colaboradores"
                 element={
-                  <ProtectedRoute requiredPermission="/colaboradores">
+                  <ProtectedRoute requiredPermission="colaboradores">
                     <Colaboradores />
                   </ProtectedRoute>
                 }
@@ -111,7 +111,7 @@ const App = () => (
               <Route
                 path="/metas"
                 element={
-                  <ProtectedRoute requiredPermission="/metas">
+                  <ProtectedRoute requiredPermission="metas">
                     <Metas />
                   </ProtectedRoute>
                 }
@@ -123,7 +123,7 @@ const App = () => (
               <Route
                 path="/acompanhamento-colaboradores"
                 element={
-                  <ProtectedRoute requiredPermission="/acompanhamento-pedidos">
+                  <ProtectedRoute requiredPermission="pedidos">
                     <AcompanhamentoColaboradores />
                   </ProtectedRoute>
                 }
@@ -132,7 +132,7 @@ const App = () => (
               <Route
                 path="/desempenho"
                 element={
-                  <ProtectedRoute requiredPermission="/colaboradores">
+                  <ProtectedRoute requiredPermission="colaboradores">
                     <DesempenhoColaboradores />
                   </ProtectedRoute>
                 }
@@ -141,7 +141,7 @@ const App = () => (
               <Route
                 path="/previsao-producao"
                 element={
-                  <ProtectedRoute requiredPermission="/producao">
+                  <ProtectedRoute requiredPermission="previsao_producao">
                     <PrevisaoProducao />
                   </ProtectedRoute>
                 }
@@ -150,7 +150,7 @@ const App = () => (
               <Route
                 path="/pop"
                 element={
-                  <ProtectedRoute requiredPermission="/pop">
+                  <ProtectedRoute requiredPermission="pop">
                     <Pop />
                   </ProtectedRoute>
                 }
@@ -159,7 +159,7 @@ const App = () => (
               <Route
                 path="/etapas"
                 element={
-                  <ProtectedRoute requiredPermission="/etapas">
+                  <ProtectedRoute requiredPermission="etapas">
                     <Etapa />
                   </ProtectedRoute>
                 }

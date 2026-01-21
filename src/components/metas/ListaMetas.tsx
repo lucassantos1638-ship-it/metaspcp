@@ -29,7 +29,7 @@ const ListaMetas = () => {
         `)
         .eq("empresa_id", empresaId)
         .order("created_at", { ascending: false });
-      
+
       if (error) throw error;
       return data;
     },
@@ -107,42 +107,100 @@ const ListaMetas = () => {
         {isLoading ? (
           <p className="text-center text-muted-foreground py-8">Carregando...</p>
         ) : metas && metas.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Etapa/Subetapa</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead className="text-right">Meta</TableHead>
-                <TableHead className="w-[180px]">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <>
+            {/* Desktop View (Table) */}
+            <div className="hidden md:block rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Etapa/Subetapa</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead className="text-right">Meta</TableHead>
+                    <TableHead className="w-[180px]">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {metas.map((meta: any) => (
+                    <TableRow key={meta.id}>
+                      <TableCell className="font-medium">
+                        {meta.subetapas?.nome || meta.etapas?.nome}
+                      </TableCell>
+                      <TableCell>{meta.subetapa_id ? "Subetapa" : "Etapa"}</TableCell>
+                      <TableCell className="text-right">
+                        {editingId === meta.id ? (
+                          <Input
+                            type="number"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className="w-24 ml-auto"
+                            autoFocus
+                          />
+                        ) : (
+                          meta.meta
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          {editingId === meta.id ? (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleSave(meta.id)}
+                              >
+                                <Check className="h-4 w-4 text-green-600" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleCancel}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(meta.id, meta.meta)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => deleteMeta.mutate(meta.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile View (Cards) */}
+            <div className="md:hidden space-y-4">
               {metas.map((meta: any) => (
-                <TableRow key={meta.id}>
-                  <TableCell className="font-medium">
-                    {meta.subetapas?.nome || meta.etapas?.nome}
-                  </TableCell>
-                  <TableCell>{meta.subetapa_id ? "Subetapa" : "Etapa"}</TableCell>
-                  <TableCell className="text-right">
-                    {editingId === meta.id ? (
-                      <Input
-                        type="number"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        className="w-24 ml-auto"
-                        autoFocus
-                      />
-                    ) : (
-                      meta.meta
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
+                <div key={meta.id} className="bg-card rounded-lg border p-4 shadow-sm space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-semibold text-base">{meta.subetapas?.nome || meta.etapas?.nome}</h4>
+                      <p className="text-xs text-muted-foreground">{meta.subetapa_id ? "Subetapa" : "Etapa"}</p>
+                    </div>
+
+                    <div className="flex gap-1">
                       {editingId === meta.id ? (
                         <>
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={() => handleSave(meta.id)}
                           >
                             <Check className="h-4 w-4 text-green-600" />
@@ -150,6 +208,7 @@ const ListaMetas = () => {
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={handleCancel}
                           >
                             <X className="h-4 w-4" />
@@ -160,6 +219,7 @@ const ListaMetas = () => {
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={() => handleEdit(meta.id, meta.meta)}
                           >
                             <Pencil className="h-4 w-4" />
@@ -167,6 +227,7 @@ const ListaMetas = () => {
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={() => deleteMeta.mutate(meta.id)}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -174,11 +235,26 @@ const ListaMetas = () => {
                         </>
                       )}
                     </div>
-                  </TableCell>
-                </TableRow>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t text-sm">
+                    <span className="text-muted-foreground">Meta Mensal:</span>
+                    {editingId === meta.id ? (
+                      <Input
+                        type="number"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="w-24 h-8"
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="font-bold text-lg">{meta.meta}</span>
+                    )}
+                  </div>
+                </div>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+          </>
         ) : (
           <p className="text-center text-muted-foreground py-8">Nenhuma meta cadastrada</p>
         )}

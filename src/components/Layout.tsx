@@ -21,7 +21,7 @@ const Layout = () => {
     { path: "/metas", icon: Target, label: "Metas", permission: "metas" },
     { path: "/etapas", icon: Layers, label: "Etapas", permission: "etapas" },
     { path: "/desempenho", icon: TrendingUp, label: "Desempenho", permission: "colaboradores" },
-    { path: "/previsao-producao", icon: Calculator, label: "Previsão", permission: "producao" },
+    { path: "/previsao-producao", icon: Calculator, label: "Previsão", permission: "previsao_producao" },
     { path: "/pop", icon: ScrollText, label: "P.O.P", permission: "pop" },
   ];
 
@@ -46,10 +46,9 @@ const Layout = () => {
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0 bg-card border-r border-border flex flex-col h-full">
             {/* Mobile Sidebar Header */}
-            <div className="h-20 flex-none flex items-center px-4 border-b border-border bg-card">
-              <div className="flex items-center gap-3">
+            <div className="h-20 flex-none flex items-center justify-center px-4 border-b border-border bg-card">
+              <div className="flex items-center justify-center">
                 <img src={logoMetaPCP} alt="Meta PCP" className="h-16 w-auto" />
-                <span className="font-semibold text-foreground tracking-wide">Meta PCP</span>
               </div>
             </div>
 
@@ -58,10 +57,10 @@ const Layout = () => {
               {/* User Info Section */}
               <div className="p-4 border-b border-border flex-none">
                 <div className="flex flex-col gap-1">
-                  <span className="font-bold text-foreground uppercase text-xs tracking-wider line-clamp-1" title={user?.nome}>
-                    {user?.nome || 'USUÁRIO'}
+                  <span className="font-bold text-foreground uppercase text-xs tracking-wider line-clamp-1" title={`${user?.nome || ''} | ${user?.username || ''} | ${user?.email || ''}`}>
+                    {user?.nome || user?.username || user?.email || 'USUÁRIO'}
                   </span>
-                  <span className="text-xs text-muted-foreground font-semibold uppercase leading-tight">
+                  <span className="text-xs text-muted-foreground font-semibold uppercase leading-tight whitespace-normal break-words">
                     {user?.empresa_nome || '001 - META INDÚSTRIA'}
                   </span>
                 </div>
@@ -128,10 +127,9 @@ const Layout = () => {
       {/* Desktop Sidebar - Fixed Height within Flex Container */}
       <aside className="hidden print:hidden lg:flex lg:flex-col w-64 bg-card border-r border-border font-sans text-sm h-full flex-none">
         {/* Header - Logo area acting as Title (Fixed) */}
-        <div className="h-20 flex-none flex items-center px-4 border-b border-border bg-card z-10">
-          <div className="flex items-center gap-3">
+        <div className="h-20 flex-none flex items-center justify-center px-4 border-b border-border bg-card z-10">
+          <div className="flex items-center justify-center">
             <img src={logoMetaPCP} alt="Meta PCP" className="h-16 w-auto" />
-            <span className="font-semibold text-foreground tracking-wide">Meta PCP</span>
           </div>
         </div>
 
@@ -140,10 +138,10 @@ const Layout = () => {
           {/* User Info Section */}
           <div className="p-4 border-b border-border flex-none">
             <div className="flex flex-col gap-1">
-              <span className="font-bold text-foreground uppercase text-xs tracking-wider line-clamp-1" title={user?.nome}>
-                {user?.nome || 'USUÁRIO'}
+              <span className="font-bold text-foreground uppercase text-xs tracking-wider line-clamp-1" title={`${user?.nome || ''} | ${user?.username || ''} | ${user?.email || ''}`}>
+                {user?.nome || user?.username || user?.email || 'USUÁRIO'}
               </span>
-              <span className="text-xs text-muted-foreground font-semibold uppercase leading-tight">
+              <span className="text-xs text-muted-foreground font-semibold uppercase leading-tight whitespace-normal break-words">
                 {user?.empresa_nome || '001 - META INDÚSTRIA'}
               </span>
             </div>
@@ -179,13 +177,15 @@ const Layout = () => {
           {/* Bottom Actions (Collapsible Menu) */}
           <div className="border-t border-border bg-card mt-auto flex-none flex flex-col">
 
-            <Link
-              to="/configuracoes"
-              className="flex items-center gap-3 px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors w-full"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="text-xs font-medium">Configurações</span>
-            </Link>
+            {temPermissao('configuracoes') && (
+              <Link
+                to="/configuracoes"
+                className="flex items-center gap-3 px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors w-full"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="text-xs font-medium">Configurações</span>
+              </Link>
+            )}
 
             <button onClick={logout} className="w-full flex items-center justify-between px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-left border-t border-border">
               <div className="flex items-center gap-3">

@@ -87,10 +87,29 @@ Deno.serve(async (req) => {
       )
     }
 
-    // O trigger 'handle_new_user' deve rodar após o insert em auth.users e popular public.usuarios.
-    // O trigger vai usar os metadados fornecidos acima.
+    // MANUALMENTE INSERIR NA TABELA PUBLICA PARA GARANTIR
+    // (Caso o trigger falhe ou demore)
+    const { error: publicProfileError } = await supabaseAdmin
+      .from('usuarios')
+      .insert({
+        id: user.user.id,
+        username: username || email,
+        nome_completo: nome_completo,
+        email: email,
+        empresa_id: empresa_id,
+        role: role,
+        permissoes: permissoes || [],
+        preferencia_ranking: 'moderno'
+      })
+      .select()
+      .single()
 
-    // Adicionar log (Opcional, pois trigger poderia fazer isso, mas vamos manter o log explícito)
+    if (publicProfileError) {
+      console.error('Erro ao criar perfil público (ignorando se duplicado):', publicProfileError)
+      // Não retorna erro aqui para não travar o processo se o trigger já tiver rodado
+    }
+
+    // Adicionar log
     await supabaseAdmin.from('logs_acoes').insert({
       user_id: user.user.id,
       username: 'sistema',

@@ -95,41 +95,35 @@ export function RankingModerno({ top3, compact = false }: RankingModernoProps) {
 
     return (
         <div className={cn("relative w-full max-w-5xl mx-auto transition-all",
-            compact ? "pt-16 pb-4" : "pt-32 pb-12 md:pb-16"
+            compact ? "pt-2 pb-0" : "pt-10 pb-4 md:pb-6"
         )}>
-            <div className={cn("flex flex-row justify-center items-end gap-2 md:gap-8 transition-all",
-                compact ? "min-h-[300px]" : "min-h-[480px]"
+            <div className={cn("flex flex-row justify-center items-end gap-1 md:gap-4 transition-all",
+                compact ? "min-h-[60px]" : "min-h-[200px]"
             )}>
 
                 {/* 2º Lugar (Esquerda) */}
                 <div className="order-1 flex-1 w-full md:w-auto max-w-sm flex flex-col justify-end">
                     {segundo && (
-                        <div className={cn("bg-white rounded-t-3xl rounded-b-xl shadow-xl border border-slate-100 flex flex-col items-center relative justify-between transition-all",
-                            compact ? "h-[260px] p-4 scale-95 origin-bottom" : "h-[360px] p-6"
+                        <div className={cn("bg-white rounded-t-lg rounded-b-md shadow-sm border border-slate-100 flex flex-col items-center relative justify-between transition-all",
+                            compact ? "h-[55px] p-1 scale-95 origin-bottom" : "h-[170px] p-3"
                         )}>
-                            <div className={cn("absolute z-10", compact ? "-top-8" : "-top-12")}>
-                                <Medalha rank={2} className={compact ? "w-16 h-16" : "w-24 h-24"} />
+                            <div className={cn("absolute z-10", compact ? "-top-2" : "-top-8")}>
+                                <Medalha rank={2} className={compact ? "w-4 h-4" : "w-14 h-14"} />
                             </div>
 
-                            <div className={cn("text-center w-full space-y-2", compact ? "mt-8" : "mt-14")}>
-                                <div>
-                                    <h3 className={cn("font-bold text-slate-700 uppercase tracking-wide", compact ? "text-sm" : "text-xl")}>{segundo.colaborador.nome}</h3>
-                                    <p className="text-sm text-slate-400 font-medium">2º Lugar</p>
+                            <div className={cn("text-center w-full space-y-1", compact ? "mt-2" : "mt-6")}>
+                                <div className="min-h-[2.5rem] flex items-end justify-center">
+                                    <h3 className={cn("font-bold text-slate-700 uppercase tracking-wide leading-tight px-1", compact ? "text-[6px] truncate" : "text-xs line-clamp-2")}>{segundo.colaborador.nome}</h3>
+                                </div>
+                                <p className={cn("text-slate-400 font-medium hidden", compact ? "hidden" : "block text-[10px]")}>2º Lugar</p>
+
+                                <div className={cn("font-black text-slate-700 tracking-tighter", compact ? "text-xs" : "text-2xl")}>
+                                    {segundo.totalPercentual.toFixed(0)}%
                                 </div>
 
-                                <div className={cn("font-black text-slate-700 tracking-tighter", compact ? "text-3xl" : "text-5xl")}>
-                                    {segundo.totalPercentual.toFixed(1)}%
-                                </div>
-
-                                <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden relative">
+                                <div className={cn("w-full bg-slate-100 rounded-full overflow-hidden relative", compact ? "h-1" : "h-2")}>
                                     <div className="absolute inset-0 bg-gradient-to-r from-slate-300 to-slate-500 w-[50%] transition-all duration-1000" style={{ width: `${Math.min(segundo.totalPercentual, 100)}%` }}></div>
                                 </div>
-
-                                {!compact && (
-                                    <div className="bg-slate-50 border border-slate-100 py-3 rounded-xl w-full flex items-center justify-center gap-2 text-slate-600 font-semibold text-sm">
-                                        <TrendingUp className="w-4 h-4" /> Em Progresso
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}
@@ -138,44 +132,27 @@ export function RankingModerno({ top3, compact = false }: RankingModernoProps) {
                 {/* 1º Lugar (Centro - Maior) */}
                 <div className={cn("order-2 flex-1 w-full md:w-auto max-w-sm z-20", compact ? "-mt-4" : "-mt-8 md:-mt-16")}>
                     {primeiro && (
-                        <div className={cn("bg-white rounded-t-3xl rounded-b-xl shadow-2xl border-t-4 border-yellow-400 flex flex-col items-center relative justify-between transition-all",
-                            compact ? "h-[320px] p-4 scale-100" : "h-[440px] p-8"
+                        <div className={cn("bg-white rounded-t-lg rounded-b-md shadow-md border-t-2 border-yellow-400 flex flex-col items-center relative justify-between transition-all",
+                            compact ? "h-[70px] p-1 scale-100" : "h-[210px] p-3"
                         )}>
-                            {/* Badge Top */}
-                            <div className={cn("absolute flex flex-col items-center animate-bounce-slow", compact ? "-top-14" : "-top-20")}>
-                                <div className="bg-yellow-400 text-yellow-950 p-2.5 rounded-full shadow-lg mb-2">
-                                    <Trophy className={compact ? "w-5 h-5" : "w-6 h-6 stroke-[2.5]"} />
-                                </div>
+                            <div className={cn("absolute z-10", compact ? "-top-3" : "-top-8")}>
+                                <Medalha rank={1} className={compact ? "w-6 h-6" : "w-16 h-16"} />
                             </div>
 
-                            <div className={cn("absolute z-10", compact ? "-top-10" : "-top-12")}>
-                                <Medalha rank={1} className={compact ? "w-24 h-24" : "w-32 h-32"} />
-                            </div>
+                            <div className={cn("text-center w-full space-y-1", compact ? "mt-3" : "mt-10")}>
+                                <div className="min-h-[2.5rem] flex items-end justify-center">
+                                    <h3 className={cn("font-bold text-yellow-600 uppercase tracking-widest leading-tight px-1", compact ? "text-[6px] truncate" : "text-sm line-clamp-2")}>{primeiro.colaborador.nome}</h3>
+                                </div>
+                                <p className={cn("text-yellow-600 font-medium hidden", compact ? "hidden" : "block text-[10px]")}>1º Lugar</p>
 
-                            <div className={cn("text-center w-full space-y-3", compact ? "mt-12" : "mt-20")}>
-                                <div>
-                                    <h3 className={cn("font-bold text-yellow-600 uppercase tracking-widest", compact ? "text-lg" : "text-2xl")}>{primeiro.colaborador.nome}</h3>
-                                    <div className="flex items-center justify-center gap-1 mt-1">
-                                        <Star className={compact ? "w-3 h-3 fill-yellow-400 text-yellow-400" : "w-4 h-4 fill-yellow-400 text-yellow-400"} />
-                                        <Star className={compact ? "w-3 h-3 fill-yellow-400 text-yellow-400" : "w-4 h-4 fill-yellow-400 text-yellow-400"} />
-                                        <Star className={compact ? "w-3 h-3 fill-yellow-400 text-yellow-400" : "w-4 h-4 fill-yellow-400 text-yellow-400"} />
-                                    </div>
+                                <div className={cn("font-black text-slate-900 tracking-tighter drop-shadow-sm", compact ? "text-sm" : "text-4xl")}>
+                                    {primeiro.totalPercentual.toFixed(0)}%
                                 </div>
 
-                                <div className={cn("font-black text-slate-900 tracking-tighter drop-shadow-sm", compact ? "text-5xl" : "text-7xl")}>
-                                    {primeiro.totalPercentual.toFixed(1)}%
-                                </div>
-
-                                <div className="w-full bg-yellow-50 h-4 rounded-full overflow-hidden relative border border-yellow-100">
+                                <div className={cn("w-full bg-yellow-50 rounded-full overflow-hidden relative border border-yellow-100", compact ? "h-1.5" : "h-3")}>
                                     <div className="absolute inset-0 bg-gradient-to-r from-yellow-300 via-yellow-500 to-yellow-400 transition-all duration-1000" style={{ width: `${Math.min(primeiro.totalPercentual, 100)}%` }}></div>
                                     {/* Shimmer effect overlay */}
                                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-full -translate-x-full animate-shimmer"></div>
-                                </div>
-
-                                <div className={cn("bg-yellow-50 border border-yellow-200 text-yellow-800 font-bold rounded-xl w-full flex items-center justify-center gap-2 shadow-sm",
-                                    compact ? "py-2 px-4 text-xs" : "py-4 px-6 text-base"
-                                )}>
-                                    <Star className={compact ? "w-3 h-3 fill-yellow-600" : "w-5 h-5 fill-yellow-600"} /> TOP PERFORMANCE
                                 </div>
                             </div>
                         </div>
@@ -185,32 +162,26 @@ export function RankingModerno({ top3, compact = false }: RankingModernoProps) {
                 {/* 3º Lugar (Direita) */}
                 <div className="order-3 flex-1 w-full md:w-auto max-w-sm flex flex-col justify-end">
                     {terceiro && (
-                        <div className={cn("bg-white rounded-t-3xl rounded-b-xl shadow-xl border border-slate-100 flex flex-col items-center relative justify-between transition-all",
-                            compact ? "h-[260px] p-4 scale-95 origin-bottom" : "h-[360px] p-6"
+                        <div className={cn("bg-white rounded-t-lg rounded-b-md shadow-sm border border-slate-100 flex flex-col items-center relative justify-between transition-all",
+                            compact ? "h-[55px] p-1 scale-95 origin-bottom" : "h-[170px] p-3"
                         )}>
-                            <div className={cn("absolute z-10", compact ? "-top-8" : "-top-12")}>
-                                <Medalha rank={3} className={compact ? "w-16 h-16" : "w-24 h-24"} />
+                            <div className={cn("absolute z-10", compact ? "-top-2" : "-top-8")}>
+                                <Medalha rank={3} className={compact ? "w-4 h-4" : "w-14 h-14"} />
                             </div>
 
-                            <div className={cn("text-center w-full space-y-2", compact ? "mt-8" : "mt-14")}>
-                                <div>
-                                    <h3 className={cn("font-bold text-orange-900 uppercase tracking-wide", compact ? "text-sm" : "text-xl")}>{terceiro.colaborador.nome}</h3>
-                                    <p className="text-sm text-slate-400 font-medium">3º Lugar</p>
+                            <div className={cn("text-center w-full space-y-1", compact ? "mt-2" : "mt-6")}>
+                                <div className="min-h-[2.5rem] flex items-end justify-center">
+                                    <h3 className={cn("font-bold text-orange-900 uppercase tracking-wide leading-tight px-1", compact ? "text-[6px] truncate" : "text-xs line-clamp-2")}>{terceiro.colaborador.nome}</h3>
+                                </div>
+                                <p className={cn("text-slate-400 font-medium hidden", compact ? "hidden" : "block text-[10px]")}>3º Lugar</p>
+
+                                <div className={cn("font-black text-slate-700 tracking-tighter", compact ? "text-xs" : "text-2xl")}>
+                                    {terceiro.totalPercentual.toFixed(0)}%
                                 </div>
 
-                                <div className={cn("font-black text-slate-700 tracking-tighter", compact ? "text-3xl" : "text-5xl")}>
-                                    {terceiro.totalPercentual.toFixed(1)}%
-                                </div>
-
-                                <div className="w-full bg-orange-50 h-3 rounded-full overflow-hidden relative">
+                                <div className={cn("w-full bg-orange-50 rounded-full overflow-hidden relative", compact ? "h-1" : "h-2")}>
                                     <div className="absolute inset-0 bg-gradient-to-r from-orange-300 to-orange-500 w-[50%] transition-all duration-1000" style={{ width: `${Math.min(terceiro.totalPercentual, 100)}%` }}></div>
                                 </div>
-
-                                {!compact && (
-                                    <div className="bg-slate-50 border border-slate-100 py-3 rounded-xl w-full flex items-center justify-center gap-2 text-slate-600 font-semibold text-sm">
-                                        <TrendingUp className="w-4 h-4" /> Em Progresso
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}
@@ -219,4 +190,3 @@ export function RankingModerno({ top3, compact = false }: RankingModernoProps) {
         </div>
     );
 }
-

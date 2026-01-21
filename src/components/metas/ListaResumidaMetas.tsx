@@ -219,36 +219,62 @@ const ListaResumidaMetas = () => {
                             Nenhuma meta registrada neste período.
                         </div>
                     ) : (
-                        <div className="rounded-md border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[200px]">Colaborador</TableHead>
-                                        <TableHead>Atividades Realizadas</TableHead>
-                                        <TableHead className="text-center w-[150px]">Status</TableHead>
-                                        <TableHead className="text-right w-[150px]">Pontuação</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {ranking.map((item) => (
-                                        <TableRow key={item.colaboradorId} className="h-10">
-                                            <TableCell className="font-medium py-2">{item.colaboradorNome}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground py-2">
-                                                {item.atividades.join(", ")}
-                                            </TableCell>
-                                            <TableCell className="text-center py-2">
-                                                <Badge variant={item.totalPercentual >= 100 ? "default" : "secondary"} className="h-6">
-                                                    {getStatusEmoji(item.totalPercentual)} {getStatusText(item.totalPercentual)}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right font-bold text-lg py-2">
-                                                {item.totalPercentual.toFixed(1)}%
-                                            </TableCell>
+                        <>
+                            {/* Desktop View (Table) */}
+                            <div className="hidden md:block rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-[200px]">Colaborador</TableHead>
+                                            <TableHead>Atividades Realizadas</TableHead>
+                                            <TableHead className="text-center w-[150px]">Status</TableHead>
+                                            <TableHead className="text-right w-[150px]">Pontuação</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {ranking.map((item) => (
+                                            <TableRow key={item.colaboradorId} className="h-10">
+                                                <TableCell className="font-medium py-2">{item.colaboradorNome}</TableCell>
+                                                <TableCell className="text-sm text-muted-foreground py-2">
+                                                    {item.atividades.join(", ")}
+                                                </TableCell>
+                                                <TableCell className="text-center py-2">
+                                                    <Badge variant={item.totalPercentual >= 100 ? "default" : "secondary"} className="h-6">
+                                                        {getStatusEmoji(item.totalPercentual)} {getStatusText(item.totalPercentual)}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right font-bold text-lg py-2">
+                                                    {item.totalPercentual.toFixed(1)}%
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            {/* Mobile View (Cards) */}
+                            <div className="md:hidden space-y-3">
+                                {ranking.map((item) => (
+                                    <div key={item.colaboradorId} className="bg-card rounded-lg border p-4 shadow-sm">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h3 className="font-semibold text-base">{item.colaboradorNome}</h3>
+                                            <div className="text-right">
+                                                <span className="block font-bold text-xl text-primary">{item.totalPercentual.toFixed(1)}%</span>
+                                            </div>
+                                        </div>
+
+                                        <Badge variant={item.totalPercentual >= 100 ? "default" : "secondary"} className="mb-3 w-fit">
+                                            {getStatusEmoji(item.totalPercentual)} {getStatusText(item.totalPercentual)}
+                                        </Badge>
+
+                                        <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+                                            <span className="font-semibold text-foreground block mb-1">Atividades:</span>
+                                            {item.atividades.length > 0 ? item.atividades.join(", ") : "Nenhuma atividade"}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
                     )}
                 </CardContent>
             </Card>

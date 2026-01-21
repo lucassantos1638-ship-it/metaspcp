@@ -99,17 +99,15 @@ export default function Login() {
   return (
     <div className="min-h-screen flex w-full">
       {/* Left Side - Hero / Image */}
-      <div className="hidden lg:flex lg:w-3/5 bg-slate-900 relative items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center opacity-20"></div>
-        <div className="relative z-10 p-12 text-white max-w-2xl">
-          <div className="flex items-center gap-4 mb-8">
-            <img src={logoMetaPCP} alt="Meta PCP" className="h-16 w-auto bg-white/10 p-2 rounded-lg backdrop-blur-sm" />
-            <h1 className="text-4xl font-bold tracking-tight">Meta PCP</h1>
-          </div>
-          <h2 className="text-3xl font-bold mb-4 leading-tight">Gestão Inteligente para sua Indústria Têxtil</h2>
-          <p className="text-lg text-slate-300 leading-relaxed">
-            Controle total da produção, do corte ao acabamento. Acompanhe pedidos em tempo real, gerencie facções e aumente sua produtividade com o Meta PCP.
-          </p>
+      {/* Left Side - Hero / Image */}
+      <div className="hidden lg:flex lg:w-3/5 bg-[#0a192f] relative items-center justify-center overflow-hidden">
+        {/* Imagem de fundo de produção têxtil com sobreposição azul escura */}
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1616423640778-28d1b53229bd?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center"></div>
+        <div className="absolute inset-0 bg-[#0a192f] opacity-90"></div>
+
+        {/* Conteúdo Centralizado */}
+        <div className="relative z-10 p-12 text-white max-w-2xl text-center">
+          <h2 className="text-4xl font-bold mb-4 leading-tight tracking-wide">Gestão Inteligente para sua Indústria</h2>
         </div>
       </div>
 
@@ -118,9 +116,8 @@ export default function Login() {
         <div className="w-full max-w-md space-y-8 my-auto">
           {/* Logo visible on form side for all screens */}
           <div className="flex flex-col items-center text-center mb-8">
-            <div className="flex items-center gap-3">
-              <img src={logoMetaPCP} alt="Meta PCP" className="h-12 w-auto" />
-              <h1 className="text-3xl font-bold text-primary">Meta PCP</h1>
+            <div className="flex items-center justify-center">
+              <img src={logoMetaPCP} alt="Meta PCP" className="h-32 w-auto" />
             </div>
           </div>
 

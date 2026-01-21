@@ -51,26 +51,26 @@ export default function Produtos() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Produtos</h1>
           <p className="text-muted-foreground">
             Gerencie itens e configurações de produção
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setDialogImportarOpen(true)}>
+        <div className="flex w-full sm:w-auto gap-2">
+          <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setDialogImportarOpen(true)}>
             <FileSpreadsheet className="mr-2 h-4 w-4" />
-            Importar Excel
+            Importar
           </Button>
-          <Button onClick={() => setDialogCadastroOpen(true)}>
+          <Button className="flex-1 sm:flex-none" onClick={() => setDialogCadastroOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            Novo Produto
+            Novo
           </Button>
         </div>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -81,7 +81,7 @@ export default function Produtos() {
           />
         </div>
         <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -100,57 +100,102 @@ export default function Produtos() {
             ))}
           </div>
         ) : produtosFiltrados && produtosFiltrados.length > 0 ? (
-          <div className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">SKU</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {produtosFiltrados.map((produto) => (
-                  <TableRow
-                    key={produto.id}
-                    className="h-8 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => setProdutoSelecionado(produto.id)}
-                  >
-                    <TableCell className="py-1 font-mono text-xs text-muted-foreground">{produto.sku}</TableCell>
-                    <TableCell className="py-1 font-medium text-sm">
-                      {produto.nome}
-                    </TableCell>
-                    <TableCell className="py-1">
-                      <Badge
-                        variant={produto.ativo ? "default" : "secondary"}
-                        className={`h-5 text-[10px] px-1.5 ${produto.ativo
-                          ? "bg-green-100 text-green-700 hover:bg-green-100/80 border-green-200"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-100/80 border-gray-200"
-                          }`}
-                      >
-                        {produto.ativo ? "Ativo" : "Inativo"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-1 text-right gap-1 flex justify-end items-center h-full">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-primary hover:text-primary/80"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setProdutoSelecionado(produto.id);
-                        }}
-                        title="Editar Produto"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+          <>
+            {/* Desktop View (Table) */}
+            <div className="hidden md:block border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px]">SKU</TableHead>
+                    <TableHead>Produto</TableHead>
+                    <TableHead className="w-[100px]">Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {produtosFiltrados.map((produto) => (
+                    <TableRow
+                      key={produto.id}
+                      className="h-8 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => setProdutoSelecionado(produto.id)}
+                    >
+                      <TableCell className="py-1 font-mono text-xs text-muted-foreground">{produto.sku}</TableCell>
+                      <TableCell className="py-1 font-medium text-sm">
+                        {produto.nome}
+                      </TableCell>
+                      <TableCell className="py-1">
+                        <Badge
+                          variant={produto.ativo ? "default" : "secondary"}
+                          className={`h-5 text-[10px] px-1.5 ${produto.ativo
+                            ? "bg-green-100 text-green-700 hover:bg-green-100/80 border-green-200"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-100/80 border-gray-200"
+                            }`}
+                        >
+                          {produto.ativo ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-1 text-right gap-1 flex justify-end items-center h-full">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-primary hover:text-primary/80"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setProdutoSelecionado(produto.id);
+                          }}
+                          title="Editar Produto"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile View (Cards) */}
+            <div className="md:hidden space-y-3">
+              {produtosFiltrados.map((produto) => (
+                <div
+                  key={produto.id}
+                  className="bg-card rounded-lg border p-4 cursor-pointer hover:border-primary/50 transition-colors active:bg-muted/5"
+                  onClick={() => setProdutoSelecionado(produto.id)}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="font-semibold text-base">{produto.nome}</div>
+                      <div className="font-mono text-xs text-muted-foreground mt-0.5">SKU: {produto.sku}</div>
+                    </div>
+                    <Badge
+                      variant={produto.ativo ? "default" : "secondary"}
+                      className={`h-5 text-[10px] px-1.5 whitespace-nowrap ${produto.ativo
+                        ? "bg-green-100 text-green-700 border-green-200"
+                        : "bg-gray-100 text-gray-700 border-gray-200"
+                        }`}
+                    >
+                      {produto.ativo ? "Ativo" : "Inativo"}
+                    </Badge>
+                  </div>
+
+                  <div className="flex justify-end pt-2 border-t mt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-primary hover:text-primary/80 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProdutoSelecionado(produto.id);
+                      }}
+                    >
+                      <Pencil className="h-3 w-3 mr-1.5" />
+                      Editar Detalhes
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 border rounded-md bg-muted/10">
             <Package className="h-12 w-12 text-muted-foreground mb-4" />

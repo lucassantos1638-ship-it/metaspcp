@@ -174,7 +174,8 @@ const ListaProgressoMetas = () => {
                                         <h3 className="font-semibold text-base">{item.colaborador.nome}</h3>
                                     </div>
 
-                                    <div className="overflow-x-auto">
+                                    {/* Desktop Table View */}
+                                    <div className="hidden md:block overflow-x-auto">
                                         <Table>
                                             <TableHeader>
                                                 <TableRow className="h-8">
@@ -215,6 +216,35 @@ const ListaProgressoMetas = () => {
                                                 ))}
                                             </TableBody>
                                         </Table>
+                                    </div>
+
+                                    {/* Mobile List View */}
+                                    <div className="md:hidden space-y-3 pt-2">
+                                        {item.atividades.map((ativ: AtividadeMeta, idx: number) => (
+                                            <div key={idx} className="bg-muted/30 rounded p-2.5">
+                                                <div className="flex justify-between items-start mb-1.5">
+                                                    <span className="font-medium text-sm text-foreground/90">{ativ.nome}</span>
+                                                    {ativ.falta <= 0 && <span className="text-green-600 font-bold text-xs bg-green-100 px-2 py-0.5 rounded-full">Batida!</span>}
+                                                </div>
+
+                                                <div className="flex justify-between text-xs text-muted-foreground mb-2">
+                                                    <span>Meta: <strong className="text-foreground">{ativ.meta}</strong></span>
+                                                    <span>Feito: <strong className="text-foreground">{ativ.produzido}</strong></span>
+                                                    <span>Falta: <strong className={ativ.falta > 0 ? "text-red-500" : "text-green-500"}>{ativ.falta > 0 ? ativ.falta : "✓"}</strong></span>
+                                                </div>
+
+                                                <div className="space-y-1">
+                                                    <Progress
+                                                        value={Math.min(ativ.percentual, 100)}
+                                                        className={ativ.percentual >= 100 ? "bg-green-100 h-2" : "h-2"}
+                                                        indicatorClassName={ativ.percentual >= 100 ? "bg-green-500" : ""}
+                                                    />
+                                                    <div className="text-right text-[10px] font-bold text-primary">
+                                                        {ativ.percentual.toFixed(1)}%
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                     <div className="mt-2 flex items-center justify-end gap-3 border-t pt-2">
                                         <span className="font-bold text-sm">Pontuação Total:</span>

@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.81.0'
 
 export interface SessionValidationResult {
   valid: boolean
@@ -22,46 +22,30 @@ export async function validateSession(
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
-  // Buscar sessão e validar expiração
-  const { data: sessao, error: sessaoError } = await supabase
-    .from('sessoes')
-    .select('user_id, expires_at')
-    .eq('token', sessionToken)
-    .single()
+  // 1. Validar token JWT via Supabase Auth
+  const { data: { user }, error: authError } = await supabase.auth.getUser(sessionToken)
 
-  if (sessaoError || !sessao) {
-    return { valid: false, error: 'Sessão inválida' }
+  if (authError || !user) {
+    console.error('Erro na validação do token:', authError)
+    return { valid: false, error: 'Sessão inválida ou expirada' }
   }
 
-  if (new Date(sessao.expires_at) < new Date()) {
-    return { valid: false, error: 'Sessão expirada' }
-  }
-
-  // Buscar dados do usuário
+  // 2. Buscar dados do usuário na tabela usuarios (incluindo a role)
   const { data: usuario, error: usuarioError } = await supabase
     .from('usuarios')
-    .select('id, empresa_id')
-    .eq('id', sessao.user_id)
+    .select('id, empresa_id, role')
+    .eq('id', user.id)
     .single()
 
   if (usuarioError || !usuario) {
-    return { valid: false, error: 'Usuário não encontrado' }
+    console.error('Erro ao buscar dados do usuário:', usuarioError)
+    return { valid: false, error: 'Usuário não encontrado no sistema' }
   }
 
-  // Buscar role do usuário
-  const { data: userRole, error: roleError } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', usuario.id)
-    .single()
+  // 3. Verificar permissão usando a coluna role da tabela usuarios
+  const role = usuario.role
 
-  if (roleError || !userRole) {
-    return { valid: false, error: 'Role não encontrada' }
-  }
-
-  const role = userRole.role
-
-  // Verificar se tem permissão de gestor ou super_admin
+  // 4. Verificar se tem permissão de gestor ou super_admin
   if (!['gestor', 'super_admin'].includes(role)) {
     return { valid: false, error: 'Sem permissão administrativa' }
   }
