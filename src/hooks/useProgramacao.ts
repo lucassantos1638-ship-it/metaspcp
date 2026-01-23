@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../integrations/supabase/client";
 import { format } from "date-fns";
+import { useEmpresaId } from "@/hooks/useEmpresaId";
 
 export interface MaterialNecessario {
     id: string;
@@ -17,10 +18,12 @@ export interface MaterialNecessario {
 }
 
 export const useProgramacaoMateriais = (mesesSelecionados: string[]) => {
+    const empresaId = useEmpresaId();
     return useQuery({
-        queryKey: ["programacao-materiais", mesesSelecionados],
+        queryKey: ["programacao-materiais", mesesSelecionados, empresaId],
+        enabled: mesesSelecionados.length > 0 && !!empresaId,
         queryFn: async () => {
-            if (mesesSelecionados.length === 0) return [];
+            if (mesesSelecionados.length === 0 || !empresaId) return [];
 
             console.log("Calculando materiais para os meses:", mesesSelecionados);
 
@@ -35,7 +38,8 @@ export const useProgramacaoMateriais = (mesesSelecionados: string[]) => {
             produto_id,
             quantidade
           )
-        `);
+        `)
+                .eq("empresa_id", empresaId);
 
             if (projecoesError) throw projecoesError;
 
@@ -165,6 +169,5 @@ export const useProgramacaoMateriais = (mesesSelecionados: string[]) => {
             console.log("Materiais calculados:", resultado.length);
             return resultado;
         },
-        enabled: mesesSelecionados.length > 0,
     });
 };

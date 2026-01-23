@@ -1,10 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import { useEmpresaId } from "@/hooks/useEmpresaId";
 
 export function useProjecoes() {
+    const empresaId = useEmpresaId();
     return useQuery({
-        queryKey: ["projecoes"],
+        queryKey: ["projecoes", empresaId],
+        enabled: !!empresaId,
         queryFn: async () => {
             const { data, error } = await supabase
                 .from("projecoes")
@@ -15,6 +18,7 @@ export function useProjecoes() {
                 produto:produtos (*)
             )
         `)
+                .eq("empresa_id", empresaId)
                 .order("data_referencia", { ascending: false });
 
             if (error) throw error;
@@ -50,7 +54,7 @@ export function useCriarProjecao() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (novaProjecao: { cliente_nome: string; data_referencia: Date; usuario_id: string; usuario_nome: string; tabela_preco: string }) => {
+        mutationFn: async (novaProjecao: { cliente_nome: string; data_referencia: Date; usuario_id: string; usuario_nome: string; tabela_preco: string; empresa_id: string }) => {
             const { data, error } = await supabase
                 .from("projecoes")
                 .insert({
@@ -59,6 +63,7 @@ export function useCriarProjecao() {
                     usuario_id: novaProjecao.usuario_id,
                     usuario_nome: novaProjecao.usuario_nome,
                     tabela_preco: novaProjecao.tabela_preco,
+                    empresa_id: novaProjecao.empresa_id
                 })
                 .select()
                 .single();

@@ -24,10 +24,11 @@ export default function NovaVendaPerdidaDialog({
     const [dataReferencia, setDataReferencia] = useState(format(new Date(), "yyyy-MM-dd"));
     const [tabelaPreco, setTabelaPreco] = useState("cpf");
     const { user } = useAuth();
+    const empresaId = user?.empresa_id;
     const criarVenda = useCriarVendaPerdida();
 
     const handleSalvar = () => {
-        if (!cliente || !dataReferencia || !user) return;
+        if (!cliente || !dataReferencia || !user || !empresaId) return;
 
         const [ano, mes, dia] = dataReferencia.split("-").map(Number);
         const dataRef = new Date(ano, mes - 1, dia);
@@ -38,6 +39,7 @@ export default function NovaVendaPerdidaDialog({
                 data_referencia: dataRef,
                 usuario_id: user.id,
                 usuario_nome: user.nome || user.username || user.email || "Usuário",
+                empresa_id: empresaId,
                 tabela_preco: tabelaPreco,
             },
             {
@@ -104,7 +106,7 @@ export default function NovaVendaPerdidaDialog({
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
                         Cancelar
                     </Button>
-                    <Button onClick={handleSalvar} disabled={!cliente || !dataReferencia || criarVenda.isPending}>
+                    <Button onClick={handleSalvar} disabled={!cliente || !dataReferencia || !empresaId || criarVenda.isPending}>
                         {criarVenda.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Próximo
                     </Button>

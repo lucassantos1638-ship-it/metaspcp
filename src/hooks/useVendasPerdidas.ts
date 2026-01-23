@@ -1,10 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import { useEmpresaId } from "@/hooks/useEmpresaId";
 
 export function useVendasPerdidas() {
+    const empresaId = useEmpresaId();
     return useQuery({
-        queryKey: ["vendas_perdidas"],
+        queryKey: ["vendas_perdidas", empresaId],
+        enabled: !!empresaId,
         queryFn: async () => {
             const { data, error } = await supabase
                 .from("vendas_perdidas")
@@ -15,6 +18,7 @@ export function useVendasPerdidas() {
                 produto:produtos (*)
             )
         `)
+                .eq("empresa_id", empresaId)
                 .order("data_referencia", { ascending: false });
 
             if (error) throw error;
@@ -50,7 +54,7 @@ export function useCriarVendaPerdida() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (novaVenda: { cliente_nome: string; data_referencia: Date; usuario_id: string; usuario_nome: string; tabela_preco: string }) => {
+        mutationFn: async (novaVenda: { cliente_nome: string; data_referencia: Date; usuario_id: string; usuario_nome: string; tabela_preco: string; empresa_id: string }) => {
             const { data, error } = await supabase
                 .from("vendas_perdidas")
                 .insert({
@@ -59,6 +63,7 @@ export function useCriarVendaPerdida() {
                     usuario_id: novaVenda.usuario_id,
                     usuario_nome: novaVenda.usuario_nome,
                     tabela_preco: novaVenda.tabela_preco,
+                    empresa_id: novaVenda.empresa_id
                 })
                 .select()
                 .single();

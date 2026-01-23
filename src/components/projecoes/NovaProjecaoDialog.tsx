@@ -24,10 +24,11 @@ export default function NovaProjecaoDialog({
     const [dataProjecao, setDataProjecao] = useState(format(new Date(), "yyyy-MM-dd"));
     const [tabelaPreco, setTabelaPreco] = useState("cpf");
     const { user } = useAuth();
+    const empresaId = user?.empresa_id;
     const criarProjecao = useCriarProjecao();
 
     const handleSalvar = () => {
-        if (!cliente || !dataProjecao || !user) return;
+        if (!cliente || !dataProjecao || !user || !empresaId) return;
 
         // Use selected date directly strings - treat as local date, but save as ISO
         // Creating date object from yyyy-MM-dd string treats it as UTC if only string? 
@@ -42,6 +43,7 @@ export default function NovaProjecaoDialog({
                 data_referencia: dataRef,
                 usuario_id: user.id,
                 usuario_nome: user.nome || user.username || user.email || "Usuário",
+                empresa_id: empresaId,
                 tabela_preco: tabelaPreco,
             },
             {
@@ -112,7 +114,7 @@ export default function NovaProjecaoDialog({
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
                         Cancelar
                     </Button>
-                    <Button onClick={handleSalvar} disabled={!cliente || !dataProjecao || criarProjecao.isPending}>
+                    <Button onClick={handleSalvar} disabled={!cliente || !dataProjecao || !empresaId || criarProjecao.isPending}>
                         {criarProjecao.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Próximo
                     </Button>
