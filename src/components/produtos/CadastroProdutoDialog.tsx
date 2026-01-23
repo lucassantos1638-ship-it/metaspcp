@@ -30,6 +30,9 @@ export default function CadastroProdutoDialog({
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [sku, setSku] = useState("");
+  const [precoCpf, setPrecoCpf] = useState("");
+  const [precoCnpj, setPrecoCnpj] = useState("");
+  const [estoque, setEstoque] = useState("");
   const [loading, setLoading] = useState(false);
 
   const gerarSku = useGerarSku();
@@ -48,6 +51,9 @@ export default function CadastroProdutoDialog({
     setNome("");
     setDescricao("");
     setSku("");
+    setPrecoCpf("");
+    setPrecoCnpj("");
+    setEstoque("");
   };
 
   const handleCriar = async () => {
@@ -69,6 +75,9 @@ export default function CadastroProdutoDialog({
           nome: nome.trim(),
           sku,
           descricao: descricao.trim() || null,
+          preco_cpf: Number(precoCpf) || 0,
+          preco_cnpj: Number(precoCnpj) || 0,
+          estoque: Number(estoque) || 0,
           empresa_id: empresaId,
           ativo: true,
         })
@@ -129,6 +138,46 @@ export default function CadastroProdutoDialog({
                 onChange={(e) => setDescricao(e.target.value)}
                 placeholder="Detalhes sobre o produto..."
                 rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="precoCpf">Preço Tabela CPF</Label>
+                <Input
+                  id="precoCpf"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={precoCpf}
+                  onChange={(e) => setPrecoCpf(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="precoCnpj">Preço Tabela CNPJ</Label>
+                <Input
+                  id="precoCnpj"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={precoCnpj}
+                  onChange={(e) => setPrecoCnpj(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="estoque">Estoque Inicial</Label>
+              <Input
+                id="estoque"
+                type="number"
+                step="0.01"
+                min="0"
+                value={estoque}
+                onChange={(e) => setEstoque(e.target.value)}
+                placeholder="0.00"
               />
             </div>
 

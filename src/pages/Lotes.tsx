@@ -166,7 +166,7 @@ const Lotes = () => {
       const payload: any = {
         numero_lote: novoLote.numero_lote,
         nome_lote: novoLote.nome_lote,
-        quantidade_total: parseInt(novoLote.quantidade_total),
+        quantidade_total: 0, // Inicia zerado, definido na finalização da etapa 1
         empresa_id: empresaId,
       };
 
@@ -351,51 +351,11 @@ const Lotes = () => {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="quantidade_total">Quantidade Total *</Label>
-                <Input
-                  id="quantidade_total"
-                  type="number"
-                  value={novoLote.quantidade_total}
-                  onChange={(e) =>
-                    setNovoLote({ ...novoLote, quantidade_total: e.target.value })
-                  }
-                  placeholder="Ex: 500"
-                />
-              </div>
-
-              {
-                estimativa && novoLote.produto_id && novoLote.produto_id !== "sem-produto" && (
-                  <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>Estimativa de Produção</AlertTitle>
-                    <AlertDescription>
-                      <div className="mt-2 space-y-1 text-sm">
-                        <p className="flex items-center gap-2">
-                          <Package className="h-3 w-3" />
-                          <span className="font-medium">Etapas necessárias:</span>
-                          {estimativa.etapas.length}
-                        </p>
-                        <p>
-                          <span className="font-medium">Tempo estimado:</span>{" "}
-                          {formatarTempoProdutivo(estimativa.tempoEstimado)}
-                        </p>
-                        <p>
-                          <span className="font-medium">Custo estimado:</span>{" "}
-                          {formatarCusto(estimativa.custoEstimado)}
-                        </p>
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-                )
-              }
-
               <Button
                 onClick={() => createLote.mutate()}
                 disabled={
                   !novoLote.numero_lote ||
-                  !novoLote.nome_lote ||
-                  !novoLote.quantidade_total
+                  !novoLote.nome_lote
                 }
                 className="w-full"
               >

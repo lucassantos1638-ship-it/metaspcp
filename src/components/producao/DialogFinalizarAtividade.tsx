@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useFinalizarProducao } from "@/hooks/useProducaoStartStop";
 
 interface DialogFinalizarAtividadeProps {
@@ -57,6 +60,54 @@ export default function DialogFinalizarAtividade({
     }
   }, [open, producao]);
 
+  // Buscar subetapas da etapa atual para verificar se é a última
+  const { data: subetapasDaEtapa } = useQuery({
+    queryKey: ["subetapas-verificacao", producao?.etapa_id],
+    enabled: !!producao?.etapa_id && producao?.etapa?.ordem === 1,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("produto_etapas")
+        .select("subetapa_id, ordem")
+        .eq("produto_id", producao.lote.produto_id)
+        .eq("etapa_id", producao.etapa_id)
+        .order("ordem");
+
+      if (error) throw error;
+      // Se não houver configuração específica no produto, buscar todas as subetapas genéricas
+      if (!data || data.length === 0) {
+        const { data: subGen, error: errSub } = await supabase
+          .from("subetapas")
+          .select("id, nome")
+          .eq("etapa_id", producao.etapa_id)
+          .order("nome"); // Ordem alfabética se não houver ordem definida? Ou criar campo ordem em subetapas?
+        if (errSub) throw errSub;
+        return subGen?.map(s => ({ subetapa_id: s.id, ordem: 0 })) || [];
+      }
+      return data;
+    }
+  });
+
+  const isUltimaSubetapaEtapa1 = () => {
+    if (!producao || !producao.etapa || producao.etapa.ordem !== 1) return false;
+
+    // Se a etapa 1 não tem subetapas, então finalizar a etapa é finalizar tudo da etapa 1
+    if (!subetapasDaEtapa || subetapasDaEtapa.length === 0) return true;
+
+    // Se tem subetapas, verificar se a atual é a última
+    const lastSub = subetapasDaEtapa[subetapasDaEtapa.length - 1];
+
+    // Se a produção atual tem subetapa, comparar IDs
+    if (producao.subetapa_id) {
+      return producao.subetapa_id === lastSub.subetapa_id;
+    }
+
+    return false;
+  };
+
+  const precisaDefinirQuantidadeLote = isUltimaSubetapaEtapa1();
+  const isEtapa1 = producao?.etapa?.ordem === 1;
+  const showQuantityInput = !isEtapa1 || precisaDefinirQuantidadeLote;
+
   const validarDataHora = () => {
     if (!producao) return false;
 
@@ -68,27 +119,98 @@ export default function DialogFinalizarAtividade({
       return false;
     }
 
-    if (!quantidadeProduzida || parseInt(quantidadeProduzida) <= 0) {
-      setErro("A quantidade produzida deve ser maior que zero");
-      return false;
+    // A validação de quantidade só é necessária se o campo estiver visível
+    if (showQuantityInput) {
+      if (!quantidadeProduzida || parseInt(quantidadeProduzida) <= 0) {
+        setErro("A quantidade produzida deve ser maior que zero");
+        return false;
+      }
     }
 
     setErro("");
     return true;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validarDataHora()) return;
 
+    // Se o campo não está visível (etapas intermediárias da etapa 1), assumimos 0
+    const qtd = showQuantityInput && quantidadeProduzida ? parseInt(quantidadeProduzida) : 0;
+
+    // Se precisa definir quantidade do lote (Fim da Etapa 1), atualizamos o lote também
+    if (precisaDefinirQuantidadeLote) {
+      // 1. Atualizar quantidade total do Lote
+      const { error: errorLote } = await supabase
+        .from("lotes")
+        .update({ quantidade_total: qtd })
+        .eq("id", producao.lote_id);
+
+      if (errorLote) {
+        console.error("Erro ao atualizar quantidade do lote", errorLote);
+        setErro("Erro ao atualizar quantidade do lote. Tente novamente.");
+        return;
+      }
+
+      // 2. Replicar a quantidade para todas as subetapas/atividades JÁ FINALIZADAS da Etapa 1
+      // Busca segura: Baixar as produções e atualizar.
+      const { data: producoesDoLote, error: errorBusca } = await supabase
+        .from("producoes")
+        .select(`
+          id, 
+          quantidade_produzida, 
+          status, 
+          etapa_id,
+          etapa:etapas(ordem)
+        `)
+        .eq("lote_id", producao.lote_id);
+
+      if (errorBusca) {
+        console.error("Erro ao buscar produções para backfill", errorBusca);
+      } else if (producoesDoLote) {
+        // Filtrar apenas as que:
+        // 1. Estão zeradas
+        // 2. Não são a atual
+        const producoesParaAtualizar = producoesDoLote.filter((p: any) =>
+          (p.quantidade_produzida === 0 || p.quantidade_produzida === null) &&
+          p.id !== producao.id
+        );
+
+        if (producoesParaAtualizar.length > 0) {
+          const idsParaAtualizar = producoesParaAtualizar.map((p: any) => p.id);
+          toast.info(`Atualizando quantidade em ${producoesParaAtualizar.length} etapas anteriores...`);
+
+          const { error: errorBackfill } = await supabase
+            .from("producoes")
+            .update({ quantidade_produzida: qtd })
+            .in("id", idsParaAtualizar);
+
+          if (errorBackfill) {
+            console.error("Erro ao atualizar produções antigas", errorBackfill);
+            toast.error("Erro ao sincronizar etapas anteriores.");
+          } else {
+            toast.success("Etapas anteriores sincronizadas!");
+          }
+        }
+      }
+
+      // 3. Finalizar a atividade atual
+      submitFinalizacao(qtd);
+
+    } else {
+      submitFinalizacao(qtd);
+    }
+  };
+
+  const submitFinalizacao = (qtd: number) => {
     finalizarProducao.mutate(
       {
         id: producao.id,
         data_fim: dataFim,
         hora_fim: horaFim,
         segundos_fim: parseInt(segundosFim),
-        quantidade_produzida: parseInt(quantidadeProduzida),
+        quantidade_produzida: qtd,
         observacao: observacao || undefined,
       },
       {
@@ -97,7 +219,7 @@ export default function DialogFinalizarAtividade({
         },
       }
     );
-  };
+  }
 
   const formatarData = (data: string) => {
     return new Date(data + "T00:00:00").toLocaleDateString("pt-BR");
@@ -140,6 +262,15 @@ export default function DialogFinalizarAtividade({
               </div>
             </div>
           </div>
+
+          {precisaDefinirQuantidadeLote && (
+            <Alert className="bg-blue-50 text-blue-800 border-blue-200">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Esta é a finalização da Etapa 1. A quantidade informada abaixo será definida como a <strong>Quantidade Total do Lote</strong>.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {erro && (
             <Alert variant="destructive">
@@ -184,17 +315,24 @@ export default function DialogFinalizarAtividade({
               </div>
             </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="quantidade">Quantidade Produzida *</Label>
-              <Input
-                type="number"
-                id="quantidade"
-                value={quantidadeProduzida}
-                onChange={(e) => setQuantidadeProduzida(e.target.value)}
-                min="1"
-                required
-              />
-            </div>
+            {showQuantityInput && (
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="quantidade">
+                  {precisaDefinirQuantidadeLote ? "Quantidade Real do Lote *" : "Quantidade Produzida *"}
+                </Label>
+                <Input
+                  type="number"
+                  id="quantidade"
+                  value={quantidadeProduzida}
+                  onChange={(e) => setQuantidadeProduzida(e.target.value)}
+                  min="1"
+                  required
+                />
+                {precisaDefinirQuantidadeLote && (
+                  <p className="text-xs text-muted-foreground">Isso definirá a quantidade para as próximas etapas.</p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="observacao">Observação (opcional)</Label>

@@ -84,6 +84,17 @@ export function useProdutoComMetricas(produtoId: string) {
 
       if (metricasError) throw metricasError;
 
+      // Buscar materiais do produto
+      const { data: materiais, error: materiaisError } = await supabase
+        .from("produto_materiais")
+        .select(`
+          *,
+          material:materiais(*)
+        `)
+        .eq("produto_id", produtoId);
+
+      if (materiaisError) throw materiaisError;
+
       // Buscar últimos lotes finalizados
       const { data: ultimosLotes, error: lotesError } = await supabase
         .from("lotes")
@@ -144,20 +155,27 @@ export function useProdutoComMetricas(produtoId: string) {
         0
       ) || 0;
 
-      const custoTotalMedio = metricas?.reduce(
+      const custoProducaoMedio = metricas?.reduce(
         (sum, m) => sum + (m.custo_medio_por_peca || 0),
         0
       ) || 0;
+
+      const custoMaterialTotal = materiais?.reduce((sum, item: any) => {
+        const preco = item.material?.preco_custo || 0;
+        return sum + (preco * item.quantidade);
+      }, 0) || 0;
 
       const numLotesAnalisados = metricas?.[0]?.num_lotes_analisados || 0;
 
       return {
         produto,
         etapas: etapas || [],
+        materiais: materiais || [],
         metricas: metricas || [],
         ultimosLotes: ultimosLotesCalculados,
         tempoTotalMedio,
-        custoTotalMedio,
+        custoProducaoMedio,
+        custoMaterialTotal,
         numLotesAnalisados,
       };
     },
@@ -250,6 +268,91 @@ export function useExcluirProduto() {
     onError: (error: Error) => {
       toast({
         title: "Erro ao excluir produto",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useAtualizarProduto() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; preco_cpf?: number; preco_cnpj?: number; nome?: string; descricao?: string; estoque?: number }) => {
+      const { data, error } = await supabase
+        .from("produtos")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["produtos"] });
+      queryClient.invalidateQueries({ queryKey: ["produto", data.id] });
+      toast({ title: "Produto atualizado com sucesso" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar produto",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useAdicionarMaterialProduto() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ produtoId, materialId, quantidade }: { produtoId: string; materialId: string; quantidade: number }) => {
+      const { error } = await supabase
+        .from("produto_materiais")
+        .insert({
+          produto_id: produtoId,
+          material_id: materialId,
+          quantidade,
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["produto", variables.produtoId, "metricas"] });
+      toast({ title: "Material adicionado com sucesso" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao adicionar material",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useRemoverMaterialProduto() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, produtoId }: { id: string; produtoId: string }) => {
+      const { error } = await supabase
+        .from("produto_materiais")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["produto", variables.produtoId, "metricas"] });
+      toast({ title: "Material removido com sucesso" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao remover material",
         description: error.message,
         variant: "destructive",
       });

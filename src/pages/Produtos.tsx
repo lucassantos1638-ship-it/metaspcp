@@ -108,6 +108,8 @@ export default function Produtos() {
                   <TableRow>
                     <TableHead className="w-[100px]">SKU</TableHead>
                     <TableHead>Produto</TableHead>
+                    <TableHead>Preço CPF</TableHead>
+                    <TableHead>Preço CNPJ</TableHead>
                     <TableHead className="w-[100px]">Status</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -122,6 +124,12 @@ export default function Produtos() {
                       <TableCell className="py-1 font-mono text-xs text-muted-foreground">{produto.sku}</TableCell>
                       <TableCell className="py-1 font-medium text-sm">
                         {produto.nome}
+                      </TableCell>
+                      <TableCell className="py-1 text-sm">
+                        {produto.preco_cpf ? `R$ ${Number(produto.preco_cpf).toFixed(2)}` : "-"}
+                      </TableCell>
+                      <TableCell className="py-1 text-sm">
+                        {produto.preco_cnpj ? `R$ ${Number(produto.preco_cnpj).toFixed(2)}` : "-"}
                       </TableCell>
                       <TableCell className="py-1">
                         <Badge

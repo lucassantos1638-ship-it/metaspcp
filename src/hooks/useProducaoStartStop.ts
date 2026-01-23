@@ -12,8 +12,8 @@ export const useProducoesEmAberto = () => {
         .select(`
           *,
           colaborador:colaboradores(nome),
-          lote:lotes(numero_lote, nome_lote),
-          etapa:etapas(nome),
+          lote:lotes(numero_lote, nome_lote, produto_id),
+          etapa:etapas(nome, ordem),
           subetapa:subetapas(nome)
         `)
         .eq("status", "em_aberto")

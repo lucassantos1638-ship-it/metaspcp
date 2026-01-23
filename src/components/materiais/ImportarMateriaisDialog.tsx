@@ -9,7 +9,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileSpreadsheet, Check, AlertTriangle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,35 +24,33 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useGerarSku } from "@/hooks/useProdutos";
 
-interface ImportarProdutosDialogProps {
+interface ImportarMateriaisDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
 
-interface ProdutoImportado {
+interface MaterialImportado {
+    codigo?: string;
     nome: string;
-    sku?: string;
-    descricao?: string;
-    preco_cpf?: number;
-    preco_cnpj?: number;
+    preco_custo?: number;
+    unidade_medida?: string;
     status: 'pendente' | 'sucesso' | 'erro';
     erro?: string;
 }
 
-export default function ImportarProdutosDialog({
+export default function ImportarMateriaisDialog({
     open,
     onOpenChange,
-}: ImportarProdutosDialogProps) {
+}: ImportarMateriaisDialogProps) {
     const empresaId = useEmpresaId();
     const queryClient = useQueryClient();
-    const [produtosParaImportar, setProdutosParaImportar] = useState<ProdutoImportado[]>([]);
+    const [materiaisParaImportar, setMateriaisParaImportar] = useState<MaterialImportado[]>([]);
     const [loading, setLoading] = useState(false);
     const [file, setFile] = useState<File | null>(null);
 
     const resetForm = () => {
-        setProdutosParaImportar([]);
+        setMateriaisParaImportar([]);
         setFile(null);
         setLoading(false);
     };
@@ -85,24 +82,28 @@ export default function ImportarProdutosDialog({
                 }
 
                 // Mapear dados
-                const produtosMapeados: ProdutoImportado[] = data.map((row: any) => ({
-                    nome: row['Nome'] || row['nome'] || row['NOME'] || '',
-                    sku: row['SKU'] || row['sku'] || undefined,
-                    descricao: row['Descrição'] || row['descricao'] || row['Descricao'] || undefined,
-                    preco_cpf: Number(row['Preço CPF'] || row['Preco CPF'] || row['preco_cpf'] || 0),
-                    preco_cnpj: Number(row['Preço CNPJ'] || row['Preco CNPJ'] || row['preco_cnpj'] || 0),
-                    status: 'pendente' as 'pendente' | 'sucesso' | 'erro'
-                })).filter(p => p.nome.trim() !== ''); // Ignorar linhas sem nome
+                const materiaisMapeados: MaterialImportado[] = data.map((row: any) => ({
+                    codigo: row['Código'] || row['Codigo'] || row['CODIGO'] || row['cod'] || row['COD'] || undefined,
+                    nome: row['Nome'] || row['nome'] || row['NOME'] || row['Descrição'] || row['Descricao'] || '',
+                    preco_custo: Number(row['Preço Custo'] || row['preco_custo'] || row['Custo'] || row['Preço'] || 0),
+                    unidade_medida: row['Unidade'] || row['unidade'] || row['UM'] || 'un',
+                    status: 'pendente'
+                })).filter(p => p.nome && p.nome.trim() !== '');
 
-                if (produtosMapeados.length === 0) {
+                const materiaisTipados: MaterialImportado[] = materiaisMapeados.map(m => ({
+                    ...m,
+                    status: 'pendente' as 'pendente' | 'sucesso' | 'erro'
+                }));
+
+                if (materiaisTipados.length === 0) {
                     toast({
-                        title: "Nenhum produto válido",
-                        description: "Certifique-se que a planilha tem uma coluna chamada 'Nome'.",
+                        title: "Nenhum material válido",
+                        description: "Certifique-se que a planilha tem colunas como 'Nome' ou 'Descrição'.",
                         variant: "destructive",
                     });
                 }
 
-                setProdutosParaImportar(produtosMapeados);
+                setMateriaisParaImportar(materiaisTipados);
             } catch (error) {
                 console.error("Erro ao ler arquivo:", error);
                 toast({
@@ -117,77 +118,57 @@ export default function ImportarProdutosDialog({
         reader.readAsBinaryString(selectedFile);
     };
 
-    const gerarSkuAuto = () => {
-        // Função auxiliar simples para caso não venha SKU
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let result = '';
-        for (let i = 0; i < 8; i++) {
-            result += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return result;
-    }
-
     const handleImportar = async () => {
-        if (produtosParaImportar.length === 0) return;
+        if (materiaisParaImportar.length === 0) return;
 
         setLoading(true);
         let sucessos = 0;
         let erros = 0;
-        const novosProdutos = [...produtosParaImportar];
+        const novosMateriais = [...materiaisParaImportar];
 
-        for (let i = 0; i < novosProdutos.length; i++) {
-            const prod = novosProdutos[i];
+        for (let i = 0; i < novosMateriais.length; i++) {
+            const mat = novosMateriais[i];
+
+            if (mat.status === 'sucesso') continue;
 
             try {
-                // Gerar SKU se não existir
-                const skuParaSalvar = prod.sku || gerarSkuAuto();
-
                 const { error } = await supabase
-                    .from("produtos")
+                    .from("materiais")
                     .insert({
-                        nome: prod.nome,
-                        sku: skuParaSalvar,
-                        descricao: prod.descricao,
-                        preco_cpf: prod.preco_cpf || 0,
-                        preco_cnpj: prod.preco_cnpj || 0,
+                        codigo: mat.codigo,
+                        nome: mat.nome,
+                        preco_custo: mat.preco_custo || 0,
+                        unidade_medida: mat.unidade_medida,
                         empresa_id: empresaId,
                         ativo: true,
                     });
 
                 if (error) throw error;
 
-                novosProdutos[i].status = 'sucesso';
+                novosMateriais[i].status = 'sucesso';
                 sucessos++;
             } catch (error: any) {
-                console.error(`Erro ao importar ${prod.nome}:`, error);
-                novosProdutos[i].status = 'erro';
-                novosProdutos[i].erro = error.message;
+                console.error(`Erro ao importar ${mat.nome}:`, error);
+                novosMateriais[i].status = 'erro';
+                novosMateriais[i].erro = error.message;
                 erros++;
             }
         }
 
-        setProdutosParaImportar(novosProdutos);
+        setMateriaisParaImportar(novosMateriais);
         setLoading(false);
 
         if (sucessos > 0) {
             toast({
                 title: "Importação concluída",
-                description: `${sucessos} produtos importados com sucesso. ${erros > 0 ? `${erros} erros.` : ''}`,
-                variant: erros > 0 ? "default" : "default", // Ajustar variante se necessário
+                description: `${sucessos} materiais importados com sucesso.`,
             });
-            queryClient.invalidateQueries({ queryKey: ["produtos"] });
+            queryClient.invalidateQueries({ queryKey: ["materiais"] });
 
-            // Se tudo deu certo, fechar
             if (erros === 0) {
                 onOpenChange(false);
                 resetForm();
             }
-        } else {
-            toast({
-                title: "Erro na importação",
-                description: "Nenhum produto foi importado. Verifique os erros na lista.",
-                variant: "destructive",
-            });
         }
     };
 
@@ -195,7 +176,7 @@ export default function ImportarProdutosDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-3xl max-h-[90vh]">
                 <DialogHeader>
-                    <DialogTitle>Importar Produtos via Excel</DialogTitle>
+                    <DialogTitle>Importar Materiais via Excel</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-6">
@@ -210,18 +191,18 @@ export default function ImportarProdutosDialog({
                                     Formatos suportados: .xlsx, .xls, .csv
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-2">
-                                    Colunas esperadas: <strong>Nome</strong>, SKU (opcional), Descrição (opcional), <strong>Preço CPF</strong> (opcional), <strong>Preço CNPJ</strong> (opcional)
+                                    Colunas: <strong>Código</strong>, <strong>Nome/Descrição</strong>, <strong>Preço Custo</strong>, <strong>Unidade</strong>
                                 </p>
                             </div>
                             <Input
                                 type="file"
                                 accept=".xlsx, .xls, .csv"
                                 className="hidden"
-                                id="file-upload"
+                                id="file-upload-mat"
                                 onChange={handleFileUpload}
                             />
                             <Button asChild>
-                                <Label htmlFor="file-upload" className="cursor-pointer">
+                                <Label htmlFor="file-upload-mat" className="cursor-pointer">
                                     <Upload className="mr-2 h-4 w-4" />
                                     Carregar Planilha
                                 </Label>
@@ -233,7 +214,7 @@ export default function ImportarProdutosDialog({
                                 <div className="flex items-center gap-2">
                                     <FileSpreadsheet className="h-5 w-5 text-green-600" />
                                     <span className="font-medium">{file.name}</span>
-                                    <Badge variant="outline">{produtosParaImportar.length} produtos encontrados</Badge>
+                                    <Badge variant="outline">{materiaisParaImportar.length} itens</Badge>
                                 </div>
                                 <Button variant="ghost" size="sm" onClick={resetForm} disabled={loading}>
                                     Trocar arquivo
@@ -245,39 +226,29 @@ export default function ImportarProdutosDialog({
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Status</TableHead>
+                                            <TableHead>Código</TableHead>
                                             <TableHead>Nome</TableHead>
-                                            <TableHead>SKU</TableHead>
-                                            <TableHead>Desc.</TableHead>
-                                            <TableHead>R$ CPF</TableHead>
-                                            <TableHead>R$ CNPJ</TableHead>
+                                            <TableHead>Unidade</TableHead>
+                                            <TableHead>Custo</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {produtosParaImportar.map((prod, idx) => (
+                                        {materiaisParaImportar.map((mat, idx) => (
                                             <TableRow key={idx}>
                                                 <TableCell>
-                                                    {prod.status === 'pendente' && <Badge variant="outline">Pendente</Badge>}
-                                                    {prod.status === 'sucesso' && <Badge className="bg-green-500 hover:bg-green-600">OK</Badge>}
-                                                    {prod.status === 'erro' && (
-                                                        <div className="flex items-center text-red-500 text-xs" title={prod.erro}>
+                                                    {mat.status === 'pendente' && <Badge variant="outline">Pendente</Badge>}
+                                                    {mat.status === 'sucesso' && <Badge className="bg-green-500 hover:bg-green-600">OK</Badge>}
+                                                    {mat.status === 'erro' && (
+                                                        <div className="flex items-center text-red-500 text-xs" title={mat.erro}>
                                                             <AlertTriangle className="h-4 w-4 mr-1" />
                                                             Erro
                                                         </div>
                                                     )}
                                                 </TableCell>
-                                                <TableCell>{prod.nome}</TableCell>
-                                                <TableCell className="font-mono text-xs text-muted-foreground">
-                                                    {prod.sku || <em>Auto-gerar</em>}
-                                                </TableCell>
-                                                <TableCell className="text-xs text-muted-foreground truncate max-w-[150px]">
-                                                    {prod.descricao || '-'}
-                                                </TableCell>
-                                                <TableCell className="text-xs">
-                                                    {prod.preco_cpf ? `R$ ${prod.preco_cpf.toFixed(2)}` : '-'}
-                                                </TableCell>
-                                                <TableCell className="text-xs">
-                                                    {prod.preco_cnpj ? `R$ ${prod.preco_cnpj.toFixed(2)}` : '-'}
-                                                </TableCell>
+                                                <TableCell className="font-mono text-xs">{mat.codigo || '-'}</TableCell>
+                                                <TableCell>{mat.nome}</TableCell>
+                                                <TableCell>{mat.unidade_medida}</TableCell>
+                                                <TableCell>R$ {mat.preco_custo?.toFixed(2)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -285,7 +256,7 @@ export default function ImportarProdutosDialog({
                             </ScrollArea>
 
                             <div className="flex justify-end pt-2">
-                                <Button onClick={handleImportar} disabled={loading || produtosParaImportar.length === 0}>
+                                <Button onClick={handleImportar} disabled={loading || materiaisParaImportar.length === 0}>
                                     {loading ? (
                                         <>
                                             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...
@@ -293,7 +264,7 @@ export default function ImportarProdutosDialog({
                                     ) : (
                                         <>
                                             <Check className="mr-2 h-4 w-4" />
-                                            Importar {produtosParaImportar.filter(p => p.status === 'pendente').length} Produtos
+                                            Importar
                                         </>
                                     )}
                                 </Button>

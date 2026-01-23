@@ -12,6 +12,7 @@ import Checkout from "./pages/Checkout";
 import SemAcesso from "./pages/SemAcesso";
 import Dashboard from "./pages/Dashboard";
 import Produtos from "./pages/Produtos";
+import Materiais from "./pages/Materiais";
 import Producao from "./pages/Producao";
 import Lotes from "./pages/Lotes";
 import Colaboradores from "./pages/Colaboradores";
@@ -25,7 +26,15 @@ import AcompanhamentoColaboradores from "./pages/AcompanhamentoColaboradores";
 import DesempenhoColaboradores from "./pages/DesempenhoColaboradores";
 import Pop from "./pages/Pop";
 import Etapa from "./pages/Etapa";
+import VendasPerdidas from "./pages/VendasPerdidas";
+import VendasPerdidasUsuario from "./pages/VendasPerdidasUsuario";
+import VendasPerdidasMensal from "./pages/VendasPerdidasMensal";
+import ProjecaoVendas from "./pages/ProjecaoVendas";
+import ProjecaoUsuario from "./pages/ProjecaoUsuario";
+import ProjecaoMensal from "./pages/ProjecaoMensal";
+import Programacao from "./pages/Programacao";
 import DetalhesLote from "./pages/DetalhesLote";
+
 import GestaoUsuarios from "./pages/gestor/GestaoUsuarios";
 import DashboardEmpresas from "./pages/super-admin/DashboardEmpresas";
 import PerfilSuperAdmin from "./pages/super-admin/PerfilSuperAdmin";
@@ -68,6 +77,51 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredPermission="produtos">
                     <Produtos />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/materiais"
+                element={
+                  <ProtectedRoute requiredPermission="produtos">
+                    <Materiais />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/vendas-perdidas"
+                element={
+                  <ProtectedRoute requiredPermission="pedidos">
+                    <VendasPerdidas />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/vendas-perdidas/:usuarioId"
+                element={
+                  <ProtectedRoute requiredPermission="pedidos">
+                    <VendasPerdidasUsuario />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/vendas-perdidas/:usuarioId/:mes"
+                element={
+                  <ProtectedRoute requiredPermission="pedidos">
+                    <VendasPerdidasMensal />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/programacao"
+                element={
+                  <ProtectedRoute requiredPermission="producao">
+                    <Programacao />
                   </ProtectedRoute>
                 }
               />
@@ -143,6 +197,33 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredPermission="previsao_producao">
                     <PrevisaoProducao />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/projecao-vendas"
+                element={
+                  <ProtectedRoute requiredPermission="pedidos">
+                    <ProjecaoVendas />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/projecao-vendas/:usuarioId"
+                element={
+                  <ProtectedRoute requiredPermission="pedidos">
+                    <ProjecaoUsuario />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/projecao-vendas/:usuarioId/:mes"
+                element={
+                  <ProtectedRoute requiredPermission="pedidos">
+                    <ProjecaoMensal />
                   </ProtectedRoute>
                 }
               />

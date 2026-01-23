@@ -1,5 +1,5 @@
 import { Link, useLocation, Outlet } from "react-router-dom";
-import { ClipboardCheck, Package, Target, BarChart3, Users, Settings, FileText, Menu, Box, TrendingUp, Activity, LogOut, Shield, KeyRound, UserCog, BookOpen, Layers, LayoutDashboard, Factory, ScrollText, ClipboardList, Calculator } from "lucide-react";
+import { ClipboardCheck, Package, Target, BarChart3, Users, Settings, FileText, Menu, Box, TrendingUp, TrendingDown, Activity, LogOut, Shield, KeyRound, UserCog, BookOpen, Layers, LayoutDashboard, Factory, ScrollText, ClipboardList, Calculator, Palette, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,10 @@ const Layout = () => {
     { path: "/acompanhamento-colaboradores", icon: ClipboardList, label: "Monitoramento", permission: "pedidos" },
     { path: "/produtos", icon: Box, label: "Produtos", permission: "produtos" },
     { path: "/metas", icon: Target, label: "Metas", permission: "metas" },
+    { path: "/materiais", icon: Palette, label: "Materiais", permission: "produtos" },
+    { path: "/projecao-vendas", icon: Activity, label: "Projeção de Vendas", permission: "pedidos" },
+    { path: "/vendas-perdidas", icon: TrendingDown, label: "Vendas Perdidas", permission: "pedidos" },
+    { path: "/programacao", icon: Calendar, label: "Programação", permission: "producao" },
     { path: "/etapas", icon: Layers, label: "Etapas", permission: "etapas" },
     { path: "/desempenho", icon: TrendingUp, label: "Desempenho", permission: "colaboradores" },
     { path: "/previsao-producao", icon: Calculator, label: "Previsão", permission: "previsao_producao" },

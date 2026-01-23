@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Package, AlertTriangle, Trash2, Settings2 } from "lucide-react";
+import { ArrowLeft, Package, AlertTriangle, Trash2, Settings2, Pencil, Plus, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useProdutoComMetricas, useToggleAtivoProduto, useExcluirProduto } from "@/hooks/useProdutos";
+import { useProdutoComMetricas, useToggleAtivoProduto, useExcluirProduto, useRemoverMaterialProduto } from "@/hooks/useProdutos";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +29,8 @@ import { formatarCusto } from "@/lib/custoUtils";
 import { formatarTempoProdutivo } from "@/lib/timeUtils";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import EditarEtapasProdutoDialog from "@/components/produtos/EditarEtapasProdutoDialog";
+import EditarProdutoDialog from "@/components/produtos/EditarProdutoDialog";
+import AdicionarMaterialProdutoDialog from "@/components/produtos/AdicionarMaterialProdutoDialog";
 
 interface DetalhesProdutoProps {
   produtoId: string;
@@ -45,7 +47,10 @@ export default function DetalhesProduto({
   const { data, isLoading } = useProdutoComMetricas(produtoId);
   const toggleAtivo = useToggleAtivoProduto();
   const excluirProduto = useExcluirProduto();
+  const removerMaterial = useRemoverMaterialProduto();
   const [dialogEtapasOpen, setDialogEtapasOpen] = useState(false);
+  const [dialogPrecosOpen, setDialogPrecosOpen] = useState(false);
+  const [dialogMateriaisOpen, setDialogMateriaisOpen] = useState(false);
 
   const handleExcluir = () => {
     excluirProduto.mutate(produtoId, {
@@ -87,7 +92,14 @@ export default function DetalhesProduto({
     );
   }
 
-  const { produto, etapas, metricas, tempoTotalMedio, custoTotalMedio, numLotesAnalisados } = data;
+  const { produto, etapas, materiais, metricas, tempoTotalMedio, custoProducaoMedio, custoMaterialTotal, numLotesAnalisados } = data;
+
+  // O custoTotalMedio do useProdutoComMetricas foi renomeado para custoProducaoMedio no hook
+  // Se ainda estiver vindo como custoTotalMedio no type, considerar atualizar o tipo
+  // Para garantir, vamos usar os valores desestruturados ou defaults
+  const custoProd = custoProducaoMedio || 0;
+  const custoMat = custoMaterialTotal || 0;
+  const custoTotalGeral = custoProd + custoMat;
 
   // Dados para o gráfico de pizza
   const dadosGrafico = metricas.map((m: any) => ({
@@ -164,57 +176,163 @@ export default function DetalhesProduto({
                 <p className="text-muted-foreground">{produto.descricao}</p>
               )}
             </div>
-            <Badge variant={produto.ativo ? "default" : "secondary"} className="text-sm">
-              {produto.ativo ? "Ativo" : "Inativo"}
-            </Badge>
+            <div className="flex flex-col items-end gap-2">
+              <Badge variant={produto.ativo ? "default" : "secondary"} className="text-sm">
+                {produto.ativo ? "Ativo" : "Inativo"}
+              </Badge>
+              <div className="flex items-center gap-4 mt-2">
+                <div className="flex flex-col items-end text-sm text-muted-foreground gap-1">
+                  <div className="flex items-center gap-2">
+                    <span>Custo Produção:</span>
+                    <span>{formatarCusto(custoProd)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>Custo Material:</span>
+                    <span>{formatarCusto(custoMat)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 font-bold text-foreground border-t border-border pt-1 mt-1">
+                    <span>Custo Total:</span>
+                    <span>{formatarCusto(custoTotalGeral)}</span>
+                  </div>
+                </div>
+
+                <div className="h-12 w-px bg-border mx-2"></div>
+
+                <div className="flex flex-col items-end text-sm text-muted-foreground gap-1">
+                  <div>
+                    <span className="font-semibold">CPF:</span> {formatarCusto(produto.preco_cpf || 0)}
+                  </div>
+                  <div>
+                    <span className="font-semibold">CNPJ:</span> {formatarCusto(produto.preco_cnpj || 0)}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Estoque:</span> {Number(produto.estoque || 0).toLocaleString()}
+                  </div>
+                </div>
+
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted" onClick={() => setDialogPrecosOpen(true)} title="Editar Produto">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
         </CardHeader>
       </Card>
 
-      {/* Composição de Etapas */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-xl font-bold">Composição de Etapas</CardTitle>
-          <Button variant="outline" size="sm" onClick={() => setDialogEtapasOpen(true)}>
-            <Settings2 className="mr-2 h-4 w-4" />
-            Configurar Etapas
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {etapas.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-20">Ordem</TableHead>
-                  <TableHead>Etapa</TableHead>
-                  <TableHead>Subetapa</TableHead>
-                  <TableHead className="text-center">Obrigatória</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {etapas.map((e: any) => (
-                  <TableRow key={e.id}>
-                    <TableCell className="font-medium">{e.ordem}</TableCell>
-                    <TableCell>{e.etapa?.nome}</TableCell>
-                    <TableCell>{e.subetapa?.nome || "-"}</TableCell>
-                    <TableCell className="text-center">
-                      {e.obrigatoria ? (
-                        <Badge variant="default">Sim</Badge>
-                      ) : (
-                        <Badge variant="outline">Não</Badge>
-                      )}
-                    </TableCell>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Composição de Materiais */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xl font-bold">Composição de Materiais</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => setDialogMateriaisOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar Material
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {materiais?.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Material</TableHead>
+                    <TableHead className="text-right">Qtd</TableHead>
+                    <TableHead className="text-right">Custo Un.</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Nenhuma etapa cadastrada
-            </p>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {materiais.map((item: any) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col">
+                          <span>{item.material?.nome}</span>
+                          <span className="text-[10px] text-muted-foreground">{item.material?.codigo}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {Number(item.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.material?.unidade_medida}
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">
+                        {formatarCusto(item.material?.preco_custo || 0)}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatarCusto((item.material?.preco_custo || 0) * item.quantidade)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => removerMaterial.mutate({ id: item.id, produtoId })}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-muted/50 font-bold">
+                    <TableCell colSpan={3} className="text-right">Total Materiais:</TableCell>
+                    <TableCell className="text-right">{formatarCusto(custoMat)}</TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <Package className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                <p className="text-sm">Nenhum material vinculado</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Composição de Etapas */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xl font-bold">Composição de Etapas</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => setDialogEtapasOpen(true)}>
+              <Settings2 className="mr-2 h-4 w-4" />
+              Configurar Etapas
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {etapas.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">Ord</TableHead>
+                    <TableHead>Etapa</TableHead>
+                    <TableHead>Subetapa</TableHead>
+                    <TableHead className="text-center">Obrig.</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {etapas.map((e: any) => (
+                    <TableRow key={e.id}>
+                      <TableCell className="font-medium">{e.ordem}</TableCell>
+                      <TableCell>{e.etapa?.nome}</TableCell>
+                      <TableCell>{e.subetapa?.nome || "-"}</TableCell>
+                      <TableCell className="text-center">
+                        {e.obrigatoria ? (
+                          <Badge variant="default" className="text-[10px] px-1 h-5">Sim</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] px-1 h-5">Não</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <Settings2 className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                <p className="text-sm">Nenhuma etapa cadastrada</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Métricas de Produção */}
       {metricas.length > 0 ? (
@@ -278,7 +396,7 @@ export default function DetalhesProduto({
                             {formatarTempoProdutivo(tempoTotalMedio)}
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right text-green-600">
-                            {formatarCusto(custoTotalMedio)}
+                            {formatarCusto(custoProd)}
                           </TableCell>
                         </TableRow>
                       </TableBody>
@@ -297,32 +415,36 @@ export default function DetalhesProduto({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Tempo Médio/Peça</CardTitle>
+                <CardTitle className="text-base">Tempo Médio Produção</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold">
                   {formatarTempoProdutivo(tempoTotalMedio)}
                 </p>
-                <p className="text-sm text-muted-foreground">todas as etapas</p>
+                <p className="text-sm text-muted-foreground">por peça</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Custo Médio/Peça</CardTitle>
+                <CardTitle className="text-base">Custos Unitários</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">
-                  {formatarCusto(custoTotalMedio)}
-                </p>
-                <p className="text-sm text-muted-foreground">todas as etapas</p>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col">
+                  <span className="text-sm text-muted-foreground">Material</span>
+                  <span className="text-2xl font-bold">{formatarCusto(custoMat)}</span>
+                </div>
+                <div className="flex flex-col border-t pt-2">
+                  <span className="text-sm text-muted-foreground">Produção</span>
+                  <span className="text-2xl font-bold">{formatarCusto(custoProd)}</span>
+                </div>
               </CardContent>
             </Card>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Detalhamento por Etapa</CardTitle>
+              <CardTitle>Detalhamento de Processos</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -402,19 +524,37 @@ export default function DetalhesProduto({
         <Card>
           <CardContent className="py-12">
             <div className="text-center space-y-2">
-              <p className="text-lg font-medium">Nenhuma métrica disponível</p>
+              <p className="text-lg font-medium">Nenhuma métrica de produção disponível</p>
               <p className="text-sm text-muted-foreground">
-                Este produto ainda não possui lotes finalizados
+                Finalize lotes para gerar o custo médio de produção.
               </p>
             </div>
           </CardContent>
         </Card>
       )}
+
       <EditarEtapasProdutoDialog
         open={dialogEtapasOpen}
         onOpenChange={setDialogEtapasOpen}
         produtoId={produtoId}
         produtoNome={produto.nome}
+      />
+
+      <EditarProdutoDialog
+        open={dialogPrecosOpen}
+        onOpenChange={setDialogPrecosOpen}
+        produtoId={produtoId}
+        nomeAtual={produto.nome}
+        descricaoAtual={produto.descricao}
+        precoCpfAtual={produto.preco_cpf || 0}
+        precoCnpjAtual={produto.preco_cnpj || 0}
+        estoqueAtual={produto.estoque || 0}
+      />
+
+      <AdicionarMaterialProdutoDialog
+        open={dialogMateriaisOpen}
+        onOpenChange={setDialogMateriaisOpen}
+        produtoId={produtoId}
       />
     </div>
   );

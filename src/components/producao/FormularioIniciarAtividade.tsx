@@ -74,7 +74,7 @@ export default function FormularioIniciarAtividade() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lotes")
-        .select("produto_id")
+        .select("produto_id, quantidade_total")
         .eq("id", loteId)
         .single();
       if (error) throw error;
@@ -321,24 +321,35 @@ export default function FormularioIniciarAtividade() {
 
           </div>
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="quantidade">Quantidade (opcional)</Label>
-          <Input
-            type="number"
-            id="quantidade"
-            value={quantidade}
-            onChange={(e) => setQuantidade(e.target.value)}
-            min="0"
-            placeholder="Pode ser preenchido ao finalizar"
-          />
-        </div>
       </div>
+
+      {/* Aviso de Bloqueio por Quantidade não definida */}
+      {selectedLote && selectedLote.quantidade_total <= 0 && etapaId && listaEtapas && listaEtapas.find(e => e.id === etapaId)?.ordem > 1 && (
+        <Alert variant="destructive" className="mt-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Não é possível iniciar etapas posteriores enquanto a quantidade do lote não for definida (final da Etapa 1).
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {selectedLote && selectedLote.quantidade_total <= 0 && etapaId && listaEtapas && listaEtapas.find(e => e.id === etapaId)?.ordem === 1 && (
+        <Alert className="mt-4 bg-yellow-50 text-yellow-800 border-yellow-200">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            A quantidade do lote será solicitada ao finalizar esta etapa.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Button
         type="submit"
         className="w-full"
-        disabled={iniciarProducao.isPending || temAtividadeAberta}
+        disabled={
+          iniciarProducao.isPending ||
+          temAtividadeAberta ||
+          (selectedLote && selectedLote.quantidade_total <= 0 && etapaId && listaEtapas && listaEtapas.find(e => e.id === etapaId)?.ordem > 1)
+        }
       >
         <Play className="mr-2 h-4 w-4" />
         {iniciarProducao.isPending ? "Iniciando..." : "Iniciar Atividade"}
