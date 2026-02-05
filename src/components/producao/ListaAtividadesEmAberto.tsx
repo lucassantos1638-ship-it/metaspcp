@@ -243,7 +243,8 @@ export default function ListaAtividadesEmAberto() {
                 </CollapsibleTrigger>
 
                 <CollapsibleContent>
-                  <div className="p-0 border-t">
+                  {/* Desktop View - Table */}
+                  <div className="hidden md:block p-0 border-t">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-transparent hover:bg-transparent">
@@ -312,6 +313,78 @@ export default function ListaAtividadesEmAberto() {
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+
+                  {/* Mobile View - Cards */}
+                  <div className="md:hidden border-t">
+                    <div className="p-4 space-y-4">
+                      {group.atividades.map((producao) => (
+                        <div key={producao.id} className="bg-muted/10 border rounded-lg p-4 space-y-4">
+                          {/* Header */}
+                          <div className="flex justify-between items-start gap-3">
+                            <div>
+                              <span className="font-medium text-sm block">{producao.colaborador?.nome || "N/A"}</span>
+                              <Badge variant="secondary" className="mt-1 bg-warning/20 text-warning text-[10px]">
+                                Em Aberto
+                              </Badge>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs text-muted-foreground block">Início</span>
+                              <span className="text-xs font-medium">
+                                {formatarData(producao.data_inicio)}
+                              </span>
+                              <span className="text-xs text-muted-foreground block">
+                                {producao.hora_inicio}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Details */}
+                          <div className="bg-background/50 rounded-md p-3 text-xs space-y-2 border border-dashed">
+                            <div>
+                              <span className="font-semibold block mb-1">Etapa:</span>
+                              {producao.atividade ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Badge variant="outline" className="text-[10px] h-5 px-1">Avulsa</Badge>
+                                  <span>{producao.atividade.nome}</span>
+                                </div>
+                              ) : (
+                                <div>
+                                  {producao.etapa?.nome || "N/A"}
+                                  {producao.subetapa && (
+                                    <span className="opacity-70"> → {producao.subetapa.nome}</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="pt-2 border-t border-dashed mt-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold">Tempo Decorrido:</span>
+                                <span className="font-mono text-sm font-bold">
+                                  <Timer
+                                    dataInicio={producao.data_inicio}
+                                    horaInicio={producao.hora_inicio}
+                                    segundosInicio={producao.segundos_inicio}
+                                  />
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Action */}
+                          <Button
+                            size="sm"
+                            onClick={() => handleFinalizar(producao)}
+                            variant="default"
+                            className="w-full"
+                          >
+                            <Check className="mr-1 h-4 w-4" />
+                            Finalizar Atividade
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </CollapsibleContent>
               </Collapsible>

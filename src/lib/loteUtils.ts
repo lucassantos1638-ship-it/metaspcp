@@ -141,6 +141,33 @@ export function agruparPorEtapa(
     }
   });
 
+  // 2.1 Pós-processamento para corrigir quantidades duplicadas (trabalho em equipe no mesmo lote)
+  // Se a soma das quantidades exceder muito o total do lote (> 120%) 
+  // E houver múltiplos registros com quantidade próxima ao total do lote,
+  // assumimos que é trabalho compartilhado e não soma.
+  etapasMap.forEach((etapa, key) => {
+    if (etapa.quantidade_produzida > quantidadeTotal * 1.2) {
+      // Filtrar produções desta etapa
+      const producoesDaEtapa = producoes.filter(p => {
+        const pKey = `${p.etapa_id}-${p.subetapa_id || 'main'}`;
+        return pKey === key && p.status === 'finalizado';
+      });
+
+      // Verificar quantos registros têm quantidade "full" (>= 90% do total)
+      const registrosFull = producoesDaEtapa.filter(p =>
+        (Number(p.quantidade_produzida) || 0) >= quantidadeTotal * 0.9
+      );
+
+      if (registrosFull.length > 1) {
+        // Detectado caso de duplicação por equipe
+        // Definimos a quantidade produzida como a maior quantidade individual encontrada (ou o total do lote)
+        // Mas para ser seguro, pegamos o MAX dos registros
+        const maxQtd = Math.max(...producoesDaEtapa.map(p => Number(p.quantidade_produzida) || 0));
+        etapa.quantidade_produzida = maxQtd;
+      }
+    }
+  });
+
   // Calcular percentuais e status
   const etapasArray = Array.from(etapasMap.values());
   etapasArray.forEach(etapa => {
