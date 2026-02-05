@@ -1,5 +1,5 @@
 import { Link, useLocation, Outlet } from "react-router-dom";
-import { ClipboardCheck, Package, Target, BarChart3, Users, Settings, FileText, Menu, Box, TrendingUp, TrendingDown, Activity, LogOut, Shield, KeyRound, UserCog, BookOpen, Layers, LayoutDashboard, Factory, ScrollText, ClipboardList, Calculator, Palette, Calendar } from "lucide-react";
+import { ClipboardCheck, Package, Target, BarChart3, Users, Settings, FileText, Menu, Box, TrendingUp, TrendingDown, Activity, LogOut, Shield, KeyRound, UserCog, BookOpen, Layers, LayoutDashboard, Factory, ScrollText, ClipboardList, Calculator, Palette, Calendar, PackagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ const Layout = () => {
   const allNavItems = [
     { path: "/", icon: LayoutDashboard, label: "Dashboard", permission: "dashboard" },
     { path: "/producao", icon: Factory, label: "Lançar Produção", permission: "producao" },
+    { path: "/lancamento-mp", icon: PackagePlus, label: "Lançar Materiais", permission: "lotes" },
     { path: "/lotes", icon: Package, label: "Lotes", permission: "lotes" },
     { path: "/acompanhamento-colaboradores", icon: ClipboardList, label: "Monitoramento", permission: "pedidos" },
     { path: "/produtos", icon: Box, label: "Produtos", permission: "produtos" },
@@ -45,14 +46,14 @@ const Layout = () => {
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon">
-              <Menu className="h-6 w-6" />
+              <Menu className="h-10 w-10" />
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0 bg-card border-r border-border flex flex-col h-full">
             {/* Mobile Sidebar Header */}
-            <div className="h-20 flex-none flex items-center justify-center px-4 border-b border-border bg-card">
+            <div className="h-16 flex-none flex items-center justify-center px-4 border-b border-border bg-card">
               <div className="flex items-center justify-center">
-                <img src={logoMetaPCP} alt="Meta PCP" className="h-16 w-auto" />
+                <img src={logoMetaPCP} alt="Meta PCP" className="h-12 w-auto" />
               </div>
             </div>
 
@@ -131,9 +132,9 @@ const Layout = () => {
       {/* Desktop Sidebar - Fixed Height within Flex Container */}
       <aside className="hidden print:hidden lg:flex lg:flex-col w-64 bg-card border-r border-border font-sans text-sm h-full flex-none">
         {/* Header - Logo area acting as Title (Fixed) */}
-        <div className="h-20 flex-none flex items-center justify-center px-4 border-b border-border bg-card z-10">
+        <div className="h-16 flex-none flex items-center justify-center px-4 border-b border-border bg-card z-10">
           <div className="flex items-center justify-center">
-            <img src={logoMetaPCP} alt="Meta PCP" className="h-16 w-auto" />
+            <img src={logoMetaPCP} alt="Meta PCP" className="h-12 w-auto" />
           </div>
         </div>
 

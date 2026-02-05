@@ -33,6 +33,8 @@ export default function DesempenhoColaboradores() {
     const [produtoId, setProdutoId] = useState<string>("all");
     const [etapaId, setEtapaId] = useState<string>("all");
     const [subetapaId, setSubetapaId] = useState<string>("all");
+    const [tipoFiltro, setTipoFiltro] = useState<string>("all"); // all, producao, atividade
+    const [atividadeId, setAtividadeId] = useState<string>("all");
     const [filtrosAplicados, setFiltrosAplicados] = useState(false);
 
     // Buscar Colaboradores
@@ -47,6 +49,22 @@ export default function DesempenhoColaboradores() {
                 .eq("ativo", true)
                 .order("nome");
 
+            if (error) throw error;
+            return data;
+        },
+    });
+
+    // Buscar Atividades Avulsas
+    const { data: atividades } = useQuery({
+        queryKey: ["atividades-desempenho", empresaId],
+        enabled: !!empresaId,
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from("atividades")
+                .select("id, nome")
+                .eq("empresa_id", empresaId)
+                .eq("ativo", true)
+                .order("nome");
             if (error) throw error;
             return data;
         },
@@ -68,10 +86,6 @@ export default function DesempenhoColaboradores() {
                 .eq("empresa_id", empresaId)
                 .order("created_at", { ascending: false });
 
-            // Client side filter is better for small datasets, or complex joins not supported directly
-            // However, we want to filter lotes by produtoId if selected.
-            // Since we join produto, we can filter in memory or RPC, but memory is fine for now.
-
             if (error) throw error;
             return data;
         },
@@ -79,10 +93,7 @@ export default function DesempenhoColaboradores() {
 
     // Filtra lotes baseado no produto selecionado
     const lotesFiltrados = lotes?.filter(l =>
-        produtoId === "all" || (l.produto && (l as any).produto_id) // Note: query needs produto_id or we filter by joined product name? 
-        // Better to filter by ID. Let's adjust query above to include product_id or just verify relationship.
-        // Wait, the select is `produto:produtos(nome)`. We don't have produto_id in the result explicitly unless we ask.
-        // Let's adjust the SELECT above.
+        produtoId === "all" || (l.produto && (l as any).produto_id)
     );
 
     // Buscar Produtos
@@ -139,7 +150,7 @@ export default function DesempenhoColaboradores() {
 
     // Query Principal de Produção
     const { data: producoes, isLoading, refetch } = useQuery({
-        queryKey: ["producoes-desempenho", empresaId, colaboradorId, dataInicio, dataFim, loteId, produtoId, etapaId, subetapaId],
+        queryKey: ["producoes-desempenho", empresaId, colaboradorId, dataInicio, dataFim, loteId, produtoId, etapaId, subetapaId, tipoFiltro, atividadeId],
         enabled: false, // Só busca quando clicar em Consultar
         queryFn: async () => {
             if (!colaboradorId) return [];
@@ -148,9 +159,10 @@ export default function DesempenhoColaboradores() {
                 .from("producoes")
                 .select(`
                 *,
-                lote:lotes!inner(numero_lote, nome_lote, produto_id),
+                lote:lotes(numero_lote, nome_lote, produto_id),
                 etapa:etapas(nome),
-                subetapa:subetapas(nome)
+                subetapa:subetapas(nome),
+                atividade:atividades(nome)
             `)
                 .eq("empresa_id", empresaId)
                 .eq("colaborador_id", colaboradorId);
@@ -161,9 +173,21 @@ export default function DesempenhoColaboradores() {
             if (dataFim) {
                 query = query.lte("data_inicio", format(dataFim, "yyyy-MM-dd"));
             }
-            // Nota: Filtro de lote precisa ser feito no JS ou com join complexo se o supabase permitir filtro em tabela relacionada direto.
-            // O Supabase suporta !inner para filtrar na relação, mas vamos buscar e filtrar no client por enquanto se for string parcial
-            // Se numeroLote for exato, podemos tentar otimizar.
+
+            // Filtro por Tipo (Produção vs Atividade)
+            if (tipoFiltro === "producao") {
+                // Se for produção, TEM que ter lote_id (ou não ter atividade_id, dependendo da regra de negócio, mas lote_id é mais seguro para "Produção")
+                // Como lote_id pode ser null em atividades, verificamos se activity_id IS NULL
+                query = query.is("atividade_id", null);
+            } else if (tipoFiltro === "atividade") {
+                // Se for atividade, TEM que ter atividade_id
+                query = query.not("atividade_id", "is", null);
+            }
+
+            // Filtro por Atividade Específica
+            if (atividadeId && atividadeId !== "all") {
+                query = query.eq("atividade_id", atividadeId);
+            }
 
             const { data, error } = await query;
             if (error) throw error;
@@ -338,12 +362,64 @@ export default function DesempenhoColaboradores() {
                             </div>
                         </div>
 
+                        {/* Filtro de Tipo (Novo) */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Tipo</label>
+                            <Select value={tipoFiltro} onValueChange={(val) => {
+                                setTipoFiltro(val);
+                                // Resetar filtros conflitantes se mudar o tipo
+                                if (val === "atividade") {
+                                    setProdutoId("all");
+                                    setLoteId("all");
+                                    setEtapaId("all");
+                                    setSubetapaId("all");
+                                } else if (val === "producao") {
+                                    setAtividadeId("all");
+                                }
+                            }}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Todos" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos</SelectItem>
+                                    <SelectItem value="producao">Produção (Lotes)</SelectItem>
+                                    <SelectItem value="atividade">Atividades Avulsas</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Filtro de Nome da Atividade (Só aparece se Tipo for Atividade ou Todos) */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Nome da Atividade</label>
+                            <Select
+                                value={atividadeId}
+                                onValueChange={setAtividadeId}
+                                disabled={tipoFiltro === "producao"}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Todas as atividades" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas as atividades</SelectItem>
+                                    {atividades?.map((ativ) => (
+                                        <SelectItem key={ativ.id} value={ativ.id}>
+                                            {ativ.nome}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Produto</label>
-                            <Select value={produtoId} onValueChange={(val) => {
-                                setProdutoId(val);
-                                setLoteId("all"); // Reset lote when product changes
-                            }}>
+                            <Select
+                                value={produtoId}
+                                onValueChange={(val) => {
+                                    setProdutoId(val);
+                                    setLoteId("all");
+                                }}
+                                disabled={tipoFiltro === "atividade"}
+                            >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Todos os produtos" />
                                 </SelectTrigger>
@@ -360,7 +436,11 @@ export default function DesempenhoColaboradores() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Lote</label>
-                            <Select value={loteId} onValueChange={setLoteId}>
+                            <Select
+                                value={loteId}
+                                onValueChange={setLoteId}
+                                disabled={tipoFiltro === "atividade"}
+                            >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Todos os lotes" />
                                 </SelectTrigger>
@@ -377,10 +457,14 @@ export default function DesempenhoColaboradores() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Etapa</label>
-                            <Select value={etapaId} onValueChange={(val) => {
-                                setEtapaId(val);
-                                setSubetapaId("all");
-                            }}>
+                            <Select
+                                value={etapaId}
+                                onValueChange={(val) => {
+                                    setEtapaId(val);
+                                    setSubetapaId("all");
+                                }}
+                                disabled={tipoFiltro === "atividade"}
+                            >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Todas as etapas" />
                                 </SelectTrigger>
@@ -397,7 +481,11 @@ export default function DesempenhoColaboradores() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Subetapa</label>
-                            <Select value={subetapaId} onValueChange={setSubetapaId} disabled={etapaId === "all" && subetapas?.length === 0}>
+                            <Select
+                                value={subetapaId}
+                                onValueChange={setSubetapaId}
+                                disabled={(etapaId === "all" && subetapas?.length === 0) || tipoFiltro === "atividade"}
+                            >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Todas as subetapas" />
                                 </SelectTrigger>
@@ -422,8 +510,8 @@ export default function DesempenhoColaboradores() {
                             </Button>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+                </CardContent >
+            </Card >
 
             {/* Resultados - Resumo */}
             {
@@ -519,10 +607,19 @@ export default function DesempenhoColaboradores() {
                                         return (
                                             <TableRow key={prod.id}>
                                                 <TableCell>
-                                                    <div className="font-medium">{prod.lote?.numero_lote} - {prod.lote?.nome_lote}</div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {prod.etapa?.nome} {prod.subetapa && `↳ ${prod.subetapa.nome}`}
-                                                    </div>
+                                                    {prod.atividade ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge variant="outline" className="text-[10px] font-mono border-primary/20 bg-primary/5 text-primary">AVULSA</Badge>
+                                                            <span className="font-medium">{prod.atividade.nome}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="font-medium">{prod.lote?.numero_lote} - {prod.lote?.nome_lote || "Sem Lote"}</div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {prod.etapa?.nome} {prod.subetapa && `↳ ${prod.subetapa.nome}`}
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     {prod.data_inicio && format(new Date(prod.data_inicio), "dd/MM/yyyy")}

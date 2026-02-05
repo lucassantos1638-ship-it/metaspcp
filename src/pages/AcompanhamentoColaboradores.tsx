@@ -136,24 +136,35 @@ export default function AcompanhamentoColaboradores() {
 
                                             <TableCell>
                                                 {isActive && colab.atividadeAtual ? (
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <Badge variant="outline" className="h-5 text-[10px] font-mono border-primary/20 bg-primary/5 text-primary whitespace-nowrap">
-                                                            {colab.atividadeAtual.lote.numero_lote}
-                                                        </Badge>
-                                                        <span className="text-sm font-medium truncate max-w-[150px]" title={colab.atividadeAtual.lote.nome_lote}>
-                                                            {colab.atividadeAtual.lote.nome_lote}
-                                                        </span>
-                                                        <span className="text-muted-foreground/30 mx-1">|</span>
-                                                        <div className="text-sm text-muted-foreground flex items-center gap-1">
-                                                            <span className="font-medium text-foreground/80">{colab.atividadeAtual.etapa.nome}</span>
-                                                            {colab.atividadeAtual.subetapa && (
-                                                                <>
-                                                                    <span className="text-muted-foreground/40">/</span>
-                                                                    <span>{colab.atividadeAtual.subetapa.nome}</span>
-                                                                </>
-                                                            )}
+                                                    colab.atividadeAtual.atividade ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge variant="outline" className="h-5 text-[10px] font-mono border-primary/20 bg-primary/5 text-primary whitespace-nowrap">
+                                                                AVULSA
+                                                            </Badge>
+                                                            <span className="text-sm font-medium">
+                                                                {colab.atividadeAtual.atividade.nome}
+                                                            </span>
                                                         </div>
-                                                    </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <Badge variant="outline" className="h-5 text-[10px] font-mono border-primary/20 bg-primary/5 text-primary whitespace-nowrap">
+                                                                {colab.atividadeAtual.lote?.numero_lote}
+                                                            </Badge>
+                                                            <span className="text-sm font-medium truncate max-w-[150px]" title={colab.atividadeAtual.lote?.nome_lote}>
+                                                                {colab.atividadeAtual.lote?.nome_lote}
+                                                            </span>
+                                                            <span className="text-muted-foreground/30 mx-1">|</span>
+                                                            <div className="text-sm text-muted-foreground flex items-center gap-1">
+                                                                <span className="font-medium text-foreground/80">{colab.atividadeAtual.etapa?.nome}</span>
+                                                                {colab.atividadeAtual.subetapa && (
+                                                                    <>
+                                                                        <span className="text-muted-foreground/40">/</span>
+                                                                        <span>{colab.atividadeAtual.subetapa.nome}</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )
                                                 ) : (
                                                     <span className="text-xs text-muted-foreground italic flex items-center gap-1.5 opacity-60">
                                                         <Clock className="h-3 w-3" />
@@ -229,29 +240,42 @@ export default function AcompanhamentoColaboradores() {
                                     {/* Body: Activity Details */}
                                     {isActive && colab.atividadeAtual ? (
                                         <div className="pt-2 border-t space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="text-[10px] font-mono border-primary/20 bg-primary/5 text-primary shrink-0">
-                                                    {colab.atividadeAtual.lote.numero_lote}
-                                                </Badge>
-                                                <span className="text-sm font-medium line-clamp-1">
-                                                    {colab.atividadeAtual.lote.nome_lote}
-                                                </span>
-                                            </div>
-
-                                            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 p-2 rounded">
-                                                <div className="min-w-1 h-8 rounded-full bg-primary/20"></div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-semibold text-foreground uppercase tracking-wider">Etapa Atual</span>
-                                                    <span className="font-medium text-foreground">
-                                                        {colab.atividadeAtual.etapa.nome}
-                                                        {colab.atividadeAtual.subetapa && (
-                                                            <span className="text-muted-foreground ml-1 font-normal">
-                                                                - {colab.atividadeAtual.subetapa.nome}
-                                                            </span>
-                                                        )}
+                                            {colab.atividadeAtual.atividade ? (
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant="outline" className="text-[10px] font-mono border-primary/20 bg-primary/5 text-primary shrink-0">
+                                                        AVULSA
+                                                    </Badge>
+                                                    <span className="text-sm font-medium line-clamp-1">
+                                                        {colab.atividadeAtual.atividade.nome}
                                                     </span>
                                                 </div>
-                                            </div>
+                                            ) : (
+                                                <>
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge variant="outline" className="text-[10px] font-mono border-primary/20 bg-primary/5 text-primary shrink-0">
+                                                            {colab.atividadeAtual.lote?.numero_lote}
+                                                        </Badge>
+                                                        <span className="text-sm font-medium line-clamp-1">
+                                                            {colab.atividadeAtual.lote?.nome_lote}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 p-2 rounded">
+                                                        <div className="min-w-1 h-8 rounded-full bg-primary/20"></div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs font-semibold text-foreground uppercase tracking-wider">Etapa Atual</span>
+                                                            <span className="font-medium text-foreground">
+                                                                {colab.atividadeAtual.etapa?.nome}
+                                                                {colab.atividadeAtual.subetapa && (
+                                                                    <span className="text-muted-foreground ml-1 font-normal">
+                                                                        - {colab.atividadeAtual.subetapa.nome}
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="pt-2 border-t">

@@ -1,3 +1,4 @@
+import { Switch } from "@/components/ui/switch"; // Import Switch
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,10 @@ export default function CadastroMaterialDialog({ open, onOpenChange }: CadastroM
     const [estoqueTingimento, setEstoqueTingimento] = useState("");
     const [estoqueFabrica, setEstoqueFabrica] = useState("");
 
+    // Conversão
+    const [temConversao, setTemConversao] = useState(false);
+    const [fatorConversao, setFatorConversao] = useState(""); // 1 Pacote = X Unidades
+
     const { mutate: criarMaterial, isPending } = useCriarMaterial();
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -36,6 +41,8 @@ export default function CadastroMaterialDialog({ open, onOpenChange }: CadastroM
                 estoque_estamparia: Number(estoqueEstamparia) || 0,
                 estoque_tingimento: Number(estoqueTingimento) || 0,
                 estoque_fabrica: Number(estoqueFabrica) || 0,
+                tem_conversao_pacote: Number(fatorConversao) > 0,
+                fator_conversao_pacote: Number(fatorConversao) || 1,
             },
             {
                 onSuccess: () => {
@@ -46,6 +53,8 @@ export default function CadastroMaterialDialog({ open, onOpenChange }: CadastroM
                     setEstoqueEstamparia("");
                     setEstoqueTingimento("");
                     setEstoqueFabrica("");
+                    setTemConversao(false);
+                    setFatorConversao("");
                     onOpenChange(false);
                 },
             }
@@ -80,7 +89,7 @@ export default function CadastroMaterialDialog({ open, onOpenChange }: CadastroM
                             />
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="preco">Preço de Custo</Label>
                             <Input
@@ -102,6 +111,17 @@ export default function CadastroMaterialDialog({ open, onOpenChange }: CadastroM
                                 placeholder="Ex: m, kg, un"
                             />
                         </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="conv">Conv</Label>
+                            <Input
+                                id="conv"
+                                type="number"
+                                step="any"
+                                value={fatorConversao}
+                                onChange={(e) => setFatorConversao(e.target.value)}
+                                placeholder="1"
+                            />
+                        </div>
                     </div>
 
                     <Separator className="my-2" />
@@ -119,29 +139,29 @@ export default function CadastroMaterialDialog({ open, onOpenChange }: CadastroM
                                 placeholder="0"
                             />
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="est_tingimento" className="text-xs">Tingimento</Label>
-                            <Input
-                                id="est_tingimento"
-                                type="number"
-                                step="any"
-                                value={estoqueTingimento}
-                                onChange={(e) => setEstoqueTingimento(e.target.value)}
-                                placeholder="0"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="est_fabrica" className="text-xs">Fábrica</Label>
-                            <Input
-                                id="est_fabrica"
-                                type="number"
-                                step="any"
-                                value={estoqueFabrica}
-                                onChange={(e) => setEstoqueFabrica(e.target.value)}
-                                placeholder="0"
-                            />
-                        </div>
+                        <Label htmlFor="est_tingimento" className="text-xs">Tingimento</Label>
+                        <Input
+                            id="est_tingimento"
+                            type="number"
+                            step="any"
+                            value={estoqueTingimento}
+                            onChange={(e) => setEstoqueTingimento(e.target.value)}
+                            placeholder="0"
+                        />
                     </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="est_fabrica" className="text-xs">Fábrica</Label>
+                        <Input
+                            id="est_fabrica"
+                            type="number"
+                            step="any"
+                            value={estoqueFabrica}
+                            onChange={(e) => setEstoqueFabrica(e.target.value)}
+                            placeholder="0"
+                        />
+                    </div>
+
+
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -154,6 +174,6 @@ export default function CadastroMaterialDialog({ open, onOpenChange }: CadastroM
                     </DialogFooter>
                 </form>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 }

@@ -99,12 +99,36 @@ export function useDetalhesLote(loteId: string | null) {
         ?.filter(p => p.status === 'finalizado')
         .reduce((sum, p) => sum + (p.quantidade_produzida || 0), 0) || 0;
 
+      // 5. Buscar consumo de materiais (Safe fetch)
+      let custoMateriais = 0;
+      try {
+        const { data: consumos, error: consumoError } = await supabase
+          .from("lote_consumo")
+          .select(`
+            quantidade_real,
+            material:materiais(preco_custo)
+          `)
+          .eq("lote_id", loteId);
+
+        if (!consumoError && consumos) {
+          custoMateriais = consumos.reduce((sum, c: any) => {
+            const preco = c.material?.preco_custo || 0;
+            return sum + (c.quantidade_real * preco);
+          }, 0);
+        } else if (consumoError) {
+          console.warn("Erro ao buscar custo materiais:", consumoError);
+        }
+      } catch (err) {
+        console.warn("Erro ao buscar custo materiais (catch):", err);
+      }
+
       return {
         lote,
         producoes: producoes || [],
         progressoPorEtapa,
         tempoTotal,
         quantidadeProduzida,
+        custoMateriais,
       };
     },
     enabled: !!loteId,

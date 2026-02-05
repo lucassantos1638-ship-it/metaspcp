@@ -34,6 +34,8 @@ import ProjecaoUsuario from "./pages/ProjecaoUsuario";
 import ProjecaoMensal from "./pages/ProjecaoMensal";
 import Programacao from "./pages/Programacao";
 import DetalhesLote from "./pages/DetalhesLote";
+import LancamentoMateriais from "./pages/LancamentoMateriais";
+import ListaLancamentoMateriais from "./pages/ListaLancamentoMateriais";
 
 import GestaoUsuarios from "./pages/gestor/GestaoUsuarios";
 import DashboardEmpresas from "./pages/super-admin/DashboardEmpresas";
@@ -149,6 +151,24 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredPermission="lotes">
                     <DetalhesLote />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/lancamento-mp"
+                element={
+                  <ProtectedRoute requiredPermission="lotes">
+                    <ListaLancamentoMateriais />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/lotes/:id/materiais"
+                element={
+                  <ProtectedRoute requiredPermission="lotes">
+                    <LancamentoMateriais />
                   </ProtectedRoute>
                 }
               />

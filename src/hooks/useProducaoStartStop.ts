@@ -14,7 +14,8 @@ export const useProducoesEmAberto = () => {
           colaborador:colaboradores(nome),
           lote:lotes(numero_lote, nome_lote, produto_id),
           etapa:etapas(nome, ordem),
-          subetapa:subetapas(nome)
+          subetapa:subetapas(nome),
+          atividade:atividades(nome)
         `)
         .eq("status", "em_aberto")
         .order("created_at", { ascending: false });
@@ -35,7 +36,13 @@ export const useColaboradorTemAtividadeAberta = (colaboradorId: string) => {
 
       const { data, error } = await supabase
         .from("producoes")
-        .select("*")
+        .select(`
+          *,
+          lote:lotes(numero_lote, nome_lote),
+          etapa:etapas(nome),
+          subetapa:subetapas(nome),
+          atividade:atividades(nome)
+        `)
         .eq("colaborador_id", colaboradorId)
         .eq("status", "em_aberto")
         .maybeSingle();
@@ -54,23 +61,35 @@ export const useIniciarProducao = () => {
   return useMutation({
     mutationFn: async (payload: {
       colaborador_id: string;
-      lote_id: string;
-      etapa_id: string;
+      lote_id?: string | null;
+      etapa_id?: string | null;
       subetapa_id?: string | null;
+      atividade_id?: string | null;
       quantidade_produzida?: number | null;
       data_inicio: string;
       hora_inicio: string;
       segundos_inicio?: number;
       empresa_id: string;
     }) => {
+      // Validar payload
+      if (!payload.atividade_id && (!payload.lote_id || !payload.etapa_id)) {
+        throw new Error("É necessário informar um Lote/Etapa OU uma Atividade.");
+      }
+
       const { data, error } = await supabase
         .from("producoes")
         .insert([{
-          ...payload,
-          status: "em_aberto",
+          colaborador_id: payload.colaborador_id,
+          empresa_id: payload.empresa_id,
+          lote_id: payload.lote_id || null, // Garante null se undefined
+          etapa_id: payload.etapa_id || null, // Garante null se undefined
           subetapa_id: payload.subetapa_id || null,
+          atividade_id: payload.atividade_id || null, // Novo campo
           quantidade_produzida: payload.quantidade_produzida || null,
+          data_inicio: payload.data_inicio,
+          hora_inicio: payload.hora_inicio,
           segundos_inicio: payload.segundos_inicio || 0,
+          status: "em_aberto",
           data_fim: null,
           hora_fim: null,
           segundos_fim: null,

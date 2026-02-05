@@ -112,7 +112,7 @@ export default function Login() {
           {/* Logo visible on form side for all screens */}
           <div className="flex flex-col items-center text-center mb-8">
             <div className="flex items-center justify-center">
-              <img src={logoMetaPCP} alt="Meta PCP" className="h-32 w-auto" />
+              <img src={logoMetaPCP} alt="Meta PCP" className="h-24 w-auto" />
             </div>
           </div>
 

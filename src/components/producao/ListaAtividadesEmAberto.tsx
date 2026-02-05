@@ -194,7 +194,7 @@ export default function ListaAtividadesEmAberto() {
         <div className="space-y-4">
           {Object.entries(
             producoesFiltradas.reduce((acc, producao) => {
-              const loteId = producao.lote_id || 'unknown';
+              const loteId = producao.lote_id || 'avulso';
               if (!acc[loteId]) {
                 acc[loteId] = {
                   lote: producao.lote,
@@ -204,8 +204,9 @@ export default function ListaAtividadesEmAberto() {
               acc[loteId].atividades.push(producao);
               return acc;
             }, {} as Record<string, { lote: any, atividades: any[] }>)
-          ).map(([loteId, group]) => {
-            const isOpen = !!openLotes[loteId] || !!filtroNome; // Auto-expand if searching
+          ).map(([loteId, group]: [string, { lote: any, atividades: any[] }]) => {
+            const isOpen = !!openLotes[loteId] || !!filtroNome;
+            const isAvulso = loteId === 'avulso';
 
             return (
               <Collapsible
@@ -220,13 +221,21 @@ export default function ListaAtividadesEmAberto() {
                       {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                       <div className="text-left">
                         <h3 className="font-semibold text-lg flex items-center gap-2">
-                          Lote {group.lote?.numero_lote || "N/A"}
+                          {isAvulso ? (
+                            <span className="flex items-center gap-2">
+                              Atividades Avulsas
+                            </span>
+                          ) : (
+                            <>
+                              Lote {group.lote?.numero_lote || "N/A"}
+                            </>
+                          )}
                           <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary hover:bg-primary/20">
                             {group.atividades.length} {group.atividades.length === 1 ? 'colaborador' : 'colaboradores'}
                           </Badge>
                         </h3>
                         <p className="text-sm text-muted-foreground truncate max-w-[300px] sm:max-w-[500px]">
-                          {group.lote?.nome_lote || "Lote sem nome"}
+                          {isAvulso ? "Atividades diversas sem lote vinculado" : (group.lote?.nome_lote || "Lote sem nome")}
                         </p>
                       </div>
                     </div>
@@ -253,11 +262,20 @@ export default function ListaAtividadesEmAberto() {
                               {producao.colaborador?.nome || "N/A"}
                             </TableCell>
                             <TableCell>
-                              {producao.etapa?.nome || "N/A"}
-                              {producao.subetapa && (
-                                <span className="text-xs text-muted-foreground block">
-                                  → {producao.subetapa.nome}
-                                </span>
+                              {producao.atividade ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Badge variant="outline" className="text-xs bg-muted/50">Avulsa</Badge>
+                                  <span className="font-medium">{producao.atividade.nome}</span>
+                                </div>
+                              ) : (
+                                <>
+                                  {producao.etapa?.nome || "N/A"}
+                                  {producao.subetapa && (
+                                    <span className="text-xs text-muted-foreground block">
+                                      → {producao.subetapa.nome}
+                                    </span>
+                                  )}
+                                </>
                               )}
                             </TableCell>
                             <TableCell>
@@ -302,11 +320,13 @@ export default function ListaAtividadesEmAberto() {
         </div>
       </div>
 
-      <DialogFinalizarAtividade
-        producao={producaoSelecionada}
-        open={dialogAberto}
-        onOpenChange={setDialogAberto}
-      />
+      {producaoSelecionada && (
+        <DialogFinalizarAtividade
+          producao={producaoSelecionada}
+          open={dialogAberto}
+          onOpenChange={setDialogAberto}
+        />
+      )}
     </>
   );
 }

@@ -68,7 +68,7 @@ export default function DialogFinalizarAtividade({
       const { data, error } = await supabase
         .from("produto_etapas")
         .select("subetapa_id, ordem")
-        .eq("produto_id", producao.lote.produto_id)
+        .eq("produto_id", producao?.lote?.produto_id)
         .eq("etapa_id", producao.etapa_id)
         .order("ordem");
 
@@ -104,9 +104,23 @@ export default function DialogFinalizarAtividade({
     return false;
   };
 
-  const precisaDefinirQuantidadeLote = isUltimaSubetapaEtapa1();
+  const isAtividadeGenerica = !!producao?.atividade_id;
+
+  // A quantidade deve ser exigida se:
+  // 1. NÃO for atividade genérica
+  // 2. E (For a última subetapa da etapa 1 OU não for etapa 1)
+  // Basicamente: Lotes precisam de quantidade. Atividades genéricas não.
+  // Mas no fluxo de lote, só pedimos quantidade no final da etapa 1 ou etapas subsequentes.
+  // Simplificando o que já existia:
+  const precisaDefinirQuantidadeLote = !isAtividadeGenerica && isUltimaSubetapaEtapa1();
   const isEtapa1 = producao?.etapa?.ordem === 1;
-  const showQuantityInput = !isEtapa1 || precisaDefinirQuantidadeLote;
+
+  // Input visível se: NÃO for genérica E (não for etapa 1 OU for o momento de definir a qtde do lote)
+  // Mas espera, nas etapas 2, 3... também pedimos quantidade produzida? 
+  // No código original: `const showQuantityInput = !isEtapa1 || precisaDefinirQuantidadeLote;`
+  // Se for etapa 2, !isEtapa1 é true -> pede quantidade.
+  // Então mantemos a lógica original mas adicionamos a exceção da genérica.
+  const showQuantityInput = !isAtividadeGenerica && (!isEtapa1 || precisaDefinirQuantidadeLote);
 
   const validarDataHora = () => {
     if (!producao) return false;
@@ -136,8 +150,14 @@ export default function DialogFinalizarAtividade({
 
     if (!validarDataHora()) return;
 
-    // Se o campo não está visível (etapas intermediárias da etapa 1), assumimos 0
-    const qtd = showQuantityInput && quantidadeProduzida ? parseInt(quantidadeProduzida) : 0;
+    // Se estiver visível, usa o valor. Se for genérica ou oculto, usa 1 (para constar produção) ou 0?
+    // Se for atividade genérica, não contabilizamos "unidades", então pode ser 1 para indicar "1 atividade feita".
+    let qtd = 0;
+    if (showQuantityInput && quantidadeProduzida) {
+      qtd = parseInt(quantidadeProduzida);
+    } else if (isAtividadeGenerica) {
+      qtd = 1;
+    }
 
     // Se precisa definir quantidade do lote (Fim da Etapa 1), atualizamos o lote também
     if (precisaDefinirQuantidadeLote) {

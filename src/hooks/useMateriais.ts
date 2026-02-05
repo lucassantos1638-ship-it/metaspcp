@@ -12,6 +12,11 @@ export interface Material {
     estoque_tingimento: number;
     estoque_fabrica: number;
     unidade_medida: string;
+
+    // Conversion fields
+    tem_conversao_pacote: boolean;
+    fator_conversao_pacote: number;
+
     ativo: boolean;
     empresa_id: string;
     created_at: string;
@@ -91,7 +96,17 @@ export function useCriarMaterial() {
     const empresaId = useEmpresaId();
 
     return useMutation({
-        mutationFn: async (novoMaterial: { nome: string; codigo?: string; preco_custo: number; unidade_medida: string; estoque_estamparia?: number; estoque_tingimento?: number; estoque_fabrica?: number }) => {
+        mutationFn: async (novoMaterial: {
+            nome: string;
+            codigo?: string;
+            preco_custo: number;
+            unidade_medida: string;
+            estoque_estamparia?: number;
+            estoque_tingimento?: number;
+            estoque_fabrica?: number;
+            tem_conversao_pacote?: boolean;
+            fator_conversao_pacote?: number;
+        }) => {
             if (!empresaId) throw new Error("Empresa não identificada");
 
             const { data, error } = await supabase
@@ -175,30 +190,37 @@ export function useToggleAtivoMaterial() {
     });
 }
 
-export function useCriarCor() {
+// Batch creation of colors
+export function useCriarCores() {
     const queryClient = useQueryClient();
     const empresaId = useEmpresaId();
 
     return useMutation({
-        mutationFn: async (novaCor: { material_id: string; nome: string; hex?: string }) => {
+        mutationFn: async (novasCores: { material_id: string; nome: string; hex?: string }[]) => {
             if (!empresaId) throw new Error("Empresa não identificada");
+
+            const coresComEmpresa = novasCores.map(cor => ({
+                ...cor,
+                empresa_id: empresaId
+            }));
 
             const { data, error } = await supabase
                 .from("materiais_cores")
-                .insert([{ ...novaCor, empresa_id: empresaId }])
-                .select()
-                .single();
+                .insert(coresComEmpresa)
+                .select();
 
             if (error) throw error;
             return data;
         },
         onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ["material", data.material_id] });
-            toast({ title: "Cor adicionada" });
+            if (data && data.length > 0) {
+                queryClient.invalidateQueries({ queryKey: ["material", data[0].material_id] });
+            }
+            toast({ title: "Cores adicionadas com sucesso" });
         },
         onError: (error: any) => {
             toast({
-                title: "Erro ao adicionar cor",
+                title: "Erro ao adicionar cores",
                 description: error.message,
                 variant: "destructive",
             });
@@ -206,6 +228,7 @@ export function useCriarCor() {
     });
 }
 
+// ...existing code...
 export function useExcluirCor() {
     const queryClient = useQueryClient();
 
@@ -217,9 +240,10 @@ export function useExcluirCor() {
                 .eq("id", id);
 
             if (error) throw error;
+            return { material_id };
         },
-        onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: ["material", variables.material_id] });
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["material", data.material_id] });
             toast({ title: "Cor removida" });
         },
         onError: (error: any) => {
@@ -229,5 +253,43 @@ export function useExcluirCor() {
                 variant: "destructive",
             });
         },
+    });
+}
+
+export function useExcluirMaterial() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (id: string) => {
+            const { error } = await supabase
+                .from("materiais")
+                .delete()
+                .eq("id", id);
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["materiais"] });
+            toast({ title: "Material excluído com sucesso" });
+        },
+        onError: (error: any) => {
+            let description = error.message;
+
+            if (error.message?.includes("violates foreign key constraint")) {
+                if (error.message?.includes("produto_materiais")) {
+                    description = "Este material faz parte da Ficha Técnica de um ou mais produtos. Remova-o dos produtos antes de excluir.";
+                } else if (error.message?.includes("lote_consumo")) {
+                    description = "Este material já possui histórico de consumo em lotes e não pode ser excluído para manter a integridade dos dados.";
+                } else {
+                    description = "Este material está em uso por outros registros do sistema e não pode ser excluído.";
+                }
+            }
+
+            toast({
+                title: "Não foi possível excluir",
+                description: description,
+                variant: "destructive",
+            });
+        }
     });
 }

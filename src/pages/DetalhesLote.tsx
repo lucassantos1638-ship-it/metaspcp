@@ -44,17 +44,13 @@ export default function DetalhesLote() {
         )
     }
 
-    const { lote, progressoPorEtapa, tempoTotal, quantidadeProduzida } = data;
+    const { lote, progressoPorEtapa, tempoTotal, quantidadeProduzida, custoMateriais } = data;
 
     // Calcular totais
-    // Calcular totais
-    const custoTotalGeral = progressoPorEtapa.reduce((acc, curr) => acc + curr.custo_total, 0);
+    const custoProcesso = progressoPorEtapa.reduce((acc, curr) => acc + curr.custo_total, 0);
+    const custoTotalGeral = custoProcesso + (custoMateriais || 0);
 
-    // Soma dos unitários de cada etapa (visão de custo do processo produzido)
-    const custoUnitarioGeral = progressoPorEtapa.reduce((acc, curr) => {
-        const unitarioEtapa = curr.quantidade_produzida > 0 ? curr.custo_total / curr.quantidade_produzida : 0;
-        return acc + unitarioEtapa;
-    }, 0);
+    const custoUnitarioGeral = quantidadeProduzida > 0 ? custoTotalGeral / quantidadeProduzida : 0;
 
     // Soma dos tempos unitários de cada etapa
     const tempoUnitarioGeral = progressoPorEtapa.reduce((acc, curr) => {
@@ -176,8 +172,6 @@ export default function DetalhesLote() {
                             <TableBody>
                                 {progressoPorEtapa.map((etapa, idx) => {
                                     const tempoUnitarioEtapa = etapa.quantidade_produzida > 0 ? etapa.tempo_total / etapa.quantidade_produzida : 0;
-
-                                    // Custo unitário da etapa também baseado na produção real da etapa (quanto custou fazer cada uma)
                                     const custoUnitarioEtapa = etapa.quantidade_produzida > 0 ? etapa.custo_total / etapa.quantidade_produzida : 0;
 
                                     return (
@@ -241,7 +235,6 @@ export default function DetalhesLote() {
                                                         : "Não iniciado"}
                                                 </div>
                                             </TableCell>
-
                                         </TableRow>
                                     );
                                 })}

@@ -4,8 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, PackageOpen, Pencil, FileSpreadsheet } from "lucide-react";
-import { useMateriais, useToggleAtivoMaterial } from "@/hooks/useMateriais";
+import { Search, Plus, PackageOpen, Pencil, FileSpreadsheet, Trash2 } from "lucide-react";
+import { useMateriais, useToggleAtivoMaterial, useExcluirMaterial } from "@/hooks/useMateriais";
 import CadastroMaterialDialog from "@/components/materiais/CadastroMaterialDialog";
 import DetalhesMaterial from "@/components/materiais/DetalhesMaterial";
 import ImportarMateriaisDialog from "@/components/materiais/ImportarMateriaisDialog";
@@ -18,6 +18,7 @@ export default function Materiais() {
 
     const { data: materiais, isLoading } = useMateriais();
     const toggleAtivo = useToggleAtivoMaterial();
+    const excluirMaterial = useExcluirMaterial();
 
     const materiaisFiltrados = materiais?.filter((m) =>
         m.nome.toLowerCase().includes(busca.toLowerCase())
@@ -113,6 +114,19 @@ export default function Materiais() {
                                     <TableCell className="text-right">
                                         <Button variant="ghost" size="icon" className="h-8 w-8">
                                             <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (confirm("Tem certeza que deseja excluir este material?")) {
+                                                    excluirMaterial.mutate(material.id);
+                                                }
+                                            }}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
                                         </Button>
                                     </TableCell>
                                 </TableRow>

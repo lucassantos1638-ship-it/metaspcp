@@ -149,6 +149,11 @@ export function useProdutoComMetricas(produtoId: string) {
         }
       }
 
+      const materiaisFormatados = materiais?.map((m: any) => ({
+        ...m,
+        quantidade: m.consumo_padrao || 0,
+      })) || [];
+
       // Calcular totais
       const tempoTotalMedio = metricas?.reduce(
         (sum, m) => sum + (m.tempo_medio_por_peca_minutos || 0),
@@ -160,7 +165,7 @@ export function useProdutoComMetricas(produtoId: string) {
         0
       ) || 0;
 
-      const custoMaterialTotal = materiais?.reduce((sum, item: any) => {
+      const custoMaterialTotal = materiaisFormatados.reduce((sum, item: any) => {
         const preco = item.material?.preco_custo || 0;
         return sum + (preco * item.quantidade);
       }, 0) || 0;
@@ -170,7 +175,7 @@ export function useProdutoComMetricas(produtoId: string) {
       return {
         produto,
         etapas: etapas || [],
-        materiais: materiais || [],
+        materiais: materiaisFormatados,
         metricas: metricas || [],
         ultimosLotes: ultimosLotesCalculados,
         tempoTotalMedio,
@@ -307,15 +312,19 @@ export function useAtualizarProduto() {
 
 export function useAdicionarMaterialProduto() {
   const queryClient = useQueryClient();
+  const empresaId = useEmpresaId();
 
   return useMutation({
     mutationFn: async ({ produtoId, materialId, quantidade }: { produtoId: string; materialId: string; quantidade: number }) => {
+      if (!empresaId) throw new Error("Empresa não identificada");
+
       const { error } = await supabase
         .from("produto_materiais")
         .insert({
+          empresa_id: empresaId,
           produto_id: produtoId,
           material_id: materialId,
-          quantidade,
+          consumo_padrao: quantidade,
         });
 
       if (error) throw error;

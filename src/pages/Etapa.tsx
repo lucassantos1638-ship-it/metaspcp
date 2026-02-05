@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import GerenciarEtapas from "@/components/configuracoes/GerenciarEtapas";
 import GerenciarSubetapas from "@/components/configuracoes/GerenciarSubetapas";
+import GerenciarAtividades from "@/components/configuracoes/GerenciarAtividades";
 
 const Etapa = () => {
     return (
@@ -13,9 +14,10 @@ const Etapa = () => {
             </div>
 
             <Tabs defaultValue="etapa" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+                <TabsList className="grid w-full grid-cols-3 max-w-[600px]">
                     <TabsTrigger value="etapa">Etapa</TabsTrigger>
                     <TabsTrigger value="subetapa">Sub-etapa</TabsTrigger>
+                    <TabsTrigger value="atividade">Atividades</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="etapa">
@@ -24,6 +26,10 @@ const Etapa = () => {
 
                 <TabsContent value="subetapa">
                     <GerenciarSubetapas />
+                </TabsContent>
+
+                <TabsContent value="atividade">
+                    <GerenciarAtividades />
                 </TabsContent>
             </Tabs>
         </div>

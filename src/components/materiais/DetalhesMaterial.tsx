@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useMaterial, useAtualizarMaterial, useCriarCor, useExcluirCor } from "@/hooks/useMateriais";
+import { useMaterial, useAtualizarMaterial, useCriarCores, useExcluirCor } from "@/hooks/useMateriais";
 import { ArrowLeft, Loader2, Plus, Trash2, Save } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
@@ -16,7 +16,7 @@ interface DetalhesMaterialProps {
 export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMaterialProps) {
     const { data: material, isLoading } = useMaterial(materialId);
     const { mutate: atualizarMaterial, isPending: isUpdating } = useAtualizarMaterial();
-    const { mutate: criarCor, isPending: isCreatingCor } = useCriarCor();
+    const { mutate: criarCores, isPending: isCreatingCores } = useCriarCores();
     const { mutate: excluirCor, isPending: isDeletingCor } = useExcluirCor();
 
     const [editMode, setEditMode] = useState(false);
@@ -25,13 +25,13 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
         codigo: "",
         preco_custo: 0,
         unidade_medida: "",
+        fator_conversao_pacote: 1,
         estoque_estamparia: 0,
         estoque_tingimento: 0,
         estoque_fabrica: 0,
     });
 
     const [novoNomeCor, setNovoNomeCor] = useState("");
-    const [novoHexCor, setNovoHexCor] = useState("#000000");
 
     // Load initial data into form when entering edit mode or when data loads
     const handleEditClick = () => {
@@ -39,8 +39,9 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
             setFormData({
                 nome: material.nome,
                 codigo: material.codigo || "",
-                preco_custo: material.preco_custo,
+                preco_custo: material.preco_custo || 0,
                 unidade_medida: material.unidade_medida || "",
+                fator_conversao_pacote: material.fator_conversao_pacote || 1,
                 estoque_estamparia: material.estoque_estamparia || 0,
                 estoque_tingimento: material.estoque_tingimento || 0,
                 estoque_fabrica: material.estoque_fabrica || 0,
@@ -65,12 +66,22 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
         e.preventDefault();
         if (!novoNomeCor) return;
 
-        criarCor(
-            { material_id: materialId, nome: novoNomeCor, hex: novoHexCor },
+        // Split by comma and cleanup whitespace
+        const nomes = novoNomeCor.split(",").map(n => n.trim()).filter(n => n.length > 0);
+
+        if (nomes.length === 0) return;
+
+        const novasCores = nomes.map(nome => ({
+            material_id: materialId,
+            nome,
+            hex: "#000000" // Default dummy hex
+        }));
+
+        criarCores(
+            novasCores,
             {
                 onSuccess: () => {
                     setNovoNomeCor("");
-                    setNovoHexCor("#000000");
                 },
             }
         );
@@ -115,7 +126,7 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
                 <CardContent className="pt-4">
                     {editMode ? (
                         <div className="space-y-4">
-                            <div className="grid gap-4 md:grid-cols-4">
+                            <div className="grid gap-4 md:grid-cols-3">
                                 <div className="space-y-2 col-span-1">
                                     <Label>Código</Label>
                                     <Input
@@ -123,7 +134,7 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
                                         onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
                                     />
                                 </div>
-                                <div className="space-y-2 col-span-3">
+                                <div className="space-y-2 col-span-2">
                                     <Label>Nome</Label>
                                     <Input
                                         value={formData.nome}
@@ -144,6 +155,15 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
                                     <Input
                                         value={formData.unidade_medida}
                                         onChange={(e) => setFormData({ ...formData, unidade_medida: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Conv</Label>
+                                    <Input
+                                        type="number"
+                                        step="any"
+                                        value={formData.fator_conversao_pacote}
+                                        onChange={(e) => setFormData({ ...formData, fator_conversao_pacote: Number(e.target.value) })}
                                     />
                                 </div>
                             </div>
@@ -182,22 +202,22 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
                         </div>
                     ) : (
                         <div className="space-y-6">
-                            <div className="grid gap-4 md:grid-cols-4 text-sm">
+                            <div className="grid gap-4 md:grid-cols-5 text-sm">
                                 <div>
                                     <span className="text-muted-foreground block">Código</span>
                                     <span className="font-medium font-mono">{material.codigo || "-"}</span>
                                 </div>
-                                <div>
+                                <div className="col-span-2">
                                     <span className="text-muted-foreground block">Nome</span>
                                     <span className="font-medium">{material.nome}</span>
                                 </div>
                                 <div>
                                     <span className="text-muted-foreground block">Preço de Custo</span>
-                                    <span className="font-medium">R$ {material.preco_custo.toFixed(2)}</span>
+                                    <span className="font-medium">R$ {(material.preco_custo || 0).toFixed(2)}</span>
                                 </div>
                                 <div>
-                                    <span className="text-muted-foreground block">Unidade</span>
-                                    <span className="font-medium">{material.unidade_medida || "-"}</span>
+                                    <span className="text-muted-foreground block">Unidade / Conv</span>
+                                    <span className="font-medium">{material.unidade_medida || "-"} (x{material.fator_conversao_pacote})</span>
                                 </div>
                             </div>
 
@@ -236,26 +256,19 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Cor</TableHead>
-                                    <TableHead>Nome</TableHead>
                                     <TableHead className="w-[100px] text-right">Ações</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {material.cores.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={3} className="text-center text-muted-foreground h-24">
+                                        <TableCell colSpan={2} className="text-center text-muted-foreground h-24">
                                             Nenhuma cor cadastrada.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     material.cores.map((cor) => (
                                         <TableRow key={cor.id}>
-                                            <TableCell>
-                                                <div
-                                                    className="w-6 h-6 rounded-full border shadow-sm"
-                                                    style={{ backgroundColor: cor.hex || "#fff" }}
-                                                />
-                                            </TableCell>
                                             <TableCell className="font-medium">{cor.nome}</TableCell>
                                             <TableCell className="text-right">
                                                 <Button
@@ -276,35 +289,24 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
 
                         <form onSubmit={handleAddCor} className="flex gap-4 items-end border-t pt-4">
                             <div className="grid gap-2 flex-1">
-                                <Label htmlFor="nomeCor">Nova Cor</Label>
+                                <Label htmlFor="nomeCor">Novas Cores</Label>
                                 <Input
                                     id="nomeCor"
-                                    placeholder="Nome da cor (ex: Azul Marinho)"
+                                    placeholder="Digite as cores separadas por vírgula (Ex: Azu, Vermelho, Verde)"
                                     value={novoNomeCor}
                                     onChange={(e) => setNovoNomeCor(e.target.value)}
                                     required
                                 />
+                                <p className="text-xs text-muted-foreground">Separe por vírgula para adicionar várias de uma vez.</p>
                             </div>
-                            <div className="grid gap-2 w-[100px]">
-                                <Label htmlFor="corHex">Cor</Label>
-                                <div className="flex h-10 w-full items-center gap-2 rounded-md border border-input bg-background p-1">
-                                    <input
-                                        type="color"
-                                        id="corHex"
-                                        className="h-full w-full cursor-pointer bg-transparent"
-                                        value={novoHexCor}
-                                        onChange={(e) => setNovoHexCor(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                            <Button type="submit" disabled={isCreatingCor}>
-                                {isCreatingCor ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+                            <Button type="submit" disabled={isCreatingCores}>
+                                {isCreatingCores ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
                                 Adicionar
                             </Button>
                         </form>
                     </div>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }

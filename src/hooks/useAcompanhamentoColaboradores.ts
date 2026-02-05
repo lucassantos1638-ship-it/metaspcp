@@ -11,11 +11,14 @@ export interface ColaboradorComAtividade {
         lote: {
             numero_lote: string;
             nome_lote: string;
-        };
+        } | null;
         etapa: {
             nome: string;
-        };
+        } | null;
         subetapa: {
+            nome: string;
+        } | null;
+        atividade: {
             nome: string;
         } | null;
         data_inicio: string;
@@ -52,7 +55,8 @@ export const useAcompanhamentoColaboradores = () => {
           segundos_inicio,
           lote:lotes(numero_lote, nome_lote),
           etapa:etapas(nome),
-          subetapa:subetapas(nome)
+          subetapa:subetapas(nome),
+          atividade:atividades(nome)
         `)
                 .eq("empresa_id", empresaId)
                 .eq("status", "em_aberto");
@@ -72,11 +76,12 @@ export const useAcompanhamentoColaboradores = () => {
                         lote: Array.isArray(atividade.lote) ? atividade.lote[0] : atividade.lote,
                         etapa: Array.isArray(atividade.etapa) ? atividade.etapa[0] : atividade.etapa,
                         subetapa: Array.isArray(atividade.subetapa) ? atividade.subetapa[0] : atividade.subetapa,
+                        atividade: Array.isArray(atividade.atividade) ? atividade.atividade[0] : atividade.atividade,
                         data_inicio: atividade.data_inicio,
                         hora_inicio: atividade.hora_inicio,
                         segundos_inicio: atividade.segundos_inicio || 0,
-                    } : null // Supabase returns single object for foreign keys usually, but let's be safe or just cast
-                } as ColaboradorComAtividade; // Casting to simplify the type inferred from Supabase join
+                    } : null
+                } as ColaboradorComAtividade;
             });
         },
         refetchInterval: 30000, // Refresh every 30s
