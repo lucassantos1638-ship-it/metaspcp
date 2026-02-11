@@ -75,17 +75,20 @@ export default function DetalhesLote() {
                         Detalhes do Lote
                     </h1>
                 </div>
-                {lote.finalizado && (
+                {lote.finalizado ? (
                     <Button
                         variant="outline"
                         onClick={async () => {
                             const { error } = await supabase
                                 .from('lotes')
-                                .update({ finalizado: false })
+                                .update({
+                                    finalizado: false,
+                                    manually_reopened: true
+                                })
                                 .eq('id', lote.id);
 
                             if (error) {
-                                toast.error("Erro ao reabrir lot");
+                                toast.error("Erro ao reabrir lote");
                             } else {
                                 toast.success("Lote reaberto com sucesso!");
                                 queryClient.invalidateQueries({ queryKey: ["detalhes_lote", id] });
@@ -93,6 +96,30 @@ export default function DetalhesLote() {
                         }}
                     >
                         Reabrir Lote
+                    </Button>
+                ) : (
+                    <Button
+                        variant="default"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={async () => {
+                            const { error } = await supabase
+                                .from('lotes')
+                                .update({
+                                    finalizado: true,
+                                    manually_reopened: false
+                                })
+                                .eq('id', lote.id);
+
+                            if (error) {
+                                toast.error("Erro ao finalizar lote");
+                            } else {
+                                toast.success("Lote finalizado com sucesso!");
+                                queryClient.invalidateQueries({ queryKey: ["detalhes_lote", id] });
+                            }
+                        }}
+                    >
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Finalizar Lote
                     </Button>
                 )}
             </div>
