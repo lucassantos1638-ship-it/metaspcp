@@ -15,10 +15,14 @@ import { formatarTempoProdutivo } from "@/lib/timeUtils";
 import { formatarCusto } from "@/lib/custoUtils";
 import { Package, Clock, Users, CheckCircle2, Loader2, DollarSign, Calculator, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function DetalhesLote() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const { data, isLoading } = useDetalhesLote(id || null);
 
     if (isLoading) {
@@ -60,15 +64,37 @@ export default function DetalhesLote() {
 
     return (
         <div className="container mx-auto py-6 space-y-6">
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" onClick={() => navigate(-1)}>
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Voltar
-                </Button>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <Package className="h-6 w-6" />
-                    Detalhes do Lote
-                </h1>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <Button variant="ghost" onClick={() => navigate(-1)}>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Voltar
+                    </Button>
+                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                        <Package className="h-6 w-6" />
+                        Detalhes do Lote
+                    </h1>
+                </div>
+                {lote.finalizado && (
+                    <Button
+                        variant="outline"
+                        onClick={async () => {
+                            const { error } = await supabase
+                                .from('lotes')
+                                .update({ finalizado: false })
+                                .eq('id', lote.id);
+
+                            if (error) {
+                                toast.error("Erro ao reabrir lot");
+                            } else {
+                                toast.success("Lote reaberto com sucesso!");
+                                queryClient.invalidateQueries({ queryKey: ["detalhes_lote", id] });
+                            }
+                        }}
+                    >
+                        Reabrir Lote
+                    </Button>
+                )}
             </div>
 
             <div className="space-y-6">
