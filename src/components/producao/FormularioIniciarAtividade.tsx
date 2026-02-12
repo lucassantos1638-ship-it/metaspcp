@@ -11,15 +11,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Play, ClipboardList } from "lucide-react";
+import { AlertCircle, Play, ClipboardList, Check, ChevronsUpDown } from "lucide-react";
 import { useIniciarProducao, useColaboradorTemAtividadeAberta } from "@/hooks/useProducaoStartStop";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 
 export default function FormularioIniciarAtividade() {
   const empresaId = useEmpresaId();
   const [colaboradorId, setColaboradorId] = useState("");
+  const [openColaborador, setOpenColaborador] = useState(false);
   const [loteId, setLoteId] = useState("");
   const [etapaId, setEtapaId] = useState("");
   const [subetapaId, setSubetapaId] = useState("");
@@ -227,18 +242,49 @@ export default function FormularioIniciarAtividade() {
         {/* Colaborador */}
         <div className="space-y-2">
           <Label htmlFor="colaborador">Colaborador *</Label>
-          <Select value={colaboradorId} onValueChange={setColaboradorId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o colaborador" />
-            </SelectTrigger>
-            <SelectContent>
-              {colaboradores?.map((colab) => (
-                <SelectItem key={colab.id} value={colab.id}>
-                  {colab.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={openColaborador} onOpenChange={setOpenColaborador}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={openColaborador}
+                className="w-full justify-between"
+              >
+                {colaboradorId
+                  ? colaboradores?.find((colab) => colab.id === colaboradorId)?.nome
+                  : "Selecione o colaborador"}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" side="bottom">
+              <Command>
+                <CommandInput placeholder="Buscar colaborador..." />
+                <CommandList>
+                  <CommandEmpty>Colaborador não encontrado.</CommandEmpty>
+                  <CommandGroup>
+                    {colaboradores?.map((colab) => (
+                      <CommandItem
+                        key={colab.id}
+                        value={colab.nome}
+                        onSelect={() => {
+                          setColaboradorId(colab.id);
+                          setOpenColaborador(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            colaboradorId === colab.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {colab.nome}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Switch Atividades Avulsas */}

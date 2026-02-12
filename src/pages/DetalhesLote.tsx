@@ -3,6 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import {
     Table,
     TableBody,
     TableCell,
@@ -13,7 +18,7 @@ import {
 import { useDetalhesLote } from "@/hooks/useDetalhesLote";
 import { formatarTempoProdutivo } from "@/lib/timeUtils";
 import { formatarCusto } from "@/lib/custoUtils";
-import { Package, Clock, Users, CheckCircle2, Loader2, DollarSign, Calculator, ArrowLeft } from "lucide-react";
+import { Package, Clock, Users, CheckCircle2, Loader2, DollarSign, Calculator, ArrowLeft, Droplet, Layers } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,13 +53,20 @@ export default function DetalhesLote() {
         )
     }
 
-    const { lote, progressoPorEtapa, tempoTotal, quantidadeProduzida, custoMateriais } = data;
+    const { lote, progressoPorEtapa, tempoTotal, quantidadeProduzida, custoMateriais, consumos } = data;
 
     // Calcular totais
     const custoProcesso = progressoPorEtapa.reduce((acc, curr) => acc + curr.custo_total, 0);
-    const custoTotalGeral = custoProcesso + (custoMateriais || 0);
+    const custoTotalGeral = custoProcesso;
 
-    const custoUnitarioGeral = quantidadeProduzida > 0 ? custoTotalGeral / quantidadeProduzida : 0;
+    // Calcular custos unitários com base na quantidade do lote
+    const quantidadeParaCalculo = lote.quantidade || lote.quantidade_total || 0;
+
+    // Soma dos custos unitários de cada etapa
+    const custoUnitarioGeral = progressoPorEtapa.reduce((acc, curr) => {
+        const unitarioEtapa = curr.quantidade_produzida > 0 ? curr.custo_total / curr.quantidade_produzida : 0;
+        return acc + unitarioEtapa;
+    }, 0);
 
     // Soma dos tempos unitários de cada etapa
     const tempoUnitarioGeral = progressoPorEtapa.reduce((acc, curr) => {
@@ -62,22 +74,31 @@ export default function DetalhesLote() {
         return acc + unitarioEtapa;
     }, 0);
 
+    // Variáveis para a nova interface de custos
+    const custoMaoDeObraTotal = custoTotalGeral;
+    const custoUnitMaoDeObra = custoUnitarioGeral;
+    const custoMaterialTotal = custoMateriais || 0;
+    const custoUnitMaterial = quantidadeParaCalculo > 0 ? custoMaterialTotal / quantidadeParaCalculo : 0;
+    const custoAgregadoTotal = custoMaoDeObraTotal + custoMaterialTotal;
+    const custoAgregadoUnit = custoUnitMaoDeObra + custoUnitMaterial;
+
     return (
         <div className="container mx-auto py-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" onClick={() => navigate(-1)}>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-center gap-2 md:gap-4">
+                    <Button variant="ghost" onClick={() => navigate(-1)} size="sm" className="pl-0 md:pl-4">
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Voltar
                     </Button>
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <Package className="h-6 w-6" />
+                    <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+                        <Package className="h-5 w-5 md:h-6 md:w-6" />
                         Detalhes do Lote
                     </h1>
                 </div>
                 {lote.finalizado ? (
                     <Button
                         variant="outline"
+                        className="w-full md:w-auto"
                         onClick={async () => {
                             const { error } = await supabase
                                 .from('lotes')
@@ -100,7 +121,7 @@ export default function DetalhesLote() {
                 ) : (
                     <Button
                         variant="default"
-                        className="bg-green-600 hover:bg-green-700"
+                        className="bg-green-600 hover:bg-green-700 w-full md:w-auto"
                         onClick={async () => {
                             const { error } = await supabase
                                 .from('lotes')
@@ -131,21 +152,21 @@ export default function DetalhesLote() {
                         <CardTitle className="text-lg">Informações Gerais</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
                                 <p className="text-sm text-muted-foreground">Número do Lote</p>
                                 <p className="text-lg font-semibold">#{lote.numero_lote}</p>
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Nome do Lote</p>
-                                <p className="text-lg font-semibold">{lote.nome_lote}</p>
+                                <p className="text-lg font-semibold break-words">{lote.nome_lote}</p>
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Produto</p>
-                                <p className="text-lg font-semibold">
+                                <p className="text-lg font-semibold break-words">
                                     {lote.produto?.nome || "N/A"}
                                     {lote.produto?.sku && (
-                                        <span className="text-sm text-muted-foreground ml-2">
+                                        <span className="text-sm text-muted-foreground ml-2 block sm:inline">
                                             ({lote.produto.sku})
                                         </span>
                                     )}
@@ -169,33 +190,108 @@ export default function DetalhesLote() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
-                            <div className="flex items-center gap-2">
-                                <Clock className="h-8 w-8 text-blue-500/20 text-blue-600 p-1.5 bg-blue-50 rounded-lg" />
-                                <div>
-                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Tempo Total</p>
-                                    <p className="font-bold text-xl">{formatarTempoProdutivo(tempoTotal)}</p>
+                        <div className="space-y-4 mt-6">
+                            {/* 1. Totais Gerais (Agregados) */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-emerald-600 uppercase tracking-wider">Custo Total (Material + Mão de Obra)</p>
+                                        <p className="text-3xl font-bold text-emerald-700 mt-1">
+                                            {formatarCusto(custoAgregadoTotal)}
+                                        </p>
+                                    </div>
+                                    <div className="h-12 w-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                                        <DollarSign className="h-6 w-6 text-emerald-600" />
+                                    </div>
+                                </div>
+                                <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-emerald-600 uppercase tracking-wider">Custo Unitário (Material + Mão de Obra)</p>
+                                        <p className="text-3xl font-bold text-emerald-700 mt-1">
+                                            {formatarCusto(custoAgregadoUnit)}
+                                        </p>
+                                    </div>
+                                    <div className="h-12 w-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                                        <Calculator className="h-6 w-6 text-emerald-600" />
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <DollarSign className="h-8 w-8 text-green-500/20 text-green-600 p-1.5 bg-green-50 rounded-lg" />
-                                <div>
-                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Custo Total</p>
-                                    <p className="font-bold text-xl text-green-600">{formatarCusto(custoTotalGeral)}</p>
+
+                            {/* 2. Detalhes Mão de Obra e Tempo */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="p-1.5 bg-blue-100 rounded-md">
+                                            <DollarSign className="h-4 w-4 text-blue-600" />
+                                        </div>
+                                        <span className="text-xs font-semibold text-blue-600 uppercase">Custo Total Mão de Obra</span>
+                                    </div>
+                                    <p className="text-xl font-bold text-slate-700">
+                                        {formatarCusto(custoMaoDeObraTotal)}
+                                    </p>
+                                </div>
+
+                                <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="p-1.5 bg-blue-100 rounded-md">
+                                            <Calculator className="h-4 w-4 text-blue-600" />
+                                        </div>
+                                        <span className="text-xs font-semibold text-blue-600 uppercase">Custo Unitário Mão de Obra</span>
+                                    </div>
+                                    <p className="text-xl font-bold text-slate-700">
+                                        {formatarCusto(custoUnitMaoDeObra)}
+                                    </p>
+                                </div>
+
+                                <div className="bg-orange-50/50 p-4 rounded-lg border border-orange-100">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="p-1.5 bg-orange-100 rounded-md">
+                                            <Clock className="h-4 w-4 text-orange-600" />
+                                        </div>
+                                        <span className="text-xs font-semibold text-orange-600 uppercase">Tempo Total</span>
+                                    </div>
+                                    <p className="text-xl font-bold text-slate-700">
+                                        {formatarTempoProdutivo(tempoTotal)}
+                                    </p>
+                                </div>
+
+                                <div className="bg-purple-50/50 p-4 rounded-lg border border-purple-100">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="p-1.5 bg-purple-100 rounded-md">
+                                            <Clock className="h-4 w-4 text-purple-600" />
+                                        </div>
+                                        <span className="text-xs font-semibold text-purple-600 uppercase">Tempo Unitário</span>
+                                    </div>
+                                    <p className="text-xl font-bold text-slate-700">
+                                        {formatarTempoProdutivo(tempoUnitarioGeral)}
+                                    </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Calculator className="h-8 w-8 text-orange-500/20 text-orange-600 p-1.5 bg-orange-50 rounded-lg" />
-                                <div>
-                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Custo Unit.</p>
-                                    <p className="font-bold text-xl text-orange-600">{formatarCusto(custoUnitarioGeral)}</p>
+
+                            {/* 3. Detalhes Materiais */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="p-1.5 bg-slate-200 rounded-md">
+                                            <Layers className="h-4 w-4 text-slate-600" />
+                                        </div>
+                                        <span className="text-xs font-semibold text-slate-600 uppercase">Custo Total Material</span>
+                                    </div>
+                                    <p className="text-xl font-bold text-slate-700">
+                                        {formatarCusto(custoMaterialTotal)}
+                                    </p>
                                 </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Clock className="h-8 w-8 text-purple-500/20 text-purple-600 p-1.5 bg-purple-50 rounded-lg" />
-                                <div>
-                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Tempo Unit.</p>
-                                    <p className="font-bold text-xl text-purple-600">{formatarTempoProdutivo(tempoUnitarioGeral)}</p>
+
+                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="p-1.5 bg-slate-200 rounded-md">
+                                            <Droplet className="h-4 w-4 text-slate-600" />
+                                        </div>
+                                        <span className="text-xs font-semibold text-slate-600 uppercase">Custo Unitário Material</span>
+                                    </div>
+                                    <p className="text-xl font-bold text-slate-700">
+                                        {formatarCusto(custoUnitMaterial)}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -233,14 +329,8 @@ export default function DetalhesLote() {
                                                 {etapa.subetapa_nome || etapa.etapa_nome}
                                             </TableCell>
                                             <TableCell>
-                                                <div className="space-y-1">
-                                                    <div className="flex flex-col gap-1">
-                                                        <div className="flex justify-between text-xs text-muted-foreground">
-                                                            <span>{etapa.quantidade_produzida} / {etapa.quantidade_total}</span>
-                                                            <span>{etapa.percentual}%</span>
-                                                        </div>
-                                                        <Progress value={etapa.percentual} className="h-2 w-full" />
-                                                    </div>
+                                                <div className="text-sm font-medium">
+                                                    {etapa.quantidade_produzida} / {etapa.quantidade_total}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
@@ -281,16 +371,119 @@ export default function DetalhesLote() {
                                                 </span>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex items-center gap-1">
-                                                    <Users className="h-3 w-3 text-muted-foreground" />
-                                                    {etapa.colaboradores.length > 0
-                                                        ? etapa.colaboradores.join(", ")
-                                                        : "Não iniciado"}
-                                                </div>
+                                                {etapa.colaboradores.length > 0 ? (
+                                                    <Popover>
+                                                        <PopoverTrigger asChild>
+                                                            <Button variant="link" className="p-0 h-auto font-normal text-foreground hover:text-primary">
+                                                                <div className="flex items-center gap-1">
+                                                                    <Users className="h-3 w-3 text-muted-foreground" />
+                                                                    {etapa.colaboradores.length} {etapa.colaboradores.length === 1 ? 'colaborador' : 'colaboradores'}
+                                                                </div>
+                                                            </Button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-80">
+                                                            <div className="space-y-2">
+                                                                <h4 className="font-medium text-sm border-b pb-2 mb-2">Colaboradores na etapa</h4>
+                                                                {etapa.colaboradores_detalhes?.map((colab, i) => (
+                                                                    <div key={i} className="flex justify-between items-center text-sm">
+                                                                        <span>{colab.nome}</span>
+                                                                        <span className="text-muted-foreground flex items-center gap-1">
+                                                                            <Clock className="h-3 w-3" />
+                                                                            {formatarTempoProdutivo(colab.tempo)}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-sm">-</span>
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     );
                                 })}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+
+                {/* Consumo de Matéria Prima */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Consumo de Matéria Prima</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Material</TableHead>
+                                    <TableHead className="text-right">Quantidade</TableHead>
+                                    <TableHead className="text-right">Preço Unit.</TableHead>
+                                    <TableHead className="text-right">Custo Total</TableHead>
+                                    <TableHead className="text-right">Custo p/ Peça</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {consumos?.length > 0 ? (
+                                    Object.values(consumos.reduce((acc: any, curr: any) => {
+                                        const id = curr.material?.id || 'unknown';
+                                        if (!acc[id]) acc[id] = { material: curr.material, itens: [] };
+                                        acc[id].itens.push(curr);
+                                        return acc;
+                                    }, {})).map((grupo: any) => (
+                                        <>
+                                            {/* Linha do Material (Título) */}
+                                            <TableRow key={`header-${grupo.material?.id}`} className="bg-muted/20 hover:bg-muted/30">
+                                                <TableCell colSpan={5} className="py-3">
+                                                    <div className="flex items-center gap-2 font-medium">
+                                                        {grupo.material?.codigo && (
+                                                            <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-muted-foreground/20">
+                                                                {grupo.material.codigo}
+                                                            </span>
+                                                        )}
+                                                        <span className="text-base text-card-foreground">
+                                                            {grupo.material?.nome || "Material sem nome"}
+                                                        </span>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+
+                                            {/* Linhas das Cores (Detalhes) */}
+                                            {grupo.itens.map((consumo: any) => {
+                                                const custoUnit = consumo.material?.preco_custo || 0;
+                                                const custoTotal = (consumo.quantidade_real || 0) * custoUnit;
+                                                const custoPorPeca = quantidadeParaCalculo > 0 ? custoTotal / quantidadeParaCalculo : 0;
+
+                                                return (
+                                                    <TableRow key={consumo.id} className="hover:bg-transparent">
+                                                        <TableCell className="pl-6 py-1">
+                                                            <div className="flex items-center pl-4 h-full">
+                                                                <span className="text-sm text-muted-foreground">
+                                                                    {consumo.cor?.nome || "Única / Padrão"}
+                                                                </span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right py-1 text-muted-foreground">
+                                                            {consumo.quantidade_real} {consumo.material?.unidade_medida}
+                                                        </TableCell>
+                                                        <TableCell className="text-right py-1 text-muted-foreground">{formatarCusto(custoUnit)}</TableCell>
+                                                        <TableCell className="text-right py-1 text-muted-foreground">{formatarCusto(custoTotal)}</TableCell>
+                                                        <TableCell className="text-right font-medium text-indigo-600 py-1">
+                                                            {formatarCusto(custoPorPeca)}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center text-muted-foreground h-24">
+                                            Nenhum material lançado para este lote.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
                     </CardContent>

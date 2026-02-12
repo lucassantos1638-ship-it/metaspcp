@@ -13,10 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ClipboardList } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useFinalizarProducao } from "@/hooks/useProducaoStartStop";
+import { Switch } from "@/components/ui/switch";
 
 interface DialogFinalizarAtividadeProps {
   producao: any;
@@ -41,6 +42,7 @@ export default function DialogFinalizarAtividade({
   const [quantidadeProduzida, setQuantidadeProduzida] = useState("");
   const [observacao, setObservacao] = useState("");
   const [erro, setErro] = useState("");
+  const [semQuantidade, setSemQuantidade] = useState(false);
 
   const finalizarProducao = useFinalizarProducao();
 
@@ -57,6 +59,7 @@ export default function DialogFinalizarAtividade({
       setQuantidadeProduzida(producao.quantidade_produzida?.toString() || "");
       setObservacao("");
       setErro("");
+      setSemQuantidade(false);
     }
   }, [open, producao]);
 
@@ -134,7 +137,7 @@ export default function DialogFinalizarAtividade({
     }
 
     // A validação de quantidade só é necessária se o campo estiver visível
-    if (showQuantityInput) {
+    if (showQuantityInput && !semQuantidade) {
       if (!quantidadeProduzida || parseInt(quantidadeProduzida) <= 0) {
         setErro("A quantidade produzida deve ser maior que zero");
         return false;
@@ -153,74 +156,20 @@ export default function DialogFinalizarAtividade({
     // Se estiver visível, usa o valor. Se for genérica ou oculto, usa 1 (para constar produção) ou 0?
     // Se for atividade genérica, não contabilizamos "unidades", então pode ser 1 para indicar "1 atividade feita".
     let qtd = 0;
-    if (showQuantityInput && quantidadeProduzida) {
+    if (showQuantityInput && !semQuantidade && quantidadeProduzida) {
       qtd = parseInt(quantidadeProduzida);
     } else if (isAtividadeGenerica) {
       qtd = 1;
     }
 
-    // Se precisa definir quantidade do lote (Fim da Etapa 1), atualizamos o lote também
-    if (precisaDefinirQuantidadeLote) {
-      // 1. Atualizar quantidade total do Lote
-      const { error: errorLote } = await supabase
-        .from("lotes")
-        .update({ quantidade_total: qtd })
-        .eq("id", producao.lote_id);
-
-      if (errorLote) {
-        console.error("Erro ao atualizar quantidade do lote", errorLote);
-        setErro("Erro ao atualizar quantidade do lote. Tente novamente.");
-        return;
-      }
-
-      // 2. Replicar a quantidade para todas as subetapas/atividades JÁ FINALIZADAS da Etapa 1
-      // Busca segura: Baixar as produções e atualizar.
-      const { data: producoesDoLote, error: errorBusca } = await supabase
-        .from("producoes")
-        .select(`
-          id, 
-          quantidade_produzida, 
-          status, 
-          etapa_id,
-          etapa:etapas(ordem)
-        `)
-        .eq("lote_id", producao.lote_id);
-
-      if (errorBusca) {
-        console.error("Erro ao buscar produções para backfill", errorBusca);
-      } else if (producoesDoLote) {
-        // Filtrar apenas as que:
-        // 1. Estão zeradas
-        // 2. Não são a atual
-        const producoesParaAtualizar = producoesDoLote.filter((p: any) =>
-          (p.quantidade_produzida === 0 || p.quantidade_produzida === null) &&
-          p.id !== producao.id
-        );
-
-        if (producoesParaAtualizar.length > 0) {
-          const idsParaAtualizar = producoesParaAtualizar.map((p: any) => p.id);
-          toast.info(`Atualizando quantidade em ${producoesParaAtualizar.length} etapas anteriores...`);
-
-          const { error: errorBackfill } = await supabase
-            .from("producoes")
-            .update({ quantidade_produzida: qtd })
-            .in("id", idsParaAtualizar);
-
-          if (errorBackfill) {
-            console.error("Erro ao atualizar produções antigas", errorBackfill);
-            toast.error("Erro ao sincronizar etapas anteriores.");
-          } else {
-            toast.success("Etapas anteriores sincronizadas!");
-          }
-        }
-      }
-
-      // 3. Finalizar a atividade atual
-      submitFinalizacao(qtd);
-
-    } else {
-      submitFinalizacao(qtd);
+    // Se estiver no modo "Sem Quantidade", garantimos que é 0
+    if (semQuantidade) {
+      qtd = 0;
     }
+
+    // A atualização do lote e a propagação para etapas anteriores (backfill)
+    // agora são tratadas automaticamente pelo Trigger 'handle_quantity_propagation' no banco de dados.
+    submitFinalizacao(qtd);
   };
 
   const submitFinalizacao = (qtd: number) => {
@@ -249,7 +198,7 @@ export default function DialogFinalizarAtividade({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Finalizar Atividade</DialogTitle>
           <DialogDescription>
@@ -283,7 +232,7 @@ export default function DialogFinalizarAtividade({
             </div>
           </div>
 
-          {precisaDefinirQuantidadeLote && (
+          {precisaDefinirQuantidadeLote && !semQuantidade && (
             <Alert className="bg-blue-50 text-blue-800 border-blue-200">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
@@ -336,20 +285,39 @@ export default function DialogFinalizarAtividade({
             </div>
 
             {showQuantityInput && (
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="quantidade">
-                  {precisaDefinirQuantidadeLote ? "Quantidade Real do Lote *" : "Quantidade Produzida *"}
-                </Label>
-                <Input
-                  type="number"
-                  id="quantidade"
-                  value={quantidadeProduzida}
-                  onChange={(e) => setQuantidadeProduzida(e.target.value)}
-                  min="1"
-                  required
-                />
-                {precisaDefinirQuantidadeLote && (
-                  <p className="text-xs text-muted-foreground">Isso definirá a quantidade para as próximas etapas.</p>
+              <div className="space-y-4 md:col-span-2">
+                <div className="flex items-center space-x-2 border p-3 rounded-md bg-muted/20">
+                  <Switch
+                    id="sem-quantidade"
+                    checked={!semQuantidade}
+                    onCheckedChange={(c) => setSemQuantidade(!c)}
+                  />
+                  <div className="flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                    <Label htmlFor="sem-quantidade" className="font-medium cursor-pointer">
+                      Lançar Quantidade
+                    </Label>
+                  </div>
+                </div>
+
+                {!semQuantidade && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <Label htmlFor="quantidade">
+                      {precisaDefinirQuantidadeLote ? "Quantidade Real do Lote *" : "Quantidade Produzida *"}
+                    </Label>
+                    <Input
+                      type="number"
+                      id="quantidade"
+                      value={quantidadeProduzida}
+                      onChange={(e) => setQuantidadeProduzida(e.target.value)}
+                      min="1"
+                      required={!semQuantidade}
+                      autoFocus
+                    />
+                    {precisaDefinirQuantidadeLote && (
+                      <p className="text-xs text-muted-foreground">Isso definirá a quantidade para as próximas etapas.</p>
+                    )}
+                  </div>
                 )}
               </div>
             )}

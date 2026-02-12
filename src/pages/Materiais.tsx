@@ -92,11 +92,11 @@ export default function Materiais() {
                                     className="cursor-pointer hover:bg-muted/50"
                                     onClick={() => setMaterialSelecionado(material.id)}
                                 >
-                                    <TableCell className="font-mono text-xs text-muted-foreground">{material.codigo || "-"}</TableCell>
-                                    <TableCell className="font-medium">{material.nome}</TableCell>
-                                    <TableCell>{material.unidade_medida}</TableCell>
-                                    <TableCell>R$ {material.preco_custo.toFixed(2)}</TableCell>
-                                    <TableCell>
+                                    <TableCell className="font-mono text-xs text-muted-foreground py-2">{material.codigo || "-"}</TableCell>
+                                    <TableCell className="font-medium py-2">{material.nome}</TableCell>
+                                    <TableCell className="py-2">{material.unidade_medida}</TableCell>
+                                    <TableCell className="py-2">R$ {material.preco_custo.toFixed(2)}</TableCell>
+                                    <TableCell className="py-2">
                                         <Badge
                                             variant={material.ativo ? "default" : "secondary"}
                                             className={`h-5 text-[10px] px-1.5 ${material.ativo
@@ -111,7 +111,7 @@ export default function Materiais() {
                                             {material.ativo ? "Ativo" : "Inativo"}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right py-2">
                                         <Button variant="ghost" size="icon" className="h-8 w-8">
                                             <Pencil className="h-4 w-4" />
                                         </Button>

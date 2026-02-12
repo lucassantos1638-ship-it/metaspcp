@@ -28,6 +28,7 @@ export interface EtapaProgresso {
   tempo_extra: number;
   custo_total: number;
   colaboradores: string[];
+  colaboradores_detalhes: { nome: string; tempo: number }[];
   status: 'concluida' | 'em_andamento' | 'pendente';
 }
 
@@ -58,6 +59,7 @@ export function agruparPorEtapa(
           tempo_extra: 0,
           custo_total: 0,
           colaboradores: [],
+          colaboradores_detalhes: [],
           status: 'pendente'
         });
       });
@@ -78,6 +80,7 @@ export function agruparPorEtapa(
         tempo_extra: 0,
         custo_total: 0,
         colaboradores: [],
+        colaboradores_detalhes: [],
         status: 'pendente'
       });
     }
@@ -103,6 +106,7 @@ export function agruparPorEtapa(
         tempo_extra: 0,
         custo_total: 0,
         colaboradores: [],
+        colaboradores_detalhes: [],
         status: 'pendente'
       });
     }
@@ -113,8 +117,8 @@ export function agruparPorEtapa(
     const custoHora = prod.colaborador_custo_hora || 0;
     const custoExtra = prod.colaborador_custo_extra || custoHora;
 
-    const minutosNormais = Number(prod.minutos_normais) || 0;
-    const minutosExtras = Number(prod.minutos_extras) || 0;
+    const minutosNormais = Math.max(0, Number(prod.minutos_normais) || 0);
+    const minutosExtras = Math.max(0, Number(prod.minutos_extras) || 0);
 
     // Calcula custo independente do status (se tiver tempo registrado, tem custo)
     const custoN = (minutosNormais / 60) * custoHora;
@@ -134,9 +138,22 @@ export function agruparPorEtapa(
     }
 
     if (prod.colaborador_nome) {
-      // Guardar lista de colaboradores
+      // Guardar lista de colaboradores (mantendo compatibilidade)
       if (!etapa.colaboradores.includes(prod.colaborador_nome)) {
         etapa.colaboradores.push(prod.colaborador_nome);
+      }
+
+      // Guardar detalhes por colaborador
+      const colabIndex = etapa.colaboradores_detalhes.findIndex(c => c.nome === prod.colaborador_nome);
+      const tempoProd = Number(prod.tempo_produtivo_minutos) || 0;
+
+      if (colabIndex >= 0) {
+        etapa.colaboradores_detalhes[colabIndex].tempo += tempoProd;
+      } else {
+        etapa.colaboradores_detalhes.push({
+          nome: prod.colaborador_nome,
+          tempo: tempoProd
+        });
       }
     }
   });

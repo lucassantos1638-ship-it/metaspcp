@@ -101,19 +101,24 @@ export function useDetalhesLote(loteId: string | null) {
 
       // 5. Buscar consumo de materiais (Safe fetch)
       let custoMateriais = 0;
+      let consumos: any[] = [];
       try {
-        const { data: consumos, error: consumoError } = await supabase
+        const { data: consumosData, error: consumoError } = await supabase
           .from("lote_consumo")
           .select(`
+            id,
             quantidade_real,
-            material:materiais(preco_custo)
+            material:materiais(id, nome, codigo, preco_custo, unidade_medida),
+            cor:materiais_cores(nome)
           `)
           .eq("lote_id", loteId);
 
-        if (!consumoError && consumos) {
-          custoMateriais = consumos.reduce((sum, c: any) => {
-            const preco = c.material?.preco_custo || 0;
-            return sum + (c.quantidade_real * preco);
+        if (!consumoError && consumosData) {
+          consumos = consumosData;
+          custoMateriais = consumosData.reduce((sum, c: any) => {
+            const preco = Math.max(0, c.material?.preco_custo || 0);
+            const quantidade = Math.max(0, c.quantidade_real || 0);
+            return sum + (quantidade * preco);
           }, 0);
         } else if (consumoError) {
           console.warn("Erro ao buscar custo materiais:", consumoError);
@@ -129,6 +134,7 @@ export function useDetalhesLote(loteId: string | null) {
         tempoTotal,
         quantidadeProduzida,
         custoMateriais,
+        consumos,
       };
     },
     enabled: !!loteId,

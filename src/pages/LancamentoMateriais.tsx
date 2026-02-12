@@ -28,9 +28,9 @@ export default function LancamentoMateriais() {
     return (
         <div className="container mx-auto py-6 space-y-6">
             <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4">
-                <Button variant="ghost" onClick={() => navigate(`/lotes/${id}`)} className="self-start md:self-center pl-0 md:pl-4">
+                <Button variant="ghost" onClick={() => navigate("/lancamento-mp")} className="self-start md:self-center pl-0 md:pl-4">
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Voltar para Detalhes
+                    Voltar
                 </Button>
                 <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
                     <Package className="h-5 w-5 md:h-6 md:w-6" />
