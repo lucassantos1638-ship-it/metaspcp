@@ -73,7 +73,7 @@ export default function CadastroProdutoDialog({
         .from("produtos")
         .insert({
           nome: nome.trim(),
-          sku,
+          sku: sku.trim(),
           descricao: descricao.trim() || null,
           preco_cpf: Number(precoCpf) || 0,
           preco_cnpj: Number(precoCnpj) || 0,
@@ -115,8 +115,14 @@ export default function CadastroProdutoDialog({
         <div className="space-y-6">
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="sku">SKU (gerado automaticamente)</Label>
-              <Input id="sku" value={sku} disabled className="font-mono bg-muted" />
+              <Label htmlFor="sku">SKU / Código do Produto</Label>
+              <Input
+                id="sku"
+                value={sku}
+                onChange={(e) => setSku(e.target.value)}
+                placeholder="Ex: 12345"
+                className="font-mono bg-muted focus:bg-background"
+              />
             </div>
 
             <div className="space-y-2">

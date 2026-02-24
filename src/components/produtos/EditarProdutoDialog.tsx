@@ -16,6 +16,7 @@ interface EditarProdutoDialogProps {
     precoCpfAtual: number;
     precoCnpjAtual: number;
     estoqueAtual: number;
+    skuAtual?: string;
 }
 
 export default function EditarProdutoDialog({
@@ -27,12 +28,14 @@ export default function EditarProdutoDialog({
     precoCpfAtual,
     precoCnpjAtual,
     estoqueAtual,
+    skuAtual,
 }: EditarProdutoDialogProps) {
     const [nome, setNome] = useState("");
     const [descricao, setDescricao] = useState("");
     const [precoCpf, setPrecoCpf] = useState("");
     const [precoCnpj, setPrecoCnpj] = useState("");
     const [estoque, setEstoque] = useState("");
+    const [sku, setSku] = useState("");
 
     const { mutate: atualizarProduto, isPending } = useAtualizarProduto();
 
@@ -43,8 +46,9 @@ export default function EditarProdutoDialog({
             setPrecoCpf(precoCpfAtual !== undefined ? precoCpfAtual.toString() : "");
             setPrecoCnpj(precoCnpjAtual !== undefined ? precoCnpjAtual.toString() : "");
             setEstoque(estoqueAtual !== undefined ? estoqueAtual.toString() : "");
+            setSku(skuAtual || "");
         }
-    }, [open, nomeAtual, descricaoAtual, precoCpfAtual, precoCnpjAtual, estoqueAtual]);
+    }, [open, nomeAtual, descricaoAtual, precoCpfAtual, precoCnpjAtual, estoqueAtual, skuAtual]);
 
     const handleSalvar = (e: React.FormEvent) => {
         e.preventDefault();
@@ -53,6 +57,7 @@ export default function EditarProdutoDialog({
                 id: produtoId,
                 nome,
                 descricao,
+                sku,
                 preco_cpf: Number(precoCpf) || 0,
                 preco_cnpj: Number(precoCnpj) || 0,
                 estoque: Number(estoque) || 0,
@@ -79,6 +84,16 @@ export default function EditarProdutoDialog({
                             value={nome}
                             onChange={(e) => setNome(e.target.value)}
                             required
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="sku">SKU / Código do Produto</Label>
+                        <Input
+                            id="sku"
+                            value={sku}
+                            onChange={(e) => setSku(e.target.value)}
+                            placeholder="Deixe em branco para usar o atual"
                         />
                     </div>
 

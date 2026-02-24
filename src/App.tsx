@@ -11,6 +11,7 @@ import Registro from "./pages/Registro";
 import Checkout from "./pages/Checkout";
 import SemAcesso from "./pages/SemAcesso";
 import Dashboard from "./pages/Dashboard";
+import Entidade from "./pages/Entidade";
 import Produtos from "./pages/Produtos";
 import Materiais from "./pages/Materiais";
 import Producao from "./pages/Producao";
@@ -75,6 +76,15 @@ const App = () => (
               />
 
               <Route
+                path="/entidade"
+                element={
+                  <ProtectedRoute requiredPermission="entidade">
+                    <Entidade />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/produtos"
                 element={
                   <ProtectedRoute requiredPermission="produtos">
@@ -86,7 +96,7 @@ const App = () => (
               <Route
                 path="/materiais"
                 element={
-                  <ProtectedRoute requiredPermission="produtos">
+                  <ProtectedRoute requiredPermission="materiais_cadastro">
                     <Materiais />
                   </ProtectedRoute>
                 }
@@ -95,7 +105,7 @@ const App = () => (
               <Route
                 path="/vendas-perdidas"
                 element={
-                  <ProtectedRoute requiredPermission="pedidos">
+                  <ProtectedRoute requiredPermission="prog_vendas">
                     <VendasPerdidas />
                   </ProtectedRoute>
                 }
@@ -104,7 +114,7 @@ const App = () => (
               <Route
                 path="/vendas-perdidas/:usuarioId"
                 element={
-                  <ProtectedRoute requiredPermission="pedidos">
+                  <ProtectedRoute requiredPermission="prog_vendas">
                     <VendasPerdidasUsuario />
                   </ProtectedRoute>
                 }
@@ -113,7 +123,7 @@ const App = () => (
               <Route
                 path="/vendas-perdidas/:usuarioId/:mes"
                 element={
-                  <ProtectedRoute requiredPermission="pedidos">
+                  <ProtectedRoute requiredPermission="prog_vendas">
                     <VendasPerdidasMensal />
                   </ProtectedRoute>
                 }
@@ -122,7 +132,7 @@ const App = () => (
               <Route
                 path="/programacao"
                 element={
-                  <ProtectedRoute requiredPermission="producao">
+                  <ProtectedRoute requiredPermission="programacao">
                     <Programacao />
                   </ProtectedRoute>
                 }
@@ -158,7 +168,7 @@ const App = () => (
               <Route
                 path="/lancamento-mp"
                 element={
-                  <ProtectedRoute requiredPermission="lotes">
+                  <ProtectedRoute requiredPermission="materiais_lancamento">
                     <ListaLancamentoMateriais />
                   </ProtectedRoute>
                 }
@@ -167,7 +177,7 @@ const App = () => (
               <Route
                 path="/lotes/:id/materiais"
                 element={
-                  <ProtectedRoute requiredPermission="lotes">
+                  <ProtectedRoute requiredPermission="materiais_lancamento">
                     <LancamentoMateriais />
                   </ProtectedRoute>
                 }
@@ -206,7 +216,7 @@ const App = () => (
               <Route
                 path="/desempenho"
                 element={
-                  <ProtectedRoute requiredPermission="colaboradores">
+                  <ProtectedRoute requiredPermission="desempenho">
                     <DesempenhoColaboradores />
                   </ProtectedRoute>
                 }
@@ -224,7 +234,7 @@ const App = () => (
               <Route
                 path="/projecao-vendas"
                 element={
-                  <ProtectedRoute requiredPermission="pedidos">
+                  <ProtectedRoute requiredPermission="prog_vendas">
                     <ProjecaoVendas />
                   </ProtectedRoute>
                 }
@@ -233,7 +243,7 @@ const App = () => (
               <Route
                 path="/projecao-vendas/:usuarioId"
                 element={
-                  <ProtectedRoute requiredPermission="pedidos">
+                  <ProtectedRoute requiredPermission="prog_vendas">
                     <ProjecaoUsuario />
                   </ProtectedRoute>
                 }
@@ -242,7 +252,7 @@ const App = () => (
               <Route
                 path="/projecao-vendas/:usuarioId/:mes"
                 element={
-                  <ProtectedRoute requiredPermission="pedidos">
+                  <ProtectedRoute requiredPermission="prog_vendas">
                     <ProjecaoMensal />
                   </ProtectedRoute>
                 }

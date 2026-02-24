@@ -107,23 +107,19 @@ export default function DialogFinalizarAtividade({
     return false;
   };
 
+  const isTerceirizado = !!producao?.terceirizado;
   const isAtividadeGenerica = !!producao?.atividade_id;
 
   // A quantidade deve ser exigida se:
   // 1. NÃO for atividade genérica
   // 2. E (For a última subetapa da etapa 1 OU não for etapa 1)
   // Basicamente: Lotes precisam de quantidade. Atividades genéricas não.
-  // Mas no fluxo de lote, só pedimos quantidade no final da etapa 1 ou etapas subsequentes.
-  // Simplificando o que já existia:
-  const precisaDefinirQuantidadeLote = !isAtividadeGenerica && isUltimaSubetapaEtapa1();
+  // E no caso de terceirização, a quantidade devolvida é obrigatória.
+  const precisaDefinirQuantidadeLote = !isTerceirizado && !isAtividadeGenerica && isUltimaSubetapaEtapa1();
   const isEtapa1 = producao?.etapa?.ordem === 1;
 
-  // Input visível se: NÃO for genérica E (não for etapa 1 OU for o momento de definir a qtde do lote)
-  // Mas espera, nas etapas 2, 3... também pedimos quantidade produzida? 
-  // No código original: `const showQuantityInput = !isEtapa1 || precisaDefinirQuantidadeLote;`
-  // Se for etapa 2, !isEtapa1 é true -> pede quantidade.
-  // Então mantemos a lógica original mas adicionamos a exceção da genérica.
-  const showQuantityInput = !isAtividadeGenerica && (!isEtapa1 || precisaDefinirQuantidadeLote);
+  // Input visível se: For Terceirizada OU (NÃO for genérica E (não for etapa 1 OU for o momento de definir a qtde do lote))
+  const showQuantityInput = isTerceirizado || (!isAtividadeGenerica && (!isEtapa1 || precisaDefinirQuantidadeLote));
 
   const validarDataHora = () => {
     if (!producao) return false;
@@ -139,7 +135,7 @@ export default function DialogFinalizarAtividade({
     // A validação de quantidade só é necessária se o campo estiver visível
     if (showQuantityInput && !semQuantidade) {
       if (!quantidadeProduzida || parseInt(quantidadeProduzida) <= 0) {
-        setErro("A quantidade produzida deve ser maior que zero");
+        setErro(isTerceirizado ? "A quantidade devolvida deve ser maior que zero" : "A quantidade produzida deve ser maior que zero");
         return false;
       }
     }
@@ -167,9 +163,34 @@ export default function DialogFinalizarAtividade({
       qtd = 0;
     }
 
-    // A atualização do lote e a propagação para etapas anteriores (backfill)
-    // agora são tratadas automaticamente pelo Trigger 'handle_quantity_propagation' no banco de dados.
-    submitFinalizacao(qtd);
+    if (isTerceirizado) {
+      const devolvidaTotal = (producao.quantidade_devolvida || 0) + qtd;
+      const enviada = producao.quantidade_enviada || 0;
+      const isFinalizado = devolvidaTotal >= enviada;
+
+      finalizarProducao.mutate(
+        {
+          id: producao.id,
+          data_fim: isFinalizado ? dataFim : null,
+          hora_fim: isFinalizado ? horaFim : null,
+          segundos_fim: isFinalizado ? parseInt(segundosFim) : null,
+          quantidade_produzida: devolvidaTotal, // Preenchemos igual p/ controle
+          quantidade_devolvida: devolvidaTotal,
+          observacao: observacao || undefined,
+          status: isFinalizado ? "finalizado" : "em_aberto",
+        },
+        {
+          onSuccess: () => {
+            onOpenChange(false);
+            if (!isFinalizado) toast.success(`Pacote devolvido. Faltam ${enviada - devolvidaTotal} peças.`);
+          },
+        }
+      );
+    } else {
+      // A atualização do lote e a propagação para etapas anteriores (backfill)
+      // agora são tratadas automaticamente pelo Trigger 'handle_quantity_propagation' no banco de dados.
+      submitFinalizacao(qtd);
+    }
   };
 
   const submitFinalizacao = (qtd: number) => {
@@ -210,22 +231,43 @@ export default function DialogFinalizarAtividade({
           {/* Informações da Abertura (Read-only) */}
           <div className="bg-muted p-4 rounded-lg space-y-2">
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <strong>Colaborador:</strong> {producao.colaborador?.nome || "N/A"}
-              </div>
-              <div>
-                <strong>Lote:</strong> {producao.lote?.numero_lote || "N/A"}
-              </div>
-              <div>
-                <strong>Etapa:</strong> {producao.etapa?.nome || "N/A"}
-              </div>
-              {producao.subetapa && (
-                <div>
-                  <strong>Subetapa:</strong> {producao.subetapa.nome}
-                </div>
+              {isTerceirizado ? (
+                <>
+                  <div className="col-span-2 sm:col-span-1">
+                    <strong>Terceirizado:</strong> {producao.entidade?.nome || "N/A"}
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <strong>Lote:</strong> {producao.lote?.numero_lote || "N/A"}
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <strong>Serviço:</strong> {producao.servico?.nome || "N/A"} - {producao.servico?.valor ? `R$ ${producao.servico.valor}` : ""}
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <span className="inline-flex items-center text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full text-xs font-medium">
+                      Progresso: {producao.quantidade_devolvida || 0} / {producao.quantidade_enviada}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="col-span-2 sm:col-span-1">
+                    <strong>Colaborador:</strong> {producao.colaborador?.nome || "N/A"}
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <strong>Lote:</strong> {producao.lote?.numero_lote || "N/A"}
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <strong>Etapa:</strong> {producao.etapa?.nome || "Atividade Avulsa"}
+                  </div>
+                  {producao.subetapa && (
+                    <div className="col-span-2 sm:col-span-1">
+                      <strong>Subetapa:</strong> {producao.subetapa.nome}
+                    </div>
+                  )}
+                </>
               )}
               <div className="col-span-2">
-                <strong>Início:</strong> {formatarData(producao.data_inicio)} às{" "}
+                <strong>{isTerceirizado ? "Enviado em" : "Início"}:</strong> {formatarData(producao.data_inicio)} às{" "}
                 {producao.hora_inicio}
                 {producao.segundos_inicio > 0 && `:${producao.segundos_inicio}s`}
               </div>
@@ -303,7 +345,7 @@ export default function DialogFinalizarAtividade({
                 {!semQuantidade && (
                   <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
                     <Label htmlFor="quantidade">
-                      {precisaDefinirQuantidadeLote ? "Quantidade Real do Lote *" : "Quantidade Produzida *"}
+                      {isTerceirizado ? "Quantidade Devolvida *" : precisaDefinirQuantidadeLote ? "Quantidade Real do Lote *" : "Quantidade Produzida *"}
                     </Label>
                     <Input
                       type="number"

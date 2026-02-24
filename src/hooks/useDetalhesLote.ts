@@ -73,7 +73,9 @@ export function useDetalhesLote(loteId: string | null) {
         .select(`
           *,
           etapa:etapas(nome, ordem),
-          subetapa:subetapas(nome)
+          subetapa:subetapas(nome),
+          entidade:entidade(nome),
+          servico:entidade_servicos(nome, valor)
         `)
         .eq("lote_id", loteId)
         .order("etapa(ordem)", { ascending: true });

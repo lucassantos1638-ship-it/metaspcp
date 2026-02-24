@@ -284,7 +284,7 @@ export function useAtualizarProduto() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; preco_cpf?: number; preco_cnpj?: number; nome?: string; descricao?: string; estoque?: number }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; preco_cpf?: number; preco_cnpj?: number; nome?: string; descricao?: string; estoque?: number; sku?: string }) => {
       const { data, error } = await supabase
         .from("produtos")
         .update(updates)

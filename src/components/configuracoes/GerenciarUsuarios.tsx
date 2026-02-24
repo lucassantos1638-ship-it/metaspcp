@@ -10,17 +10,23 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
-import { Plus, Trash2, KeyRound, Users } from "lucide-react";
+import { Plus, Trash2, KeyRound, Users, Edit } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const PERMISSIONS = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'producao', label: 'Lançar Produção' },
     { id: 'lotes', label: 'Lotes' },
-    { id: 'pedidos', label: 'Pedidos / Acompanhamento' },
+    { id: 'entidade', label: 'Entidade' },
+    { id: 'materiais_cadastro', label: 'Materiais (Cadastro)' },
+    { id: 'materiais_lancamento', label: 'Lançar Materiais' },
+    { id: 'pedidos', label: 'Pedidos / Monitoramento' },
     { id: 'produtos', label: 'Produtos' },
+    { id: 'programacao', label: 'Programação / MRP' },
+    { id: 'prog_vendas', label: 'Projeção / Vendas' },
     { id: 'previsao_producao', label: 'Previsão de Produção' },
     { id: 'metas', label: 'Metas' },
+    { id: 'desempenho', label: 'Desempenho' },
     { id: 'etapas', label: 'Etapas' },
     { id: 'relatorios', label: 'Relatórios' },
     { id: 'pop', label: 'P.O.P' },
@@ -40,6 +46,9 @@ const GerenciarUsuarios = () => {
     const [deleteUser, setDeleteUser] = useState<any>(null);
     const [resetPasswordUser, setResetPasswordUser] = useState<any>(null);
     const [newPassword, setNewPassword] = useState("");
+
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
         username: "",
@@ -70,6 +79,11 @@ const GerenciarUsuarios = () => {
                 // Filtro de segurança: Estrito por empresa (mesmo para admins)
                 if (user?.empresa_id) {
                     query = query.eq('empresa_id', user.empresa_id);
+                }
+
+                // Ocultar usuários 'super_admin' (Master) da lista normal, a menos que o usuário logado também seja super_admin
+                if (!isSuperAdmin) {
+                    query = query.neq('role', 'super_admin');
                 }
 
                 const { data, error } = await query;
@@ -127,6 +141,31 @@ const GerenciarUsuarios = () => {
         }
     });
 
+    const updateMutation = useMutation({
+        mutationFn: async (data: typeof formData) => {
+            if (!editingUserId) throw new Error("Usuário não selecionado para edição");
+
+            const { error } = await supabase
+                .from('usuarios')
+                .update({
+                    nome_completo: data.nome_completo,
+                    role: data.role,
+                    permissoes: data.permissoes
+                })
+                .eq('id', editingUserId);
+
+            if (error) throw error;
+            return true;
+        },
+        onSuccess: () => {
+            // Reload manually since we aren't using useQuery for the list
+            window.location.reload();
+        },
+        onError: (error: Error) => {
+            toast.error(error.message || "Erro ao atualizar usuário");
+        }
+    });
+
     const deleteMutation = useMutation({
         mutationFn: async (userId: string) => {
             if (userId === user?.id) throw new Error("Você não pode excluir seu próprio usuário");
@@ -181,7 +220,24 @@ const GerenciarUsuarios = () => {
             role: "colaborador",
             permissoes: []
         });
+        setIsEditMode(false);
+        setEditingUserId(null);
         setIsDialogOpen(false);
+    };
+
+    const handleEdit = (u: any) => {
+        setFormData({
+            username: u.username,
+            password: "", // Senha não editável por aqui
+            nome_completo: u.nome_completo,
+            email: u.email,
+            empresa_id: u.empresa_id || "",
+            role: u.role,
+            permissoes: u.permissoes || []
+        });
+        setEditingUserId(u.id);
+        setIsEditMode(true);
+        setIsDialogOpen(true);
     };
 
     const togglePermission = (permissionId: string) => {
@@ -198,7 +254,7 @@ const GerenciarUsuarios = () => {
     // Safe permission renderer
     const renderPermissions = (user: any) => {
         try {
-            if (user.role === 'gestor') return <span className="text-xs text-muted-foreground">Acesso Total</span>;
+            if (user.role === 'super_admin') return <span className="text-xs text-muted-foreground">Acesso Total (Admin)</span>;
 
             const perms = user.permissoes;
             if (!Array.isArray(perms) || perms.length === 0) return <span className="text-xs text-muted-foreground">Nenhuma</span>;
@@ -318,6 +374,15 @@ const GerenciarUsuarios = () => {
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
+                                                            onClick={() => handleEdit(u)}
+                                                            disabled={isMaster || (!isSuperAdmin && u.role === 'gestor' && u.id !== user?.id)}
+                                                            title={isMaster ? "A conta principal não pode ser editada aqui" : (!isSuperAdmin && u.role === 'gestor' && u.id !== user?.id) ? "Um gestor não pode editar outro gestor" : "Editar usuário"}
+                                                        >
+                                                            <Edit className={`h-4 w-4 ${isMaster || (!isSuperAdmin && u.role === 'gestor' && u.id !== user?.id) ? 'opacity-30' : ''}`} />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
                                                             disabled={!canResetPassword}
                                                             onClick={() => {
                                                                 setResetPasswordUser(u);
@@ -354,12 +419,19 @@ const GerenciarUsuarios = () => {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>Novo Usuário</DialogTitle>
+                        <DialogTitle>{isEditMode ? "Editar Permissões do Usuário" : "Novo Usuário"}</DialogTitle>
                         <DialogDescription>
-                            Crie um novo usuário para acesso ao sistema
+                            {isEditMode ? "Altere o perfil e as permissões de acesso do usuário." : "Crie um novo usuário para acesso ao sistema"}
                         </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={(e) => { e.preventDefault(); createMutation.mutate(formData); }}>
+                    <form onSubmit={(e) => {
+                        e.preventDefault();
+                        if (isEditMode) {
+                            updateMutation.mutate(formData);
+                        } else {
+                            createMutation.mutate(formData);
+                        }
+                    }}>
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
@@ -380,6 +452,7 @@ const GerenciarUsuarios = () => {
                                         onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                                         placeholder="user@empresa.com"
                                         required
+                                        disabled={isEditMode}
                                     />
                                 </div>
                             </div>
@@ -392,20 +465,23 @@ const GerenciarUsuarios = () => {
                                         value={formData.username}
                                         onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
                                         required
+                                        disabled={isEditMode}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="password">Senha *</Label>
-                                    <Input
-                                        id="password"
-                                        type="password"
-                                        value={formData.password}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                                        minLength={6}
-                                        placeholder="Min. 6 caracteres"
-                                        required
-                                    />
-                                </div>
+                                {!isEditMode && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="password">Senha *</Label>
+                                        <Input
+                                            id="password"
+                                            type="password"
+                                            value={formData.password}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                                            minLength={6}
+                                            placeholder="Min. 6 caracteres"
+                                            required={!isEditMode}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-2">
@@ -432,16 +508,37 @@ const GerenciarUsuarios = () => {
 
                             {(formData.role === 'colaborador' || formData.role === 'gestor') && (
                                 <div className="space-y-3 border rounded-md p-3 bg-muted/20">
-                                    <Label>Permissões de Acesso</Label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {PERMISSIONS.map(permission => (
+                                    <div className="flex justify-between items-center">
+                                        <Label>Permissões de Acesso</Label>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 px-2 text-[10px]"
+                                            onClick={() => {
+                                                const allowedPerms = isSuperAdmin ? PERMISSIONS.map(p => p.id) : (user?.permissoes || []);
+                                                if (formData.permissoes.length === allowedPerms.length) {
+                                                    setFormData(prev => ({ ...prev, permissoes: [] }));
+                                                } else {
+                                                    setFormData(prev => ({ ...prev, permissoes: allowedPerms as string[] }));
+                                                }
+                                            }}
+                                        >
+                                            {(() => {
+                                                const allowedPerms = isSuperAdmin ? PERMISSIONS.map(p => p.id) : (user?.permissoes || []);
+                                                return formData.permissoes.length === allowedPerms.length ? "Desmarcar Todos" : "Selecionar Todos";
+                                            })()}
+                                        </Button>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-muted-foreground/20">
+                                        {PERMISSIONS.filter(p => isSuperAdmin || (user?.permissoes || []).includes(p.id)).map(permission => (
                                             <div key={permission.id} className="flex items-center space-x-2">
                                                 <Checkbox
                                                     id={`perm-${permission.id}`}
                                                     checked={formData.permissoes.includes(permission.id)}
                                                     onCheckedChange={() => togglePermission(permission.id)}
                                                 />
-                                                <Label htmlFor={`perm-${permission.id}`} className="font-normal cursor-pointer">
+                                                <Label htmlFor={`perm-${permission.id}`} className="font-normal cursor-pointer text-xs">
                                                     {permission.label}
                                                 </Label>
                                             </div>
@@ -463,8 +560,8 @@ const GerenciarUsuarios = () => {
                             <Button type="button" variant="outline" onClick={resetForm}>
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={createMutation.isPending}>
-                                Criar Usuário
+                            <Button type="submit" disabled={isEditMode ? updateMutation.isPending : createMutation.isPending}>
+                                {isEditMode ? "Salvar Alterações" : "Criar Usuário"}
                             </Button>
                         </DialogFooter>
                     </form>

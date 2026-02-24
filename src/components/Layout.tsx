@@ -14,18 +14,19 @@ const Layout = () => {
   const { user, isGestor, temPermissao, logout } = useAuth();
   const allNavItems = [
     { path: "/", icon: LayoutDashboard, label: "Dashboard", permission: "dashboard" },
+    { path: "/entidade", icon: Users, label: "Entidade", permission: "entidade" },
     { path: "/producao", icon: Factory, label: "Lançar Produção", permission: "producao" },
-    { path: "/lancamento-mp", icon: PackagePlus, label: "Lançar Materiais", permission: "lotes" },
+    { path: "/lancamento-mp", icon: PackagePlus, label: "Lançar Materiais", permission: "materiais_lancamento" },
     { path: "/lotes", icon: Package, label: "Lotes", permission: "lotes" },
     { path: "/acompanhamento-colaboradores", icon: ClipboardList, label: "Monitoramento", permission: "pedidos" },
     { path: "/produtos", icon: Box, label: "Produtos", permission: "produtos" },
     { path: "/metas", icon: Target, label: "Metas", permission: "metas" },
-    { path: "/materiais", icon: Palette, label: "Materiais", permission: "produtos" },
-    { path: "/projecao-vendas", icon: Activity, label: "Projeção de Vendas", permission: "pedidos" },
-    { path: "/vendas-perdidas", icon: TrendingDown, label: "Vendas Perdidas", permission: "pedidos" },
-    { path: "/programacao", icon: Calendar, label: "Programação", permission: "producao" },
+    { path: "/materiais", icon: Palette, label: "Materiais", permission: "materiais_cadastro" },
+    { path: "/projecao-vendas", icon: Activity, label: "Projeção de Vendas", permission: "prog_vendas" },
+    { path: "/vendas-perdidas", icon: TrendingDown, label: "Vendas Perdidas", permission: "prog_vendas" },
+    { path: "/programacao", icon: Calendar, label: "Programação", permission: "programacao" },
     { path: "/etapas", icon: Layers, label: "Etapas", permission: "etapas" },
-    { path: "/desempenho", icon: TrendingUp, label: "Desempenho", permission: "colaboradores" },
+    { path: "/desempenho", icon: TrendingUp, label: "Desempenho", permission: "desempenho" },
     { path: "/previsao-producao", icon: Calculator, label: "Previsão", permission: "previsao_producao" },
     { path: "/pop", icon: ScrollText, label: "P.O.P", permission: "pop" },
   ];
@@ -33,9 +34,7 @@ const Layout = () => {
   // Main Nav Items
   const navItems = user?.role === 'super_admin'
     ? allNavItems
-    : isGestor
-      ? allNavItems
-      : allNavItems.filter(item => temPermissao(item.permission));
+    : allNavItems.filter(item => temPermissao(item.permission));
 
 
 

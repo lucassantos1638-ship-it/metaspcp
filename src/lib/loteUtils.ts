@@ -12,6 +12,14 @@ interface Producao {
   minutos_normais: number | null;
   minutos_extras: number | null;
   status: string;
+
+  terceirizado?: boolean;
+  entidade_id?: string | null;
+  servico_id?: string | null;
+  quantidade_enviada?: number | null;
+  quantidade_devolvida?: number | null;
+  entidade?: { nome: string } | null;
+  servico?: { nome: string; valor: number } | null;
 }
 
 export interface EtapaProgresso {
@@ -28,8 +36,9 @@ export interface EtapaProgresso {
   tempo_extra: number;
   custo_total: number;
   colaboradores: string[];
-  colaboradores_detalhes: { nome: string; tempo: number }[];
+  colaboradores_detalhes: { nome: string; tempo: number; quantidade: number }[];
   status: 'concluida' | 'em_andamento' | 'pendente';
+  is_terceirizado?: boolean;
 }
 
 export function agruparPorEtapa(
@@ -88,16 +97,19 @@ export function agruparPorEtapa(
 
   // 2. Preencher com dados reais de produção
   producoes.forEach(prod => {
-    const key = `${prod.etapa_id}-${prod.subetapa_id || 'main'}`;
+    // Se for terceirizado, agrupamos por serviço para ficar detalhado
+    const key = prod.terceirizado
+      ? `terceirizado-${prod.servico_id || 'general'}`
+      : `${prod.etapa_id}-${prod.subetapa_id || 'main'}`;
 
-    // Se não existir (caso de etapa apagada ou inconsistência), cria
+    // Se não existir (caso de etapa apagada, terceirizado, ou inconsistência), cria
     if (!etapasMap.has(key)) {
       etapasMap.set(key, {
-        etapa_id: prod.etapa_id,
-        subetapa_id: prod.subetapa_id,
-        etapa_nome: prod.etapa.nome,
-        subetapa_nome: prod.subetapa?.nome || null,
-        etapa_ordem: prod.etapa.ordem,
+        etapa_id: prod.terceirizado ? 'terceirizado' : prod.etapa_id,
+        subetapa_id: prod.terceirizado ? prod.servico_id : prod.subetapa_id,
+        etapa_nome: prod.terceirizado ? 'Terceirização' : (prod.etapa?.nome || 'Desconhecido'),
+        subetapa_nome: prod.terceirizado ? (prod.servico?.nome || 'Serviço G.') : (prod.subetapa?.nome || null),
+        etapa_ordem: prod.terceirizado ? 999 : (prod.etapa?.ordem || 999),
         quantidade_produzida: 0,
         quantidade_total: quantidadeTotal,
         percentual: 0,
@@ -107,55 +119,80 @@ export function agruparPorEtapa(
         custo_total: 0,
         colaboradores: [],
         colaboradores_detalhes: [],
-        status: 'pendente'
+        status: 'pendente',
+        is_terceirizado: prod.terceirizado
       });
     }
 
     const etapa = etapasMap.get(key)!;
 
     // Cálculo de custos
-    const custoHora = prod.colaborador_custo_hora || 0;
-    const custoExtra = prod.colaborador_custo_extra || custoHora;
+    if (prod.terceirizado) {
+      // Custo de terceirização = quantidade_devolvida * valor do serviço
+      const qtdeValida = Number(prod.quantidade_devolvida) || 0;
+      const valorServico = Number(prod.servico?.valor) || 0;
+      etapa.custo_total += (qtdeValida * valorServico);
 
-    const minutosNormais = Math.max(0, Number(prod.minutos_normais) || 0);
-    const minutosExtras = Math.max(0, Number(prod.minutos_extras) || 0);
-
-    // Calcula custo independente do status (se tiver tempo registrado, tem custo)
-    const custoN = (minutosNormais / 60) * custoHora;
-    const custoE = (minutosExtras / 60) * custoExtra;
-
-    etapa.custo_total += custoN + custoE;
-
-    if (prod.status === 'finalizado') {
-      etapa.quantidade_produzida += Number(prod.quantidade_produzida) || 0;
-      etapa.tempo_total += Number(prod.tempo_produtivo_minutos) || 0;
-      etapa.tempo_normal += minutosNormais;
-      etapa.tempo_extra += minutosExtras;
-    } else if (prod.status === 'em_aberto') {
-      etapa.tempo_total += Number(prod.tempo_produtivo_minutos) || 0;
-      etapa.tempo_normal += minutosNormais;
-      etapa.tempo_extra += minutosExtras;
-    }
-
-    if (prod.colaborador_nome) {
-      // Guardar lista de colaboradores (mantendo compatibilidade)
-      if (!etapa.colaboradores.includes(prod.colaborador_nome)) {
-        etapa.colaboradores.push(prod.colaborador_nome);
+      // Controlando a quantidade visualmente na tabela
+      if (prod.status === 'finalizado') {
+        etapa.quantidade_produzida += qtdeValida;
+      } else if (prod.status === 'em_aberto') {
+        etapa.quantidade_produzida += qtdeValida; // Mostrar o que já devolveu mesmo aberto
       }
 
-      // Guardar detalhes por colaborador
-      const colabIndex = etapa.colaboradores_detalhes.findIndex(c => c.nome === prod.colaborador_nome);
-      const tempoProd = Number(prod.tempo_produtivo_minutos) || 0;
+      if (prod.entidade?.nome) {
+        if (!etapa.colaboradores.includes(prod.entidade.nome)) {
+          etapa.colaboradores.push(prod.entidade.nome);
+        }
+      }
+    } else {
+      const custoHora = prod.colaborador_custo_hora || 0;
+      const custoExtra = prod.colaborador_custo_extra || custoHora;
 
-      if (colabIndex >= 0) {
-        etapa.colaboradores_detalhes[colabIndex].tempo += tempoProd;
-      } else {
-        etapa.colaboradores_detalhes.push({
-          nome: prod.colaborador_nome,
-          tempo: tempoProd
-        });
+      const minutosNormais = Math.max(0, Number(prod.minutos_normais) || 0);
+      const minutosExtras = Math.max(0, Number(prod.minutos_extras) || 0);
+
+      // Calcula custo independente do status (se tiver tempo registrado, tem custo)
+      const custoN = (minutosNormais / 60) * custoHora;
+      const custoE = (minutosExtras / 60) * custoExtra;
+
+      etapa.custo_total += custoN + custoE;
+
+      if (prod.status === 'finalizado') {
+        etapa.quantidade_produzida += Number(prod.quantidade_produzida) || 0;
+        etapa.tempo_total += Number(prod.tempo_produtivo_minutos) || 0;
+        etapa.tempo_normal += minutosNormais;
+        etapa.tempo_extra += minutosExtras;
+      } else if (prod.status === 'em_aberto') {
+        etapa.tempo_total += Number(prod.tempo_produtivo_minutos) || 0;
+        etapa.tempo_normal += minutosNormais;
+        etapa.tempo_extra += minutosExtras;
+      }
+
+      if (prod.colaborador_nome) {
+        // Guardar lista de colaboradores (mantendo compatibilidade)
+        if (!etapa.colaboradores.includes(prod.colaborador_nome)) {
+          etapa.colaboradores.push(prod.colaborador_nome);
+        }
+
+        // Guardar detalhes por colaborador
+        const colabIndex = etapa.colaboradores_detalhes.findIndex(c => c.nome === prod.colaborador_nome);
+        const tempoProd = Number(prod.tempo_produtivo_minutos) || 0;
+        const qtdProd = Number(prod.quantidade_produzida) || 0;
+
+        if (colabIndex >= 0) {
+          etapa.colaboradores_detalhes[colabIndex].tempo += tempoProd;
+          etapa.colaboradores_detalhes[colabIndex].quantidade += qtdProd;
+        } else {
+          etapa.colaboradores_detalhes.push({
+            nome: prod.colaborador_nome,
+            tempo: tempoProd,
+            quantidade: qtdProd
+          });
+        }
       }
     }
+
   });
 
   // 2.1 Pós-processamento para corrigir quantidades duplicadas (trabalho em equipe no mesmo lote)

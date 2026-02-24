@@ -549,6 +549,7 @@ export default function DetalhesProduto({
         precoCpfAtual={produto.preco_cpf || 0}
         precoCnpjAtual={produto.preco_cnpj || 0}
         estoqueAtual={produto.estoque || 0}
+        skuAtual={produto.sku}
       />
 
       <AdicionarMaterialProdutoDialog

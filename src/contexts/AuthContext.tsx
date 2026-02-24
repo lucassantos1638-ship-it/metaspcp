@@ -177,6 +177,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             navigate('/acompanhamento-colaboradores');
           } else if (perms.includes('produtos')) {
             navigate('/produtos');
+          } else if (perms.includes('materiais_cadastro')) {
+            navigate('/materiais');
+          } else if (perms.includes('materiais_lancamento')) {
+            navigate('/lancamento-mp');
           } else if (perms.includes('metas')) {
             navigate('/metas');
           } else {

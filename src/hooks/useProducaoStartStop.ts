@@ -15,7 +15,9 @@ export const useProducoesEmAberto = () => {
           lote:lotes(numero_lote, nome_lote, produto_id),
           etapa:etapas(nome, ordem),
           subetapa:subetapas(nome),
-          atividade:atividades(nome)
+          atividade:atividades(nome),
+          entidade:entidade(nome),
+          servico:entidade_servicos(nome, valor)
         `)
         .eq("status", "em_aberto")
         .order("created_at", { ascending: false });
@@ -60,11 +62,15 @@ export const useIniciarProducao = () => {
 
   return useMutation({
     mutationFn: async (payload: {
-      colaborador_id: string;
+      colaborador_id?: string | null;
       lote_id?: string | null;
       etapa_id?: string | null;
       subetapa_id?: string | null;
       atividade_id?: string | null;
+      terceirizado?: boolean;
+      entidade_id?: string | null;
+      servico_id?: string | null;
+      quantidade_enviada?: number | null;
       quantidade_produzida?: number | null;
       data_inicio: string;
       hora_inicio: string;
@@ -72,19 +78,29 @@ export const useIniciarProducao = () => {
       empresa_id: string;
     }) => {
       // Validar payload
-      if (!payload.atividade_id && (!payload.lote_id || !payload.etapa_id)) {
-        throw new Error("É necessário informar um Lote/Etapa OU uma Atividade.");
+      if (!payload.atividade_id && (!payload.lote_id || (!payload.etapa_id && !payload.terceirizado))) {
+        throw new Error("É necessário informar um Lote/Etapa, uma Atividade, ou um Lote Terceirizado.");
+      }
+      if (payload.terceirizado && (!payload.entidade_id || !payload.servico_id || !payload.quantidade_enviada)) {
+        throw new Error("Para terceirização, informe a Entidade, o Serviço e a Quantidade Enviada.");
+      }
+      if (!payload.terceirizado && !payload.colaborador_id) {
+        throw new Error("É necessário informar o Colaborador para atividades internas.");
       }
 
       const { data, error } = await supabase
         .from("producoes")
         .insert([{
-          colaborador_id: payload.colaborador_id,
+          colaborador_id: payload.colaborador_id || null,
           empresa_id: payload.empresa_id,
           lote_id: payload.lote_id || null, // Garante null se undefined
           etapa_id: payload.etapa_id || null, // Garante null se undefined
           subetapa_id: payload.subetapa_id || null,
           atividade_id: payload.atividade_id || null, // Novo campo
+          terceirizado: payload.terceirizado || false,
+          entidade_id: payload.entidade_id || null,
+          servico_id: payload.servico_id || null,
+          quantidade_enviada: payload.quantidade_enviada || null,
           quantidade_produzida: payload.quantidade_produzida || null,
           data_inicio: payload.data_inicio,
           hora_inicio: payload.hora_inicio,
@@ -121,21 +137,24 @@ export const useFinalizarProducao = () => {
   return useMutation({
     mutationFn: async (payload: {
       id: string;
-      data_fim: string;
-      hora_fim: string;
-      segundos_fim?: number;
-      quantidade_produzida: number;
+      data_fim?: string | null;
+      hora_fim?: string | null;
+      segundos_fim?: number | null;
+      quantidade_produzida?: number;
+      quantidade_devolvida?: number;
       observacao?: string;
+      status?: "em_aberto" | "finalizado";
     }) => {
       const { data, error } = await supabase
         .from("producoes")
         .update({
-          data_fim: payload.data_fim,
-          hora_fim: payload.hora_fim,
-          segundos_fim: payload.segundos_fim || 0,
+          data_fim: payload.data_fim !== undefined ? payload.data_fim : null,
+          hora_fim: payload.hora_fim !== undefined ? payload.hora_fim : null,
+          segundos_fim: payload.segundos_fim !== undefined ? payload.segundos_fim : null,
           quantidade_produzida: payload.quantidade_produzida,
+          quantidade_devolvida: payload.quantidade_devolvida !== undefined ? payload.quantidade_devolvida : undefined,
           observacao: payload.observacao || null,
-          status: "finalizado",
+          status: payload.status || "finalizado",
         })
         .eq("id", payload.id)
         .select()

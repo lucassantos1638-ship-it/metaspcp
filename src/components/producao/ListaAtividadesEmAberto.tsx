@@ -110,7 +110,7 @@ export default function ListaAtividadesEmAberto() {
   }
 
   const producoesFiltradas = producoesEmAberto.filter((producao) => {
-    const nomeColaborador = producao.colaborador?.nome?.toLowerCase() || "";
+    const nomeColaborador = (producao.terceirizado ? producao.entidade?.nome : producao.colaborador?.nome)?.toLowerCase() || "";
     return nomeColaborador.includes(filtroNome.toLowerCase());
   });
 
@@ -260,10 +260,22 @@ export default function ListaAtividadesEmAberto() {
                         {group.atividades.map((producao) => (
                           <TableRow key={producao.id}>
                             <TableCell className="font-medium">
-                              {producao.colaborador?.nome || "N/A"}
+                              {producao.terceirizado ? (
+                                <div className="flex flex-col">
+                                  <span>{producao.entidade?.nome || "Entidade N/A"}</span>
+                                  <Badge variant="outline" className="w-fit text-[10px] uppercase mt-1 bg-amber-50 text-amber-700 border-amber-200">Terceirizado</Badge>
+                                </div>
+                              ) : (
+                                producao.colaborador?.nome || "N/A"
+                              )}
                             </TableCell>
                             <TableCell>
-                              {producao.atividade ? (
+                              {producao.terceirizado ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Badge variant="outline" className="text-xs bg-muted/50">Serviço</Badge>
+                                  <span className="font-medium">{producao.servico?.nome || "N/A"}</span>
+                                </div>
+                              ) : producao.atividade ? (
                                 <div className="flex items-center gap-1.5">
                                   <Badge variant="outline" className="text-xs bg-muted/50">Avulsa</Badge>
                                   <span className="font-medium">{producao.atividade.nome}</span>
@@ -323,7 +335,16 @@ export default function ListaAtividadesEmAberto() {
                           {/* Header */}
                           <div className="flex justify-between items-start gap-3">
                             <div>
-                              <span className="font-medium text-sm block">{producao.colaborador?.nome || "N/A"}</span>
+                              <span className="font-medium text-sm block">
+                                {producao.terceirizado ? (
+                                  <div className="flex flex-col gap-1">
+                                    <span>{producao.entidade?.nome || "N/A"}</span>
+                                    <Badge variant="outline" className="w-fit text-[10px] uppercase bg-amber-50 text-amber-700 border-amber-200">Terceirizado</Badge>
+                                  </div>
+                                ) : (
+                                  producao.colaborador?.nome || "N/A"
+                                )}
+                              </span>
                               <Badge variant="secondary" className="mt-1 bg-warning/20 text-warning text-[10px]">
                                 Em Aberto
                               </Badge>
@@ -343,7 +364,12 @@ export default function ListaAtividadesEmAberto() {
                           <div className="bg-background/50 rounded-md p-3 text-xs space-y-2 border border-dashed">
                             <div>
                               <span className="font-semibold block mb-1">Etapa:</span>
-                              {producao.atividade ? (
+                              {producao.terceirizado ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Badge variant="outline" className="text-[10px] h-5 px-1">Serviço</Badge>
+                                  <span>{producao.servico?.nome || "N/A"}</span>
+                                </div>
+                              ) : producao.atividade ? (
                                 <div className="flex items-center gap-1.5">
                                   <Badge variant="outline" className="text-[10px] h-5 px-1">Avulsa</Badge>
                                   <span>{producao.atividade.nome}</span>
