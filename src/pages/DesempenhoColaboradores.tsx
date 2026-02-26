@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Search, DollarSign, Clock, Package, Printer } from "lucide-react";
-import { format } from "date-fns";
+import { CalendarIcon, Search, DollarSign, Clock, Package, Printer, ChevronDown, ChevronRight, Check } from "lucide-react";
+import { format, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
@@ -22,6 +23,68 @@ const formatarTempo = (minutos: number) => {
     const m = Math.floor(minutos % 60);
     return `${h}h ${m}min`;
 };
+
+function SearchableSelect({
+    value,
+    onValueChange,
+    options,
+    placeholder,
+    disabled
+}: {
+    value: string;
+    onValueChange: (val: string) => void;
+    options: { value: string; label: string }[];
+    placeholder: string;
+    disabled?: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+    const selectedLabel = options.find(o => o.value === value)?.label || placeholder;
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className="w-full justify-between font-normal bg-background"
+                    disabled={disabled}
+                >
+                    <span className="truncate">{selectedLabel}</span>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                    <CommandInput placeholder="Pesquisar..." />
+                    <CommandList>
+                        <CommandEmpty>Nenhum resultado.</CommandEmpty>
+                        <CommandGroup>
+                            {options.map((option) => (
+                                <CommandItem
+                                    key={option.value}
+                                    value={option.label}
+                                    onSelect={() => {
+                                        onValueChange(option.value);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <Check
+                                        className={cn(
+                                            "mr-2 h-4 w-4",
+                                            value === option.value ? "opacity-100" : "opacity-0"
+                                        )}
+                                    />
+                                    {option.label}
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
+}
 
 export default function DesempenhoColaboradores() {
     console.log("DesempenhoColaboradores component mounted");
@@ -36,6 +99,11 @@ export default function DesempenhoColaboradores() {
     const [tipoFiltro, setTipoFiltro] = useState<string>("all"); // all, producao, atividade
     const [atividadeId, setAtividadeId] = useState<string>("all");
     const [filtrosAplicados, setFiltrosAplicados] = useState(false);
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+    const toggleGroup = (id: string) => {
+        setExpandedGroups(prev => ({ ...prev, [id]: !prev[id] }));
+    };
 
     // Buscar Colaboradores
     const { data: colaboradores } = useQuery({
@@ -160,18 +228,22 @@ export default function DesempenhoColaboradores() {
                 .select(`
                 *,
                 lote:lotes(numero_lote, nome_lote, produto_id),
-                etapa:etapas(nome),
+                etapa:etapas(nome, ordem),
                 subetapa:subetapas(nome),
                 atividade:atividades(nome)
             `)
                 .eq("empresa_id", empresaId)
                 .eq("colaborador_id", colaboradorId);
 
+            const fromStr = format(dataInicio, "yyyy-MM-dd");
+            const toStr = format(dataFim, "yyyy-MM-dd");
+            console.log(`Buscando produções de colaboradorId: ${colaboradorId} entre ${fromStr} e ${toStr}`);
+
             if (dataInicio) {
-                query = query.gte("data_inicio", format(dataInicio, "yyyy-MM-dd"));
+                query = query.gte("data_inicio", fromStr);
             }
             if (dataFim) {
-                query = query.lte("data_inicio", format(dataFim, "yyyy-MM-dd"));
+                query = query.lte("data_inicio", `${toStr} 23:59:59`);
             }
 
             // Filtro por Tipo (Produção vs Atividade)
@@ -189,8 +261,13 @@ export default function DesempenhoColaboradores() {
                 query = query.eq("atividade_id", atividadeId);
             }
 
+            console.log("Query URL e params processados...", { fromStr, toStr, tipoFiltro, atividadeId });
             const { data, error } = await query;
-            if (error) throw error;
+            if (error) {
+                console.error("Erro na busca de produções:", error);
+                throw error;
+            }
+            console.log("Dados retornados da busca:", data?.length);
 
             // Filtro de Lote no Client Side se preenchido e não for "all"
             let filteredData = data;
@@ -222,27 +299,136 @@ export default function DesempenhoColaboradores() {
         }
     };
 
+    const grupos = useMemo(() => {
+        if (!producoes || !colaboradores || !colaboradorId) return [];
+        const colaborador = colaboradores.find(c => c.id === colaboradorId);
+        const custoHoraNormal = Number((colaborador as any)?.custo_por_hora || 0);
+        const custoHoraExtra = Number((colaborador as any)?.custo_hora_extra || 0);
+
+        const map = new Map<string, any>();
+        const lotesPorGrupo = new Map<string, Map<string, number>>(); // Controlar max qtd de Lote por Grupo
+
+        producoes.forEach(prod => {
+            const isAvulsa = !!prod.atividade;
+            const key = isAvulsa
+                ? `atividade_${prod.atividade_id}`
+                : `etapa_${prod.etapa_id}_subetapa_${prod.subetapa_id || 'null'}`;
+
+            if (!map.has(key)) {
+                map.set(key, {
+                    id: key,
+                    isAvulsa,
+                    titulo: isAvulsa
+                        ? (prod.atividade as any).nome
+                        : `${(prod.etapa as any)?.nome} ${(prod.subetapa as any) ? `↳ ${(prod.subetapa as any).nome}` : ''}`,
+                    items: [],
+                    qtd: 0,
+                    minutosNormais: 0,
+                    minutosExtras: 0,
+                    custoNormal: 0,
+                    custoExtra: 0,
+                });
+                lotesPorGrupo.set(key, new Map());
+            }
+
+            const grupo = map.get(key);
+            grupo.items.push(prod);
+
+            // Regra da Primeira Etapa: a quantidade inteira do lote repete em cada lanca de tempo parcial
+            // Entao usamos somente a "MAX" quantidade daquele lote, em vez de somar (apenas na Etapa 1)
+            const isPrimeiraEtapa = (prod.etapa as any)?.ordem === 1;
+            const loteId = prod.lote_id;
+            const qtdLancamento = prod.quantidade_produzida || 0;
+
+            if (isPrimeiraEtapa && loteId) {
+                const maxDoLoteParaEsteGrupo = lotesPorGrupo.get(key)!.get(loteId) || 0;
+                if (qtdLancamento > maxDoLoteParaEsteGrupo) {
+                    lotesPorGrupo.get(key)!.set(loteId, qtdLancamento);
+                }
+            } else {
+                grupo.qtd += qtdLancamento;
+            }
+
+            const minNormais = (prod as any).minutos_normais || 0;
+            const minExtras = (prod as any).minutos_extras || 0;
+            grupo.minutosNormais += minNormais;
+            grupo.minutosExtras += minExtras;
+
+            grupo.custoNormal += (minNormais / 60) * custoHoraNormal;
+            grupo.custoExtra += (minExtras / 60) * custoHoraExtra;
+        });
+
+        // Somar as "MÁXIMAS quantidades dos Lotes" para cada grupo se for a Etapa 1
+        for (const [key, lotesMap] of lotesPorGrupo.entries()) {
+            const grupo = map.get(key);
+            let totalLotesPrimeira = 0;
+            for (const maxQtd of lotesMap.values()) {
+                totalLotesPrimeira += maxQtd;
+            }
+            grupo.qtd += totalLotesPrimeira;
+        }
+
+        // Ordenar por qtd maior primeiro ou titulo
+        return Array.from(map.values()).sort((a, b) => b.qtd - a.qtd);
+    }, [producoes, colaboradores, colaboradorId]);
+
     // Cálculos de Totais
-    const totais = producoes?.reduce((acc, curr) => {
+    const totais = useMemo(() => {
+        if (!producoes || !colaboradores || !colaboradorId) return null;
+
         const colaborador = colaboradores?.find(c => c.id === colaboradorId);
         const custoHoraNormal = Number((colaborador as any)?.custo_por_hora || 0);
         const custoHoraExtra = Number((colaborador as any)?.custo_hora_extra || 0);
 
-        const minutosNormais = (curr as any).minutos_normais || 0;
-        const minutosExtras = (curr as any).minutos_extras || 0;
+        let qtdProduzida = 0;
+        let tempoNormal = 0;
+        let tempoExtra = 0;
+        let custoTotal = 0;
+        let custoExtraTotal = 0;
+        let custoNormalTotal = 0;
 
-        const custoNormal = (minutosNormais / 60) * custoHoraNormal;
-        const custoExtra = (minutosExtras / 60) * custoHoraExtra;
+        const lotesPrimeiraEtapaGeral = new Map<string, number>();
+
+        producoes.forEach(curr => {
+            const minN = (curr as any).minutos_normais || 0;
+            const minE = (curr as any).minutos_extras || 0;
+            const cNormal = (minN / 60) * custoHoraNormal;
+            const cExtra = (minE / 60) * custoHoraExtra;
+
+            const isPrimeiraEtapa = (curr.etapa as any)?.ordem === 1;
+            const loteId = curr.lote_id;
+            const qtdLanc = curr.quantidade_produzida || 0;
+
+            if (isPrimeiraEtapa && loteId) {
+                const maxQty = lotesPrimeiraEtapaGeral.get(loteId) || 0;
+                if (qtdLanc > maxQty) {
+                    lotesPrimeiraEtapaGeral.set(loteId, qtdLanc);
+                }
+            } else {
+                qtdProduzida += qtdLanc;
+            }
+
+            tempoNormal += minN;
+            tempoExtra += minE;
+            custoNormalTotal += cNormal;
+            custoExtraTotal += cExtra;
+            custoTotal += cNormal + cExtra;
+        });
+
+        let qtdLotesPrimeiraEtapa = 0;
+        for (const num of lotesPrimeiraEtapaGeral.values()) {
+            qtdLotesPrimeiraEtapa += num;
+        }
 
         return {
-            qtdProduzida: acc.qtdProduzida + (curr.quantidade_produzida || 0),
-            tempoNormal: acc.tempoNormal + minutosNormais,
-            tempoExtra: acc.tempoExtra + minutosExtras,
-            custoTotal: acc.custoTotal + custoNormal + custoExtra,
-            custoExtraTotal: acc.custoExtraTotal + custoExtra,
-            custoNormal: acc.custoNormal + custoNormal // Adding this property
+            qtdProduzida: qtdProduzida + qtdLotesPrimeiraEtapa,
+            tempoNormal,
+            tempoExtra,
+            custoTotal,
+            custoExtraTotal,
+            custoNormal: custoNormalTotal
         };
-    }, { qtdProduzida: 0, tempoNormal: 0, tempoExtra: 0, custoTotal: 0, custoExtraTotal: 0, custoNormal: 0 });
+    }, [producoes, colaboradores, colaboradorId]);
 
     const mediaTempoPorUnidade = totais && totais.qtdProduzida > 0
         ? (totais.tempoNormal + totais.tempoExtra) / totais.qtdProduzida
@@ -297,18 +483,15 @@ export default function DesempenhoColaboradores() {
                     <div className="grid gap-4 md:grid-cols-4 items-end mb-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Colaborador</label>
-                            <Select value={colaboradorId} onValueChange={setColaboradorId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecione..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {colaboradores?.map((c) => (
-                                        <SelectItem key={c.id} value={c.id}>
-                                            {c.nome}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <SearchableSelect
+                                value={colaboradorId}
+                                onValueChange={setColaboradorId}
+                                placeholder="Selecione..."
+                                options={[
+                                    { value: "", label: "Selecione..." },
+                                    ...(colaboradores?.map(c => ({ value: c.id, label: c.nome })) || [])
+                                ]}
+                            />
                         </div>
 
                         <div className="space-y-2">
@@ -333,6 +516,7 @@ export default function DesempenhoColaboradores() {
                                             selected={dataInicio}
                                             onSelect={setDataInicio}
                                             initialFocus
+                                            locale={ptBR}
                                         />
                                     </PopoverContent>
                                 </Popover>
@@ -356,6 +540,7 @@ export default function DesempenhoColaboradores() {
                                             selected={dataFim}
                                             onSelect={setDataFim}
                                             initialFocus
+                                            locale={ptBR}
                                         />
                                     </PopoverContent>
                                 </Popover>
@@ -365,139 +550,106 @@ export default function DesempenhoColaboradores() {
                         {/* Filtro de Tipo (Novo) */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Tipo</label>
-                            <Select value={tipoFiltro} onValueChange={(val) => {
-                                setTipoFiltro(val);
-                                // Resetar filtros conflitantes se mudar o tipo
-                                if (val === "atividade") {
-                                    setProdutoId("all");
-                                    setLoteId("all");
-                                    setEtapaId("all");
-                                    setSubetapaId("all");
-                                } else if (val === "producao") {
-                                    setAtividadeId("all");
-                                }
-                            }}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Todos" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todos</SelectItem>
-                                    <SelectItem value="producao">Produção (Lotes)</SelectItem>
-                                    <SelectItem value="atividade">Atividades Avulsas</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <SearchableSelect
+                                value={tipoFiltro}
+                                onValueChange={(val) => {
+                                    setTipoFiltro(val);
+                                    if (val === "atividade") {
+                                        setProdutoId("all");
+                                        setLoteId("all");
+                                        setEtapaId("all");
+                                        setSubetapaId("all");
+                                    } else if (val === "producao") {
+                                        setAtividadeId("all");
+                                    }
+                                }}
+                                placeholder="Todos"
+                                options={[
+                                    { value: "all", label: "Todos" },
+                                    { value: "producao", label: "Produção (Lotes)" },
+                                    { value: "atividade", label: "Atividades Avulsas" }
+                                ]}
+                            />
                         </div>
 
-                        {/* Filtro de Nome da Atividade (Só aparece se Tipo for Atividade ou Todos) */}
+                        {/* Filtro de Nome da Atividade */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Nome da Atividade</label>
-                            <Select
+                            <SearchableSelect
                                 value={atividadeId}
                                 onValueChange={setAtividadeId}
                                 disabled={tipoFiltro === "producao"}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Todas as atividades" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas as atividades</SelectItem>
-                                    {atividades?.map((ativ) => (
-                                        <SelectItem key={ativ.id} value={ativ.id}>
-                                            {ativ.nome}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                                placeholder="Todas as atividades"
+                                options={[
+                                    { value: "all", label: "Todas as atividades" },
+                                    ...(atividades?.map(a => ({ value: a.id, label: a.nome })) || [])
+                                ]}
+                            />
                         </div>
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Produto</label>
-                            <Select
+                            <SearchableSelect
                                 value={produtoId}
                                 onValueChange={(val) => {
                                     setProdutoId(val);
                                     setLoteId("all");
                                 }}
                                 disabled={tipoFiltro === "atividade"}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Todos os produtos" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todos os produtos</SelectItem>
-                                    {produtos?.map((prod) => (
-                                        <SelectItem key={prod.id} value={prod.id}>
-                                            {prod.nome}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                                placeholder="Todos os produtos"
+                                options={[
+                                    { value: "all", label: "Todos os produtos" },
+                                    ...(produtos?.map(p => ({ value: p.id, label: p.nome })) || [])
+                                ]}
+                            />
                         </div>
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Lote</label>
-                            <Select
+                            <SearchableSelect
                                 value={loteId}
                                 onValueChange={setLoteId}
                                 disabled={tipoFiltro === "atividade"}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Todos os lotes" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todos os lotes</SelectItem>
-                                    {lotes?.filter(l => produtoId === "all" || l.produto_id === produtoId).map((lote) => (
-                                        <SelectItem key={lote.id} value={lote.id}>
-                                            {lote.numero_lote} - {(lote.produto as any)?.nome || 'Sem Produto'}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                                placeholder="Todos os lotes"
+                                options={[
+                                    { value: "all", label: "Todos os lotes" },
+                                    ...(lotes?.filter(l => produtoId === "all" || l.produto_id === produtoId).map(l => ({
+                                        value: l.id,
+                                        label: `${l.numero_lote} - ${(l.produto as any)?.nome || 'Sem Produto'}`
+                                    })) || [])
+                                ]}
+                            />
                         </div>
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Etapa</label>
-                            <Select
+                            <SearchableSelect
                                 value={etapaId}
                                 onValueChange={(val) => {
                                     setEtapaId(val);
                                     setSubetapaId("all");
                                 }}
                                 disabled={tipoFiltro === "atividade"}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Todas as etapas" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas as etapas</SelectItem>
-                                    {etapas?.map((etapa) => (
-                                        <SelectItem key={etapa.id} value={etapa.id}>
-                                            {etapa.nome}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                                placeholder="Todas as etapas"
+                                options={[
+                                    { value: "all", label: "Todas as etapas" },
+                                    ...(etapas?.map(e => ({ value: e.id, label: e.nome })) || [])
+                                ]}
+                            />
                         </div>
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Subetapa</label>
-                            <Select
+                            <SearchableSelect
                                 value={subetapaId}
                                 onValueChange={setSubetapaId}
-                                disabled={(etapaId === "all" && subetapas?.length === 0) || tipoFiltro === "atividade"}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Todas as subetapas" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas as subetapas</SelectItem>
-                                    {subetapas?.map((sub) => (
-                                        <SelectItem key={sub.id} value={sub.id}>
-                                            {sub.nome}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                                disabled={(etapaId === "all" && (!subetapas || subetapas.length === 0)) || tipoFiltro === "atividade"}
+                                placeholder="Todas as subetapas"
+                                options={[
+                                    { value: "all", label: "Todas as subetapas" },
+                                    ...(subetapas?.map(s => ({ value: s.id, label: s.nome })) || [])
+                                ]}
+                            />
                         </div>
 
                         <div className="flex gap-2 items-end">
@@ -516,7 +668,7 @@ export default function DesempenhoColaboradores() {
             {/* Resultados - Resumo */}
             {
                 filtrosAplicados && totais && (
-                    <div className="grid gap-4 md:grid-cols-4 print:grid-cols-4 print:gap-2 print-compact">
+                    <div className="grid gap-4 md:grid-cols-5 print:grid-cols-5 print:gap-2 print-compact">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">Produção Total</CardTitle>
@@ -533,8 +685,8 @@ export default function DesempenhoColaboradores() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold text-green-600">{formatarMoeda(totais.custoTotal)}</div>
-                                <p className="text-xs text-muted-foreground">
-                                    {formatarMoeda(totais.custoNormal)} Normal + {formatarMoeda(totais.custoExtraTotal)} Hora Extra
+                                <p className="text-[10px] text-muted-foreground">
+                                    {formatarMoeda(totais.custoNormal)} Normal + {formatarMoeda(totais.custoExtraTotal)} Extra
                                 </p>
                             </CardContent>
                         </Card>
@@ -545,24 +697,34 @@ export default function DesempenhoColaboradores() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{formatarTempo(totais.tempoNormal + totais.tempoExtra)}</div>
-                                <p className="text-xs text-muted-foreground">
-                                    {formatarTempo(totais.tempoNormal)} Normal + {formatarTempo(totais.tempoExtra)} Extra
-                                </p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Hora Extra</CardTitle>
-                                <Clock className="h-4 w-4 text-orange-500" />
+                                <CardTitle className="text-sm font-medium">Custo Unitário</CardTitle>
+                                <DollarSign className="h-4 w-4 text-purple-600" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-orange-500">{formatarTempo(totais.tempoExtra)}</div>
-                                <p className="text-xs text-muted-foreground">
-                                    Custo: {formatarMoeda(totais.custoExtraTotal)}
-                                </p>
+                                <div className="text-2xl font-bold text-purple-700">{formatarMoeda(mediaCustoPorUnidade)}</div>
                             </CardContent>
                         </Card>
-
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Tempo Unit.</CardTitle>
+                                <Clock className="h-4 w-4 text-purple-600" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold text-purple-700">
+                                    {(() => {
+                                        const segundosTotal = mediaTempoPorUnidade * 60;
+                                        if (isNaN(segundosTotal) || !isFinite(segundosTotal) || segundosTotal === 0) return "-";
+                                        const m = Math.floor(segundosTotal / 60);
+                                        const s = Math.round(segundosTotal % 60);
+                                        return `${m}m ${s}s`;
+                                    })()}
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 )
             }
@@ -592,81 +754,148 @@ export default function DesempenhoColaboradores() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {producoes.map((prod) => {
-                                        const colaborador = colaboradores?.find(c => c.id === colaboradorId);
-                                        const custoHoraNormal = Number((colaborador as any)?.custo_por_hora || 0);
-                                        const custoHoraExtra = Number((colaborador as any)?.custo_hora_extra || 0);
-
-                                        const minutosNormais = (prod as any).minutos_normais || 0;
-                                        const minutosExtras = (prod as any).minutos_extras || 0;
-
-                                        const custoNormal = (minutosNormais / 60) * custoHoraNormal;
-                                        const custoExtra = (minutosExtras / 60) * custoHoraExtra;
-                                        const custoTotal = custoNormal + custoExtra;
+                                    {grupos.map((grupo) => {
+                                        const custoTotalGrupo = grupo.custoNormal + grupo.custoExtra;
+                                        const tempoTotalGrupo = grupo.minutosNormais + grupo.minutosExtras;
 
                                         return (
-                                            <TableRow key={prod.id}>
-                                                <TableCell>
-                                                    {prod.atividade ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <Badge variant="outline" className="text-[10px] font-mono border-primary/20 bg-primary/5 text-primary">AVULSA</Badge>
-                                                            <span className="font-medium">{prod.atividade.nome}</span>
+                                            <React.Fragment key={grupo.id}>
+                                                <TableRow className="bg-muted/30 font-semibold cursor-pointer hover:bg-muted/50" onClick={() => toggleGroup(grupo.id)}>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            {expandedGroups[grupo.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                                            {grupo.isAvulsa && <Badge variant="outline" className="text-[10px] font-mono border-primary/20 bg-primary/5 text-primary">AVULSA</Badge>}
+                                                            <span>{grupo.titulo}</span>
                                                         </div>
-                                                    ) : (
-                                                        <>
-                                                            <div className="font-medium">{prod.lote?.numero_lote} - {prod.lote?.nome_lote || "Sem Lote"}</div>
-                                                            <div className="text-xs text-muted-foreground">
-                                                                {prod.etapa?.nome} {prod.subetapa && `↳ ${prod.subetapa.nome}`}
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {prod.data_inicio && format(new Date(prod.data_inicio), "dd/MM/yyyy")}
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {prod.hora_inicio?.substring(0, 5)} - {prod.hora_fim?.substring(0, 5)}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right font-medium">
-                                                    {prod.quantidade_produzida}
-                                                </TableCell>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-xs text-muted-foreground">{grupo.items.length} registro(s)</span>
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-bold">
+                                                        {grupo.qtd}
+                                                    </TableCell>
 
-                                                {/* Tempo */}
-                                                <TableCell className="text-right bg-blue-50/30">
-                                                    {formatarTempo(minutosNormais)}
-                                                </TableCell>
-                                                <TableCell className="text-right bg-orange-50/30">
-                                                    {formatarTempo(minutosExtras)}
-                                                </TableCell>
-                                                <TableCell className="text-right font-bold text-blue-600">
-                                                    {formatarTempo(minutosNormais + minutosExtras)}
-                                                </TableCell>
+                                                    <TableCell className="text-right bg-blue-50/50">
+                                                        {formatarTempo(grupo.minutosNormais)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right bg-orange-50/50">
+                                                        {formatarTempo(grupo.minutosExtras)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-bold text-blue-700">
+                                                        {formatarTempo(tempoTotalGrupo)}
+                                                    </TableCell>
 
-                                                {/* Custo */}
-                                                <TableCell className="text-right bg-blue-50/30">
-                                                    {formatarMoeda(custoNormal)}
-                                                </TableCell>
-                                                <TableCell className="text-right bg-orange-50/30">
-                                                    {formatarMoeda(custoExtra)}
-                                                </TableCell>
-                                                <TableCell className="text-right font-bold text-green-600">
-                                                    {formatarMoeda(custoTotal)}
-                                                </TableCell>
+                                                    <TableCell className="text-right bg-blue-50/50">
+                                                        {formatarMoeda(grupo.custoNormal)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right bg-orange-50/50">
+                                                        {formatarMoeda(grupo.custoExtra)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-bold text-green-700">
+                                                        {formatarMoeda(custoTotalGrupo)}
+                                                    </TableCell>
 
-                                                {/* Médias */}
-                                                <TableCell className="text-right font-medium text-purple-600">
-                                                    {prod.quantidade_produzida > 0 ? (() => {
-                                                        const mediaMinutos = (minutosNormais + minutosExtras) / prod.quantidade_produzida;
-                                                        const segundosTotal = mediaMinutos * 60;
-                                                        const m = Math.floor(segundosTotal / 60);
-                                                        const s = Math.round(segundosTotal % 60);
-                                                        return `${m}m ${s}s`;
-                                                    })() : '-'}
-                                                </TableCell>
-                                                <TableCell className="text-right font-medium text-purple-600">
-                                                    {prod.quantidade_produzida > 0 ? formatarMoeda(custoTotal / prod.quantidade_produzida) : '-'}
-                                                </TableCell>
-                                            </TableRow>
+                                                    <TableCell className="text-right font-medium text-purple-700">
+                                                        {grupo.qtd > 0 ? (() => {
+                                                            const mediaMinutos = tempoTotalGrupo / grupo.qtd;
+                                                            const segundosTotal = mediaMinutos * 60;
+                                                            const m = Math.floor(segundosTotal / 60);
+                                                            const s = Math.round(segundosTotal % 60);
+                                                            return `${m}m ${s}s`;
+                                                        })() : '-'}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-medium text-purple-700">
+                                                        {grupo.qtd > 0 ? formatarMoeda(custoTotalGrupo / grupo.qtd) : '-'}
+                                                    </TableCell>
+                                                </TableRow>
+
+                                                {expandedGroups[grupo.id] && (() => {
+                                                    // Controlar visualização de duplicadas na Etapa 1
+                                                    const lotesProcessados = new Set<string>();
+
+                                                    // Primeiro, ordenar por ID desc para que o último lançamento seja o que mostra a QTD.
+                                                    // Isso garante que mostramos a qtd na primeira linha de cima para baixo
+                                                    const sortedItems = [...grupo.items].sort((a, b) => b.id - a.id);
+
+                                                    return sortedItems.map((prod: any) => {
+                                                        const colaborador = colaboradores?.find(c => c.id === colaboradorId);
+                                                        const custoHoraNormal = Number((colaborador as any)?.custo_por_hora || 0);
+                                                        const custoHoraExtra = Number((colaborador as any)?.custo_hora_extra || 0);
+
+                                                        const minutosNormais = prod.minutos_normais || 0;
+                                                        const minutosExtras = prod.minutos_extras || 0;
+
+                                                        const custoNormal = (minutosNormais / 60) * custoHoraNormal;
+                                                        const custoExtra = (minutosExtras / 60) * custoHoraExtra;
+                                                        const custoTotal = custoNormal + custoExtra;
+
+                                                        return (
+                                                            <TableRow key={prod.id} className="bg-muted/10 text-sm">
+                                                                <TableCell className="pl-10">
+                                                                    {prod.atividade ? (
+                                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                                            <span>Registro de Atividade</span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <>
+                                                                            <div className="font-medium">{prod.lote?.numero_lote} - {prod.lote?.nome_lote || "Sem Lote"}</div>
+                                                                        </>
+                                                                    )}
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    {prod.data_inicio && format(new Date(prod.data_inicio + "T12:00:00"), "dd/MM/yyyy")}
+                                                                    <div className="text-xs text-muted-foreground">
+                                                                        {prod.hora_inicio?.substring(0, 5)} - {prod.hora_fim?.substring(0, 5)}
+                                                                    </div>
+                                                                </TableCell>
+                                                                <TableCell className="text-right font-medium">
+                                                                    {(() => {
+                                                                        const isPrimeiraEtapa = (prod.etapa as any)?.ordem === 1;
+                                                                        const loteId = prod.lote_id;
+
+                                                                        if (isPrimeiraEtapa && loteId) {
+                                                                            if (lotesProcessados.has(loteId)) {
+                                                                                return "0";
+                                                                            }
+                                                                            lotesProcessados.add(loteId);
+                                                                        }
+                                                                        return prod.quantidade_produzida || "0";
+                                                                    })()}
+                                                                </TableCell>
+
+                                                                {/* Tempo */}
+                                                                <TableCell className="text-right bg-blue-50/20 text-xs text-muted-foreground">
+                                                                    {formatarTempo(minutosNormais)}
+                                                                </TableCell>
+                                                                <TableCell className="text-right bg-orange-50/20 text-xs text-muted-foreground">
+                                                                    {formatarTempo(minutosExtras)}
+                                                                </TableCell>
+                                                                <TableCell className="text-right font-semibold text-blue-600/80 text-xs">
+                                                                    {formatarTempo(minutosNormais + minutosExtras)}
+                                                                </TableCell>
+
+                                                                {/* Custo */}
+                                                                <TableCell className="text-right text-muted-foreground/50 text-xs italic">
+                                                                    -
+                                                                </TableCell>
+                                                                <TableCell className="text-right text-muted-foreground/50 text-xs italic">
+                                                                    -
+                                                                </TableCell>
+                                                                <TableCell className="text-right text-green-600/50 text-xs italic">
+                                                                    -
+                                                                </TableCell>
+
+                                                                <TableCell className="text-right text-purple-400/50 text-xs italic">
+                                                                    -
+                                                                </TableCell>
+                                                                <TableCell className="text-right text-purple-400/50 text-xs italic">
+                                                                    -
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })
+                                                })()}
+                                            </React.Fragment>
                                         );
                                     })}
                                 </TableBody>

@@ -3,9 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { Check, ChevronDown, Search, Calendar as CalendarIcon } from "lucide-react";
 
 interface AtividadeMeta {
     nome: string;
@@ -24,16 +30,141 @@ interface ColaboradorProgresso {
     atividades: AtividadeMeta[];
 }
 
+function SearchableSelect({
+    value,
+    onValueChange,
+    options,
+    placeholder,
+    disabled
+}: {
+    value: string;
+    onValueChange: (val: string) => void;
+    options: { value: string; label: string }[];
+    placeholder: string;
+    disabled?: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+    const selectedLabel = options.find(o => o.value === value)?.label || placeholder;
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className="w-full justify-between font-normal bg-background"
+                    disabled={disabled}
+                >
+                    <span className="truncate">{selectedLabel}</span>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                    <CommandInput placeholder="Pesquisar..." />
+                    <CommandList>
+                        <CommandEmpty>Nenhum resultado.</CommandEmpty>
+                        <CommandGroup>
+                            {options.map((option) => (
+                                <CommandItem
+                                    key={option.value}
+                                    value={option.label}
+                                    onSelect={() => {
+                                        onValueChange(option.value);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <Check
+                                        className={cn(
+                                            "mr-2 h-4 w-4",
+                                            value === option.value ? "opacity-100" : "opacity-0"
+                                        )}
+                                    />
+                                    {option.label}
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+function MonthYearPicker({ value, onChange }: { value: string, onChange: (val: string) => void }) {
+    const [ano, mes] = value.split("-");
+
+    const meses = [
+        { value: "01", label: "Janeiro" },
+        { value: "02", label: "Fevereiro" },
+        { value: "03", label: "Março" },
+        { value: "04", label: "Abril" },
+        { value: "05", label: "Maio" },
+        { value: "06", label: "Junho" },
+        { value: "07", label: "Julho" },
+        { value: "08", label: "Agosto" },
+        { value: "09", label: "Setembro" },
+        { value: "10", label: "Outubro" },
+        { value: "11", label: "Novembro" },
+        { value: "12", label: "Dezembro" },
+    ];
+
+    const anos = Array.from({ length: 5 }, (_, i) => String(new Date().getFullYear() - 2 + i));
+
+    return (
+        <div className="flex bg-background border rounded-md shadow-sm h-10 items-center px-1 space-x-1">
+            <CalendarIcon className="h-4 w-4 ml-2 text-muted-foreground shrink-0" />
+            <Select value={mes} onValueChange={(v) => onChange(`${ano}-${v}`)}>
+                <SelectTrigger className="h-8 border-0 shadow-none focus:ring-0 w-[120px]">
+                    <SelectValue placeholder="Mês" />
+                </SelectTrigger>
+                <SelectContent>
+                    {meses.map(m => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <div className="w-px h-4 bg-border mx-1" />
+            <Select value={ano} onValueChange={(v) => onChange(`${v}-${mes}`)}>
+                <SelectTrigger className="h-8 border-0 shadow-none focus:ring-0 w-[80px]">
+                    <SelectValue placeholder="Ano" />
+                </SelectTrigger>
+                <SelectContent>
+                    {anos.map(a => (
+                        <SelectItem key={a} value={a}>{a}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+    );
+}
+
 const ListaProgressoMetas = () => {
     const empresaId = useEmpresaId();
     const dataAtual = new Date();
     const mesAtualFormatado = `${dataAtual.getFullYear()}-${String(dataAtual.getMonth() + 1).padStart(2, "0")}`;
     const [mesAno, setMesAno] = useState(mesAtualFormatado);
-    const [searchTerm, setSearchTerm] = useState("");
+    const [colaboradorId, setColaboradorId] = useState("all");
+    const [hasConsulted, setHasConsulted] = useState(false);
 
-    const { data: progresso, isLoading } = useQuery({
+    const { data: colaboradoresList } = useQuery({
+        queryKey: ["colaboradores-metas-lista", empresaId],
+        enabled: !!empresaId,
+        queryFn: async () => {
+            const { data } = await supabase
+                .from("colaboradores")
+                .select("id, nome")
+                .eq("empresa_id", empresaId)
+                .eq("ativo", true)
+                .order("nome");
+            return data || [];
+        }
+    });
+
+    const { data: progresso, isLoading, refetch } = useQuery({
         queryKey: ["progresso-metas-lista", mesAno, empresaId],
-        enabled: !!mesAno && !!empresaId,
+        enabled: false,
         queryFn: async (): Promise<ColaboradorProgresso[]> => {
             const [ano, mes] = mesAno.split("-");
             const dataInicio = `${ano}-${mes}-01`;
@@ -139,23 +270,46 @@ const ListaProgressoMetas = () => {
                         <CardDescription>Progresso individual por atividade no mês selecionado</CardDescription>
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto">
-                        <Input
-                            placeholder="Buscar colaborador..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full sm:w-[200px]"
-                        />
-                        <Input
-                            type="month"
-                            value={mesAno}
-                            onChange={(e) => setMesAno(e.target.value)}
-                            className="w-full sm:w-[180px]"
-                        />
+                        <div className="w-full sm:w-[250px]">
+                            <SearchableSelect
+                                value={colaboradorId}
+                                onValueChange={setColaboradorId}
+                                placeholder="Todos os colaboradores"
+                                options={[
+                                    { value: "all", label: "Todos os colaboradores" },
+                                    ...(colaboradoresList?.map(c => ({ value: c.id, label: c.nome })) || [])
+                                ]}
+                            />
+                        </div>
+                        <div className="w-full sm:w-auto shrink-0">
+                            <MonthYearPicker
+                                value={mesAno}
+                                onChange={(val) => {
+                                    setMesAno(val);
+                                    setHasConsulted(false);
+                                }}
+                            />
+                        </div>
+                        <Button
+                            onClick={() => {
+                                setHasConsulted(true);
+                                refetch();
+                            }}
+                            disabled={isLoading}
+                        >
+                            <Search className="h-4 w-4 mr-2" />
+                            Consultar
+                        </Button>
                     </div>
                 </div>
             </CardHeader>
             <CardContent>
-                {isLoading ? (
+                {!hasConsulted ? (
+                    <div className="text-center py-12 text-muted-foreground flex flex-col items-center justify-center space-y-3">
+                        <Search className="h-12 w-12 text-muted-foreground/30" />
+                        <p>Selecione o mês desejado e clique em Consultar para visualizar o progresso das metas.</p>
+                    </div>
+                ) : isLoading ? (
                     <div className="text-center py-8">Carregando dados...</div>
                 ) : !progresso || progresso.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
@@ -164,7 +318,7 @@ const ListaProgressoMetas = () => {
                 ) : (
                     <div className="space-y-3">
                         {progresso
-                            .filter(item => item.colaborador.nome.toLowerCase().includes(searchTerm.toLowerCase()))
+                            .filter(item => colaboradorId === "all" || item.colaborador.id === colaboradorId)
                             .map((item) => (
                                 <div key={item.colaborador.id} className="border rounded-md p-3 text-sm">
                                     <div className="flex items-center gap-2 mb-2">
