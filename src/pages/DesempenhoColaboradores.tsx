@@ -24,21 +24,25 @@ const formatarTempo = (minutos: number) => {
     return `${h}h ${m}min`;
 };
 
-function SearchableSelect({
-    value,
-    onValueChange,
+function MultiSelect({
+    values,
+    onValuesChange,
     options,
     placeholder,
     disabled
 }: {
-    value: string;
-    onValueChange: (val: string) => void;
+    values: string[];
+    onValuesChange: (vals: string[]) => void;
     options: { value: string; label: string }[];
     placeholder: string;
     disabled?: boolean;
 }) {
     const [open, setOpen] = useState(false);
-    const selectedLabel = options.find(o => o.value === value)?.label || placeholder;
+
+    // If no values selected, show placeholder
+    const selectedLabels = values.length
+        ? values.map(v => options.find(o => o.value === v)?.label).filter(Boolean).join(", ")
+        : placeholder;
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -47,10 +51,10 @@ function SearchableSelect({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className="w-full justify-between font-normal bg-background"
+                    className="w-full justify-between font-normal bg-background px-3 h-10"
                     disabled={disabled}
                 >
-                    <span className="truncate">{selectedLabel}</span>
+                    <span className="truncate">{values.length === 0 ? `Todos (Selecione)` : (values.length === 1 ? selectedLabels : `${values.length} selecionados`)}</span>
                     <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
@@ -60,24 +64,36 @@ function SearchableSelect({
                     <CommandList>
                         <CommandEmpty>Nenhum resultado.</CommandEmpty>
                         <CommandGroup>
-                            {options.map((option) => (
-                                <CommandItem
-                                    key={option.value}
-                                    value={option.label}
-                                    onSelect={() => {
-                                        onValueChange(option.value);
-                                        setOpen(false);
-                                    }}
-                                >
-                                    <Check
-                                        className={cn(
-                                            "mr-2 h-4 w-4",
-                                            value === option.value ? "opacity-100" : "opacity-0"
-                                        )}
-                                    />
-                                    {option.label}
-                                </CommandItem>
-                            ))}
+                            <CommandItem
+                                onSelect={() => {
+                                    onValuesChange([]);
+                                }}
+                            >
+                                <div className={cn("mr-2 flex h-4 w-4 items-center justify-center rounded-sm border", values.length === 0 ? "bg-primary text-primary-foreground border-primary" : "opacity-50 border-input")}>
+                                    {values.length === 0 && <Check className={cn("h-4 w-4")} />}
+                                </div>
+                                <span className="font-semibold">Todos</span>
+                            </CommandItem>
+                            {options.map((option) => {
+                                const isSelected = values.includes(option.value);
+                                return (
+                                    <CommandItem
+                                        key={option.value}
+                                        onSelect={() => {
+                                            if (isSelected) {
+                                                onValuesChange(values.filter(v => v !== option.value));
+                                            } else {
+                                                onValuesChange([...values, option.value]);
+                                            }
+                                        }}
+                                    >
+                                        <div className={cn("mr-2 flex h-4 w-4 items-center justify-center rounded-sm border", isSelected ? "bg-primary text-primary-foreground border-primary" : "opacity-50 border-input")}>
+                                            {isSelected && <Check className={cn("h-4 w-4")} />}
+                                        </div>
+                                        <span>{option.label}</span>
+                                    </CommandItem>
+                                );
+                            })}
                         </CommandGroup>
                     </CommandList>
                 </Command>
@@ -89,15 +105,15 @@ function SearchableSelect({
 export default function DesempenhoColaboradores() {
     console.log("DesempenhoColaboradores component mounted");
     const empresaId = useEmpresaId();
-    const [colaboradorId, setColaboradorId] = useState<string>("");
+    const [colaboradorIds, setColaboradorIds] = useState<string[]>([]);
     const [dataInicio, setDataInicio] = useState<Date | undefined>(new Date());
     const [dataFim, setDataFim] = useState<Date | undefined>(new Date());
-    const [loteId, setLoteId] = useState<string>("all");
-    const [produtoId, setProdutoId] = useState<string>("all");
-    const [etapaId, setEtapaId] = useState<string>("all");
-    const [subetapaId, setSubetapaId] = useState<string>("all");
+    const [loteIds, setLoteIds] = useState<string[]>([]);
+    const [produtoIds, setProdutoIds] = useState<string[]>([]);
+    const [etapaIds, setEtapaIds] = useState<string[]>([]);
+    const [subetapaIds, setSubetapaIds] = useState<string[]>([]);
     const [tipoFiltro, setTipoFiltro] = useState<string>("all"); // all, producao, atividade
-    const [atividadeId, setAtividadeId] = useState<string>("all");
+    const [atividadeIds, setAtividadeIds] = useState<string[]>([]);
     const [filtrosAplicados, setFiltrosAplicados] = useState(false);
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -161,7 +177,7 @@ export default function DesempenhoColaboradores() {
 
     // Filtra lotes baseado no produto selecionado
     const lotesFiltrados = lotes?.filter(l =>
-        produtoId === "all" || (l.produto && (l as any).produto_id)
+        produtoIds.length === 0 || (l.produto && produtoIds.includes((l as any).produto_id))
     );
 
     // Buscar Produtos
@@ -197,7 +213,7 @@ export default function DesempenhoColaboradores() {
 
     // Buscar Subetapas (se etapa selecionada ou todas)
     const { data: subetapas } = useQuery({
-        queryKey: ["subetapas-desempenho", empresaId, etapaId],
+        queryKey: ["subetapas-desempenho", empresaId, etapaIds],
         enabled: !!empresaId,
         queryFn: async () => {
             let query = supabase
@@ -206,8 +222,8 @@ export default function DesempenhoColaboradores() {
                 .eq("empresa_id", empresaId)
                 .order("nome");
 
-            if (etapaId !== "all") {
-                query = query.eq("etapa_id", etapaId);
+            if (etapaIds.length > 0) {
+                query = query.in("etapa_id", etapaIds);
             }
 
             const { data, error } = await query;
@@ -218,10 +234,10 @@ export default function DesempenhoColaboradores() {
 
     // Query Principal de Produção
     const { data: producoes, isLoading, refetch } = useQuery({
-        queryKey: ["producoes-desempenho", empresaId, colaboradorId, dataInicio, dataFim, loteId, produtoId, etapaId, subetapaId, tipoFiltro, atividadeId],
+        queryKey: ["producoes-desempenho", empresaId, colaboradorIds, dataInicio, dataFim, loteIds, produtoIds, etapaIds, subetapaIds, tipoFiltro, atividadeIds],
         enabled: false, // Só busca quando clicar em Consultar
         queryFn: async () => {
-            if (!colaboradorId) return [];
+            if (colaboradorIds.length === 0) return [];
 
             let query = supabase
                 .from("producoes")
@@ -233,11 +249,11 @@ export default function DesempenhoColaboradores() {
                 atividade:atividades(nome)
             `)
                 .eq("empresa_id", empresaId)
-                .eq("colaborador_id", colaboradorId);
+                .in("colaborador_id", colaboradorIds);
 
             const fromStr = format(dataInicio, "yyyy-MM-dd");
             const toStr = format(dataFim, "yyyy-MM-dd");
-            console.log(`Buscando produções de colaboradorId: ${colaboradorId} entre ${fromStr} e ${toStr}`);
+            console.log(`Buscando produções de colaboradorIds: ${colaboradorIds.join(",")} entre ${fromStr} e ${toStr}`);
 
             if (dataInicio) {
                 query = query.gte("data_inicio", fromStr);
@@ -248,44 +264,39 @@ export default function DesempenhoColaboradores() {
 
             // Filtro por Tipo (Produção vs Atividade)
             if (tipoFiltro === "producao") {
-                // Se for produção, TEM que ter lote_id (ou não ter atividade_id, dependendo da regra de negócio, mas lote_id é mais seguro para "Produção")
-                // Como lote_id pode ser null em atividades, verificamos se activity_id IS NULL
                 query = query.is("atividade_id", null);
             } else if (tipoFiltro === "atividade") {
-                // Se for atividade, TEM que ter atividade_id
                 query = query.not("atividade_id", "is", null);
             }
 
             // Filtro por Atividade Específica
-            if (atividadeId && atividadeId !== "all") {
-                query = query.eq("atividade_id", atividadeId);
+            if (atividadeIds.length > 0) {
+                query = query.in("atividade_id", atividadeIds);
             }
 
-            console.log("Query URL e params processados...", { fromStr, toStr, tipoFiltro, atividadeId });
             const { data, error } = await query;
             if (error) {
                 console.error("Erro na busca de produções:", error);
                 throw error;
             }
-            console.log("Dados retornados da busca:", data?.length);
 
-            // Filtro de Lote no Client Side se preenchido e não for "all"
+            // Filtro de client side para o resto dos arrays
             let filteredData = data;
 
-            if (produtoId && produtoId !== "all") {
-                filteredData = filteredData?.filter(p => p.lote?.produto_id === produtoId) || [];
+            if (produtoIds.length > 0) {
+                filteredData = filteredData?.filter(p => p.lote && produtoIds.includes(p.lote.produto_id)) || [];
             }
 
-            if (loteId && loteId !== "all") {
-                filteredData = filteredData?.filter(p => p.lote_id === loteId) || [];
+            if (loteIds.length > 0) {
+                filteredData = filteredData?.filter(p => p.lote_id && loteIds.includes(p.lote_id)) || [];
             }
 
-            if (etapaId && etapaId !== "all") {
-                filteredData = filteredData?.filter(p => p.etapa_id === etapaId) || [];
+            if (etapaIds.length > 0) {
+                filteredData = filteredData?.filter(p => p.etapa_id && etapaIds.includes(p.etapa_id)) || [];
             }
 
-            if (subetapaId && subetapaId !== "all") {
-                filteredData = filteredData?.filter(p => p.subetapa_id === subetapaId) || [];
+            if (subetapaIds.length > 0) {
+                filteredData = filteredData?.filter(p => p.subetapa_id && subetapaIds.includes(p.subetapa_id)) || [];
             }
 
             return filteredData;
@@ -293,22 +304,23 @@ export default function DesempenhoColaboradores() {
     });
 
     const handleConsultar = () => {
-        if (colaboradorId) {
+        if (colaboradorIds.length > 0) {
             setFiltrosAplicados(true);
             refetch();
         }
     };
 
     const grupos = useMemo(() => {
-        if (!producoes || !colaboradores || !colaboradorId) return [];
-        const colaborador = colaboradores.find(c => c.id === colaboradorId);
-        const custoHoraNormal = Number((colaborador as any)?.custo_por_hora || 0);
-        const custoHoraExtra = Number((colaborador as any)?.custo_hora_extra || 0);
+        if (!producoes || !colaboradores || colaboradorIds.length === 0) return [];
 
         const map = new Map<string, any>();
         const lotesPorGrupo = new Map<string, Map<string, number>>(); // Controlar max qtd de Lote por Grupo
 
         producoes.forEach(prod => {
+            const colaboradorRef = colaboradores.find(c => c.id === prod.colaborador_id);
+            const custoHoraNormal = Number((colaboradorRef as any)?.custo_por_hora || 0);
+            const custoHoraExtra = Number((colaboradorRef as any)?.custo_hora_extra || 0);
+
             const isAvulsa = !!prod.atividade;
             const key = isAvulsa
                 ? `atividade_${prod.atividade_id}`
@@ -370,15 +382,11 @@ export default function DesempenhoColaboradores() {
 
         // Ordenar por qtd maior primeiro ou titulo
         return Array.from(map.values()).sort((a, b) => b.qtd - a.qtd);
-    }, [producoes, colaboradores, colaboradorId]);
+    }, [producoes, colaboradores, colaboradorIds]);
 
     // Cálculos de Totais
     const totais = useMemo(() => {
-        if (!producoes || !colaboradores || !colaboradorId) return null;
-
-        const colaborador = colaboradores?.find(c => c.id === colaboradorId);
-        const custoHoraNormal = Number((colaborador as any)?.custo_por_hora || 0);
-        const custoHoraExtra = Number((colaborador as any)?.custo_hora_extra || 0);
+        if (!producoes || !colaboradores || colaboradorIds.length === 0) return null;
 
         let qtdProduzida = 0;
         let tempoNormal = 0;
@@ -390,6 +398,10 @@ export default function DesempenhoColaboradores() {
         const lotesPrimeiraEtapaGeral = new Map<string, number>();
 
         producoes.forEach(curr => {
+            const colaboradorRef = colaboradores?.find(c => c.id === curr.colaborador_id);
+            const custoHoraNormal = Number((colaboradorRef as any)?.custo_por_hora || 0);
+            const custoHoraExtra = Number((colaboradorRef as any)?.custo_hora_extra || 0);
+
             const minN = (curr as any).minutos_normais || 0;
             const minE = (curr as any).minutos_extras || 0;
             const cNormal = (minN / 60) * custoHoraNormal;
@@ -428,7 +440,7 @@ export default function DesempenhoColaboradores() {
             custoExtraTotal,
             custoNormal: custoNormalTotal
         };
-    }, [producoes, colaboradores, colaboradorId]);
+    }, [producoes, colaboradores, colaboradorIds]);
 
     const mediaTempoPorUnidade = totais && totais.qtdProduzida > 0
         ? (totais.tempoNormal + totais.tempoExtra) / totais.qtdProduzida
@@ -462,8 +474,8 @@ export default function DesempenhoColaboradores() {
                     </div>
                     <div className="text-right text-sm">
                         <p><strong>Emissão:</strong> {format(new Date(), "dd/MM/yyyy HH:mm")}</p>
-                        {colaboradorId && (
-                            <p><strong>Colaborador:</strong> {colaboradores?.find(c => c.id === colaboradorId)?.nome}</p>
+                        {colaboradorIds.length > 0 && (
+                            <p><strong>Colaborador(es):</strong> {colaboradorIds.length === 1 ? colaboradores?.find(c => c.id === colaboradorIds[0])?.nome : `${colaboradorIds.length} selecionados`}</p>
                         )}
                         <p><strong>Período:</strong> {dataInicio ? format(dataInicio, "dd/MM/yy") : "Início"} até {dataFim ? format(dataFim, "dd/MM/yy") : "Fim"}</p>
                     </div>
@@ -482,13 +494,12 @@ export default function DesempenhoColaboradores() {
                 <CardContent className="pt-6">
                     <div className="grid gap-4 md:grid-cols-4 items-end mb-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Colaborador</label>
-                            <SearchableSelect
-                                value={colaboradorId}
-                                onValueChange={setColaboradorId}
+                            <label className="text-sm font-medium">Colaborador(es)</label>
+                            <MultiSelect
+                                values={colaboradorIds}
+                                onValuesChange={setColaboradorIds}
                                 placeholder="Selecione..."
                                 options={[
-                                    { value: "", label: "Selecione..." },
                                     ...(colaboradores?.map(c => ({ value: c.id, label: c.nome })) || [])
                                 ]}
                             />
@@ -547,41 +558,40 @@ export default function DesempenhoColaboradores() {
                             </div>
                         </div>
 
-                        {/* Filtro de Tipo (Novo) */}
+                        {/* Filtro de Tipo */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Tipo</label>
-                            <SearchableSelect
-                                value={tipoFiltro}
-                                onValueChange={(val) => {
-                                    setTipoFiltro(val);
-                                    if (val === "atividade") {
-                                        setProdutoId("all");
-                                        setLoteId("all");
-                                        setEtapaId("all");
-                                        setSubetapaId("all");
-                                    } else if (val === "producao") {
-                                        setAtividadeId("all");
-                                    }
-                                }}
-                                placeholder="Todos"
-                                options={[
-                                    { value: "all", label: "Todos" },
-                                    { value: "producao", label: "Produção (Lotes)" },
-                                    { value: "atividade", label: "Atividades Avulsas" }
-                                ]}
-                            />
+                            <Select value={tipoFiltro} onValueChange={(val) => {
+                                setTipoFiltro(val);
+                                if (val === "atividade") {
+                                    setProdutoIds([]);
+                                    setLoteIds([]);
+                                    setEtapaIds([]);
+                                    setSubetapaIds([]);
+                                } else if (val === "producao") {
+                                    setAtividadeIds([]);
+                                }
+                            }}>
+                                <SelectTrigger className="bg-background">
+                                    <SelectValue placeholder="Todos" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos</SelectItem>
+                                    <SelectItem value="producao">Produção (Lotes)</SelectItem>
+                                    <SelectItem value="atividade">Atividades Avulsas</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         {/* Filtro de Nome da Atividade */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Nome da Atividade</label>
-                            <SearchableSelect
-                                value={atividadeId}
-                                onValueChange={setAtividadeId}
+                            <MultiSelect
+                                values={atividadeIds}
+                                onValuesChange={setAtividadeIds}
                                 disabled={tipoFiltro === "producao"}
                                 placeholder="Todas as atividades"
                                 options={[
-                                    { value: "all", label: "Todas as atividades" },
                                     ...(atividades?.map(a => ({ value: a.id, label: a.nome })) || [])
                                 ]}
                             />
@@ -589,16 +599,15 @@ export default function DesempenhoColaboradores() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Produto</label>
-                            <SearchableSelect
-                                value={produtoId}
-                                onValueChange={(val) => {
-                                    setProdutoId(val);
-                                    setLoteId("all");
+                            <MultiSelect
+                                values={produtoIds}
+                                onValuesChange={(vals) => {
+                                    setProdutoIds(vals);
+                                    setLoteIds([]);
                                 }}
                                 disabled={tipoFiltro === "atividade"}
                                 placeholder="Todos os produtos"
                                 options={[
-                                    { value: "all", label: "Todos os produtos" },
                                     ...(produtos?.map(p => ({ value: p.id, label: p.nome })) || [])
                                 ]}
                             />
@@ -606,14 +615,13 @@ export default function DesempenhoColaboradores() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Lote</label>
-                            <SearchableSelect
-                                value={loteId}
-                                onValueChange={setLoteId}
+                            <MultiSelect
+                                values={loteIds}
+                                onValuesChange={setLoteIds}
                                 disabled={tipoFiltro === "atividade"}
                                 placeholder="Todos os lotes"
                                 options={[
-                                    { value: "all", label: "Todos os lotes" },
-                                    ...(lotes?.filter(l => produtoId === "all" || l.produto_id === produtoId).map(l => ({
+                                    ...(lotes?.filter(l => produtoIds.length === 0 || produtoIds.includes((l as any).produto_id)).map(l => ({
                                         value: l.id,
                                         label: `${l.numero_lote} - ${(l.produto as any)?.nome || 'Sem Produto'}`
                                     })) || [])
@@ -623,16 +631,15 @@ export default function DesempenhoColaboradores() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Etapa</label>
-                            <SearchableSelect
-                                value={etapaId}
-                                onValueChange={(val) => {
-                                    setEtapaId(val);
-                                    setSubetapaId("all");
+                            <MultiSelect
+                                values={etapaIds}
+                                onValuesChange={(vals) => {
+                                    setEtapaIds(vals);
+                                    setSubetapaIds([]);
                                 }}
                                 disabled={tipoFiltro === "atividade"}
                                 placeholder="Todas as etapas"
                                 options={[
-                                    { value: "all", label: "Todas as etapas" },
                                     ...(etapas?.map(e => ({ value: e.id, label: e.nome })) || [])
                                 ]}
                             />
@@ -640,20 +647,19 @@ export default function DesempenhoColaboradores() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Subetapa</label>
-                            <SearchableSelect
-                                value={subetapaId}
-                                onValueChange={setSubetapaId}
-                                disabled={(etapaId === "all" && (!subetapas || subetapas.length === 0)) || tipoFiltro === "atividade"}
+                            <MultiSelect
+                                values={subetapaIds}
+                                onValuesChange={setSubetapaIds}
+                                disabled={(etapaIds.length === 0 && (!subetapas || subetapas.length === 0)) || tipoFiltro === "atividade"}
                                 placeholder="Todas as subetapas"
                                 options={[
-                                    { value: "all", label: "Todas as subetapas" },
                                     ...(subetapas?.map(s => ({ value: s.id, label: s.nome })) || [])
                                 ]}
                             />
                         </div>
 
                         <div className="flex gap-2 items-end">
-                            <Button onClick={handleConsultar} disabled={!colaboradorId || isLoading} className="flex-1">
+                            <Button onClick={handleConsultar} disabled={colaboradorIds.length === 0 || isLoading} className="flex-1">
                                 {isLoading ? "Consultando..." : "Consultar"}
                                 <Search className="ml-2 h-4 w-4" />
                             </Button>
@@ -818,9 +824,9 @@ export default function DesempenhoColaboradores() {
                                                     const sortedItems = [...grupo.items].sort((a, b) => b.id - a.id);
 
                                                     return sortedItems.map((prod: any) => {
-                                                        const colaborador = colaboradores?.find(c => c.id === colaboradorId);
-                                                        const custoHoraNormal = Number((colaborador as any)?.custo_por_hora || 0);
-                                                        const custoHoraExtra = Number((colaborador as any)?.custo_hora_extra || 0);
+                                                        const colaboradorRef = colaboradores?.find(c => c.id === prod.colaborador_id);
+                                                        const custoHoraNormal = Number((colaboradorRef as any)?.custo_por_hora || 0);
+                                                        const custoHoraExtra = Number((colaboradorRef as any)?.custo_hora_extra || 0);
 
                                                         const minutosNormais = prod.minutos_normais || 0;
                                                         const minutosExtras = prod.minutos_extras || 0;
@@ -839,6 +845,7 @@ export default function DesempenhoColaboradores() {
                                                                     ) : (
                                                                         <>
                                                                             <div className="font-medium">{prod.lote?.numero_lote} - {prod.lote?.nome_lote || "Sem Lote"}</div>
+                                                                            <div className="text-xs text-muted-foreground">{colaboradorRef?.nome}</div>
                                                                         </>
                                                                     )}
                                                                 </TableCell>
