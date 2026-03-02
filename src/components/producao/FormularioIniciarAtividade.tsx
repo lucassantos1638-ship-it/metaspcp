@@ -25,7 +25,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Play, ClipboardList, Check, ChevronsUpDown } from "lucide-react";
+import { AlertCircle, Play, ClipboardList, Check, ChevronsUpDown, ShoppingBag } from "lucide-react";
 import { useIniciarProducao, useColaboradorTemAtividadeAberta } from "@/hooks/useProducaoStartStop";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
 import { Switch } from "@/components/ui/switch";
@@ -40,8 +40,10 @@ export default function FormularioIniciarAtividade() {
   const [etapaId, setEtapaId] = useState("");
   const [subetapaId, setSubetapaId] = useState("");
   const [atividadeId, setAtividadeId] = useState(""); // Novo campo
+  const [pedidoId, setPedidoId] = useState("");
   const [isAtividadeAvulsa, setIsAtividadeAvulsa] = useState(false); // Switch
   const [isTerceirizado, setIsTerceirizado] = useState(false);
+  const [isPedido, setIsPedido] = useState(false); // Switch Pedido
   const [quantidade, setQuantidade] = useState("");
   const [entidadeId, setEntidadeId] = useState("");
   const [servicoId, setServicoId] = useState("");
@@ -74,9 +76,24 @@ export default function FormularioIniciarAtividade() {
     },
   });
 
+  const { data: pedidos } = useQuery({
+    queryKey: ["pedidos_para_producao", empresaId],
+    enabled: !!empresaId && isPedido,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pedidos")
+        .select("id, numero, cliente_id, data_emissao, status, entidade(nome)")
+        .eq("empresa_id", empresaId)
+        .order("data_emissao", { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: lotes } = useQuery({
     queryKey: ["lotes-ativos", empresaId],
-    enabled: !!empresaId && !isAtividadeAvulsa,
+    enabled: !!empresaId && !isAtividadeAvulsa && !isPedido,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lotes")
@@ -138,7 +155,7 @@ export default function FormularioIniciarAtividade() {
   // Buscar o produto do lote selecionado
   const { data: selectedLote } = useQuery({
     queryKey: ["lote", loteId],
-    enabled: !!loteId && !isAtividadeAvulsa,
+    enabled: !!loteId && !isAtividadeAvulsa && !isPedido,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lotes")
@@ -154,7 +171,7 @@ export default function FormularioIniciarAtividade() {
   // Buscar etapas vinculadas ao produto
   const { data: produtoEtapas } = useQuery({
     queryKey: ["produto_etapas", selectedLote?.produto_id],
-    enabled: !!selectedLote?.produto_id && !isAtividadeAvulsa,
+    enabled: !!selectedLote?.produto_id && !isAtividadeAvulsa && !isPedido,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produto_etapas")
@@ -169,7 +186,7 @@ export default function FormularioIniciarAtividade() {
 
   const { data: etapas } = useQuery({
     queryKey: ["etapas", empresaId],
-    enabled: !!empresaId && !isAtividadeAvulsa,
+    enabled: !!empresaId && !isAtividadeAvulsa && !isPedido,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("etapas")
@@ -203,7 +220,7 @@ export default function FormularioIniciarAtividade() {
       if (error) throw error;
       return data;
     },
-    enabled: !!etapaId && !!empresaId && !isAtividadeAvulsa,
+    enabled: !!etapaId && !!empresaId && !isAtividadeAvulsa && !isPedido,
   });
 
   const subetapasFiltradas = subetapas?.filter(sub => {
@@ -226,6 +243,8 @@ export default function FormularioIniciarAtividade() {
       if (!entidadeId || !servicoId || !quantidadeEnviada || !loteId) return;
     } else if (isAtividadeAvulsa) {
       if (!colaboradorId || !atividadeId) return;
+    } else if (isPedido) {
+      if (!colaboradorId || !pedidoId) return;
     } else {
       if (!colaboradorId || !loteId || !etapaId) return;
     }
@@ -233,10 +252,11 @@ export default function FormularioIniciarAtividade() {
     iniciarProducao.mutate(
       {
         colaborador_id: isTerceirizado ? null : colaboradorId,
-        lote_id: isAtividadeAvulsa ? null : loteId,
-        etapa_id: (isAtividadeAvulsa || isTerceirizado) ? null : etapaId,
-        subetapa_id: (isAtividadeAvulsa || isTerceirizado) ? null : (subetapaId || null),
+        lote_id: (isAtividadeAvulsa || isPedido) ? null : loteId,
+        etapa_id: (isAtividadeAvulsa || isPedido || isTerceirizado) ? null : etapaId,
+        subetapa_id: (isAtividadeAvulsa || isPedido || isTerceirizado) ? null : (subetapaId || null),
         atividade_id: isAtividadeAvulsa ? atividadeId : null,
+        pedido_id: isPedido ? pedidoId : null,
         terceirizado: isTerceirizado,
         entidade_id: isTerceirizado ? entidadeId : null,
         servico_id: isTerceirizado ? servicoId : null,
@@ -254,6 +274,7 @@ export default function FormularioIniciarAtividade() {
           setEtapaId("");
           setSubetapaId("");
           setAtividadeId("");
+          setPedidoId("");
           setQuantidade("");
           setEntidadeId("");
           setServicoId("");
@@ -272,8 +293,8 @@ export default function FormularioIniciarAtividade() {
 
   const temAtividadeAberta = !!atividadeAberta;
 
-  const isPrimeiraEtapaDoProduto = !isAtividadeAvulsa && etapaId && listaEtapas && listaEtapas.length > 0 && listaEtapas[0].id === etapaId;
-  const isEtapaPosterior = !isAtividadeAvulsa && etapaId && listaEtapas && listaEtapas.length > 0 && listaEtapas[0].id !== etapaId;
+  const isPrimeiraEtapaDoProduto = !isAtividadeAvulsa && !isPedido && etapaId && listaEtapas && listaEtapas.length > 0 && listaEtapas[0].id === etapaId;
+  const isEtapaPosterior = !isAtividadeAvulsa && !isPedido && etapaId && listaEtapas && listaEtapas.length > 0 && listaEtapas[0].id !== etapaId;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -345,11 +366,15 @@ export default function FormularioIniciarAtividade() {
               checked={isAtividadeAvulsa}
               onCheckedChange={(checked) => {
                 setIsAtividadeAvulsa(checked);
-                if (checked) setIsTerceirizado(false);
+                if (checked) {
+                  setIsTerceirizado(false);
+                  setIsPedido(false);
+                }
                 setLoteId("");
                 setEtapaId("");
                 setSubetapaId("");
                 setAtividadeId("");
+                setPedidoId("");
                 setEntidadeId("");
               }}
             />
@@ -360,16 +385,44 @@ export default function FormularioIniciarAtividade() {
           </div>
           <div className="flex-1 flex items-center space-x-2 border p-3 rounded-md bg-muted/20">
             <Switch
-              id="terceirizado"
-              checked={isTerceirizado}
+              id="atividade-pedido"
+              checked={isPedido}
               onCheckedChange={(checked) => {
-                setIsTerceirizado(checked);
-                if (checked) setIsAtividadeAvulsa(false);
+                setIsPedido(checked);
+                if (checked) {
+                  setIsAtividadeAvulsa(false);
+                  setIsTerceirizado(false);
+                }
                 setColaboradorId("");
                 setLoteId("");
                 setEtapaId("");
                 setSubetapaId("");
                 setAtividadeId("");
+                setPedidoId("");
+                setEntidadeId("");
+              }}
+            />
+            <Label htmlFor="atividade-pedido" className="cursor-pointer flex items-center gap-2">
+              <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+              Pedido
+            </Label>
+          </div>
+          <div className="flex-1 flex items-center space-x-2 border p-3 rounded-md bg-muted/20">
+            <Switch
+              id="terceirizado"
+              checked={isTerceirizado}
+              onCheckedChange={(checked) => {
+                setIsTerceirizado(checked);
+                if (checked) {
+                  setIsAtividadeAvulsa(false);
+                  setIsPedido(false);
+                }
+                setColaboradorId("");
+                setLoteId("");
+                setEtapaId("");
+                setSubetapaId("");
+                setAtividadeId("");
+                setPedidoId("");
               }}
             />
             <Label htmlFor="terceirizado" className="cursor-pointer flex items-center gap-2">
@@ -489,6 +542,24 @@ export default function FormularioIniciarAtividade() {
             {atividadesAvulsas && atividadesAvulsas.length === 0 && (
               <p className="text-xs text-muted-foreground">Nenhuma atividade cadastrada. Vá em Configurações &gt; Etapas &gt; Atividades.</p>
             )}
+          </div>
+        ) : isPedido ? (
+          // Campo para Pedido
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="pedido_id">Pedido *</Label>
+            <Select value={pedidoId} onValueChange={setPedidoId}>
+              <SelectTrigger id="pedido_id">
+                <SelectValue placeholder="Selecione o pedido" />
+              </SelectTrigger>
+              <SelectContent>
+                {pedidos?.map((pedido) => (
+                  <SelectItem key={pedido.id} value={pedido.id}>
+                    {pedido.numero ? `[${pedido.numero}] ` : ""}
+                    {pedido.entidade?.nome || "Cliente não informado"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         ) : (
           // Campos para Produção (Lote/Etapa)
@@ -614,7 +685,7 @@ export default function FormularioIniciarAtividade() {
       </div>
 
       {/* Aviso de Bloqueio por Quantidade não definida (apenas para produção normal) */}
-      {!isAtividadeAvulsa && selectedLote && selectedLote.quantidade_total <= 0 && isEtapaPosterior && (
+      {!isAtividadeAvulsa && !isPedido && selectedLote && selectedLote.quantidade_total <= 0 && isEtapaPosterior && (
         <Alert variant="destructive" className="mt-4">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -623,7 +694,7 @@ export default function FormularioIniciarAtividade() {
         </Alert>
       )}
 
-      {!isAtividadeAvulsa && selectedLote && selectedLote.quantidade_total <= 0 && isPrimeiraEtapaDoProduto && (
+      {!isAtividadeAvulsa && !isPedido && selectedLote && selectedLote.quantidade_total <= 0 && isPrimeiraEtapaDoProduto && (
         <Alert className="mt-4 bg-yellow-50 text-yellow-800 border-yellow-200">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -638,7 +709,7 @@ export default function FormularioIniciarAtividade() {
         disabled={
           iniciarProducao.isPending ||
           temAtividadeAberta ||
-          (!isAtividadeAvulsa && !isTerceirizado && selectedLote && selectedLote.quantidade_total <= 0 && isEtapaPosterior)
+          (!isAtividadeAvulsa && !isPedido && !isTerceirizado && selectedLote && selectedLote.quantidade_total <= 0 && isEtapaPosterior)
         }
       >
         <Play className="mr-2 h-4 w-4" />

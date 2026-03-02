@@ -37,6 +37,9 @@ import Programacao from "./pages/Programacao";
 import DetalhesLote from "./pages/DetalhesLote";
 import LancamentoMateriais from "./pages/LancamentoMateriais";
 import ListaLancamentoMateriais from "./pages/ListaLancamentoMateriais";
+import TabelasPreco from "./pages/TabelasPreco";
+import Pedidos from "./pages/Pedidos";
+import NovoPedido from "./pages/NovoPedido";
 
 import GestaoUsuarios from "./pages/gestor/GestaoUsuarios";
 import DashboardEmpresas from "./pages/super-admin/DashboardEmpresas";
@@ -98,6 +101,15 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredPermission="materiais_cadastro">
                     <Materiais />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/tabelas-preco"
+                element={
+                  <ProtectedRoute requiredPermission="produtos">
+                    <TabelasPreco />
                   </ProtectedRoute>
                 }
               />
@@ -201,8 +213,32 @@ const App = () => (
                 }
               />
 
+              <Route
+                path="/pedidos"
+                element={
+                  <ProtectedRoute requiredPermission="pedidos">
+                    <Pedidos />
+                  </ProtectedRoute>
+                }
+              />
 
+              <Route
+                path="/pedidos/novo"
+                element={
+                  <ProtectedRoute requiredPermission="pedidos">
+                    <NovoPedido />
+                  </ProtectedRoute>
+                }
+              />
 
+              <Route
+                path="/pedidos/:id"
+                element={
+                  <ProtectedRoute requiredPermission="pedidos">
+                    <NovoPedido />
+                  </ProtectedRoute>
+                }
+              />
 
               <Route
                 path="/acompanhamento-colaboradores"

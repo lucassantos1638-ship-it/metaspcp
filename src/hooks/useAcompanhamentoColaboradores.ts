@@ -21,6 +21,12 @@ export interface ColaboradorComAtividade {
         atividade: {
             nome: string;
         } | null;
+        pedido: {
+            numero: string;
+            entidade: {
+                nome: string;
+            } | null;
+        } | null;
         data_inicio: string;
         hora_inicio: string;
         segundos_inicio: number;
@@ -56,7 +62,8 @@ export const useAcompanhamentoColaboradores = () => {
           lote:lotes(numero_lote, nome_lote),
           etapa:etapas(nome),
           subetapa:subetapas(nome),
-          atividade:atividades(nome)
+          atividade:atividades(nome),
+          pedido:pedidos(numero, entidade(nome))
         `)
                 .eq("empresa_id", empresaId)
                 .eq("status", "em_aberto");
@@ -77,6 +84,7 @@ export const useAcompanhamentoColaboradores = () => {
                         etapa: Array.isArray(atividade.etapa) ? atividade.etapa[0] : atividade.etapa,
                         subetapa: Array.isArray(atividade.subetapa) ? atividade.subetapa[0] : atividade.subetapa,
                         atividade: Array.isArray(atividade.atividade) ? atividade.atividade[0] : atividade.atividade,
+                        pedido: Array.isArray(atividade.pedido) ? atividade.pedido[0] : atividade.pedido,
                         data_inicio: atividade.data_inicio,
                         hora_inicio: atividade.hora_inicio,
                         segundos_inicio: atividade.segundos_inicio || 0,

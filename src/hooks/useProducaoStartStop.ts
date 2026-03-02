@@ -17,7 +17,8 @@ export const useProducoesEmAberto = () => {
           subetapa:subetapas(nome),
           atividade:atividades(nome),
           entidade:entidade(nome),
-          servico:entidade_servicos(nome, valor)
+          servico:entidade_servicos(nome, valor),
+          pedido:pedidos(id, numero, entidade(nome))
         `)
         .eq("status", "em_aberto")
         .order("created_at", { ascending: false });
@@ -43,7 +44,8 @@ export const useColaboradorTemAtividadeAberta = (colaboradorId: string) => {
           lote:lotes(numero_lote, nome_lote),
           etapa:etapas(nome),
           subetapa:subetapas(nome),
-          atividade:atividades(nome)
+          atividade:atividades(nome),
+          pedido:pedidos(numero, entidade(nome))
         `)
         .eq("colaborador_id", colaboradorId)
         .eq("status", "em_aberto")
@@ -67,6 +69,7 @@ export const useIniciarProducao = () => {
       etapa_id?: string | null;
       subetapa_id?: string | null;
       atividade_id?: string | null;
+      pedido_id?: string | null;
       terceirizado?: boolean;
       entidade_id?: string | null;
       servico_id?: string | null;
@@ -78,8 +81,8 @@ export const useIniciarProducao = () => {
       empresa_id: string;
     }) => {
       // Validar payload
-      if (!payload.atividade_id && (!payload.lote_id || (!payload.etapa_id && !payload.terceirizado))) {
-        throw new Error("É necessário informar um Lote/Etapa, uma Atividade, ou um Lote Terceirizado.");
+      if (!payload.atividade_id && !payload.pedido_id && (!payload.lote_id || (!payload.etapa_id && !payload.terceirizado))) {
+        throw new Error("É necessário informar um Lote/Etapa, uma Atividade, um Pedido, ou um Lote Terceirizado.");
       }
       if (payload.terceirizado && (!payload.entidade_id || !payload.servico_id || !payload.quantidade_enviada)) {
         throw new Error("Para terceirização, informe a Entidade, o Serviço e a Quantidade Enviada.");
@@ -97,6 +100,7 @@ export const useIniciarProducao = () => {
           etapa_id: payload.etapa_id || null, // Garante null se undefined
           subetapa_id: payload.subetapa_id || null,
           atividade_id: payload.atividade_id || null, // Novo campo
+          pedido_id: payload.pedido_id || null,
           terceirizado: payload.terceirizado || false,
           entidade_id: payload.entidade_id || null,
           servico_id: payload.servico_id || null,

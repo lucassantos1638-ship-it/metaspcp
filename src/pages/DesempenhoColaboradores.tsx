@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { CalendarIcon, Search, DollarSign, Clock, Package, Printer, ChevronDown, ChevronRight, Check } from "lucide-react";
-import { format, endOfDay } from "date-fns";
+import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { toast } from "sonner";
 import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -112,8 +113,9 @@ export default function DesempenhoColaboradores() {
     const [produtoIds, setProdutoIds] = useState<string[]>([]);
     const [etapaIds, setEtapaIds] = useState<string[]>([]);
     const [subetapaIds, setSubetapaIds] = useState<string[]>([]);
-    const [tipoFiltro, setTipoFiltro] = useState<string>("all"); // all, producao, atividade
+    const [tipoFiltro, setTipoFiltro] = useState<string>("all"); // all, producao, atividade, pedido
     const [atividadeIds, setAtividadeIds] = useState<string[]>([]);
+    const [pedidoIds, setPedidoIds] = useState<string[]>([]);
     const [filtrosAplicados, setFiltrosAplicados] = useState(false);
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -150,6 +152,26 @@ export default function DesempenhoColaboradores() {
                 .eq("ativo", true)
                 .order("nome");
             if (error) throw error;
+            return data;
+        },
+    });
+
+    // Buscar Pedidos
+    const { data: pedidos } = useQuery({
+        queryKey: ["pedidos-listagem-desempenho", empresaId],
+        enabled: !!empresaId,
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from("pedidos")
+                .select("id, numero, entidade (nome)")
+                .eq("empresa_id", empresaId)
+                .order("data_criacao", { ascending: false });
+
+            if (error) {
+                console.error("Erro pedidos:", error);
+                toast.error("Erro ao carregar pedidos: " + error.message);
+                throw error;
+            }
             return data;
         },
     });
@@ -234,7 +256,7 @@ export default function DesempenhoColaboradores() {
 
     // Query Principal de Produção
     const { data: producoes, isLoading, refetch } = useQuery({
-        queryKey: ["producoes-desempenho", empresaId, colaboradorIds, dataInicio, dataFim, loteIds, produtoIds, etapaIds, subetapaIds, tipoFiltro, atividadeIds],
+        queryKey: ["producoes-desempenho", empresaId, colaboradorIds, dataInicio, dataFim, loteIds, produtoIds, etapaIds, subetapaIds, tipoFiltro, atividadeIds, pedidoIds],
         enabled: false, // Só busca quando clicar em Consultar
         queryFn: async () => {
             if (colaboradorIds.length === 0) return [];
@@ -246,7 +268,8 @@ export default function DesempenhoColaboradores() {
                 lote:lotes(numero_lote, nome_lote, produto_id),
                 etapa:etapas(nome, ordem),
                 subetapa:subetapas(nome),
-                atividade:atividades(nome)
+                atividade:atividades(nome),
+                pedido:pedidos(id, numero, entidade(nome))
             `)
                 .eq("empresa_id", empresaId)
                 .in("colaborador_id", colaboradorIds);
@@ -262,16 +285,23 @@ export default function DesempenhoColaboradores() {
                 query = query.lte("data_inicio", `${toStr} 23:59:59`);
             }
 
-            // Filtro por Tipo (Produção vs Atividade)
+            // Filtro por Tipo (Produção vs Atividade vs Pedido)
             if (tipoFiltro === "producao") {
-                query = query.is("atividade_id", null);
+                query = query.is("atividade_id", null).is("pedido_id", null);
             } else if (tipoFiltro === "atividade") {
                 query = query.not("atividade_id", "is", null);
+            } else if (tipoFiltro === "pedido") {
+                query = query.not("pedido_id", "is", null);
             }
 
             // Filtro por Atividade Específica
             if (atividadeIds.length > 0) {
                 query = query.in("atividade_id", atividadeIds);
+            }
+
+            // Filtro por Pedido Específico
+            if (pedidoIds.length > 0) {
+                query = query.in("pedido_id", pedidoIds);
             }
 
             const { data, error } = await query;
@@ -322,17 +352,26 @@ export default function DesempenhoColaboradores() {
             const custoHoraExtra = Number((colaboradorRef as any)?.custo_hora_extra || 0);
 
             const isAvulsa = !!prod.atividade;
+            const isPedido = !!prod.pedido_id;
             const key = isAvulsa
                 ? `atividade_${prod.atividade_id}`
-                : `etapa_${prod.etapa_id}_subetapa_${prod.subetapa_id || 'null'}`;
+                : isPedido
+                    ? `pedido_${prod.pedido_id}`
+                    : `etapa_${prod.etapa_id}_subetapa_${prod.subetapa_id || 'null'}`;
 
             if (!map.has(key)) {
                 map.set(key, {
                     id: key,
                     isAvulsa,
+                    isPedido,
                     titulo: isAvulsa
                         ? (prod.atividade as any).nome
-                        : `${(prod.etapa as any)?.nome} ${(prod.subetapa as any) ? `↳ ${(prod.subetapa as any).nome}` : ''}`,
+                        : isPedido
+                            ? `Pedido`
+                            : `${(prod.etapa as any)?.nome} ${(prod.subetapa as any) ? `↳ ${(prod.subetapa as any).nome}` : ''}`,
+                    subtitulo: isPedido
+                        ? `${(prod.pedido as any)?.numero ? `Nº ${(prod.pedido as any).numero} - ` : ''}${(prod.pedido as any)?.entidade?.nome || 'Cliente não informado'}`
+                        : null,
                     items: [],
                     qtd: 0,
                     minutosNormais: 0,
@@ -568,8 +607,16 @@ export default function DesempenhoColaboradores() {
                                     setLoteIds([]);
                                     setEtapaIds([]);
                                     setSubetapaIds([]);
+                                    setPedidoIds([]);
                                 } else if (val === "producao") {
                                     setAtividadeIds([]);
+                                    setPedidoIds([]);
+                                } else if (val === "pedido") {
+                                    setAtividadeIds([]);
+                                    setProdutoIds([]);
+                                    setLoteIds([]);
+                                    setEtapaIds([]);
+                                    setSubetapaIds([]);
                                 }
                             }}>
                                 <SelectTrigger className="bg-background">
@@ -579,6 +626,7 @@ export default function DesempenhoColaboradores() {
                                     <SelectItem value="all">Todos</SelectItem>
                                     <SelectItem value="producao">Produção (Lotes)</SelectItem>
                                     <SelectItem value="atividade">Atividades Avulsas</SelectItem>
+                                    <SelectItem value="pedido">Pedido</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -589,10 +637,27 @@ export default function DesempenhoColaboradores() {
                             <MultiSelect
                                 values={atividadeIds}
                                 onValuesChange={setAtividadeIds}
-                                disabled={tipoFiltro === "producao"}
+                                disabled={tipoFiltro === "producao" || tipoFiltro === "pedido"}
                                 placeholder="Todas as atividades"
                                 options={[
                                     ...(atividades?.map(a => ({ value: a.id, label: a.nome })) || [])
+                                ]}
+                            />
+                        </div>
+
+                        {/* Filtro de Pedido */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Pedido</label>
+                            <MultiSelect
+                                values={pedidoIds}
+                                onValuesChange={setPedidoIds}
+                                disabled={tipoFiltro === "producao" || tipoFiltro === "atividade"}
+                                placeholder="Todos os pedidos"
+                                options={[
+                                    ...(pedidos?.map(p => ({
+                                        value: p.id,
+                                        label: `${p.numero ? `Nº ${p.numero}` : 'S/N'} - ${(p.entidade as any)?.nome || 'Cliente não informado'}`
+                                    })) || [])
                                 ]}
                             />
                         </div>
@@ -605,7 +670,7 @@ export default function DesempenhoColaboradores() {
                                     setProdutoIds(vals);
                                     setLoteIds([]);
                                 }}
-                                disabled={tipoFiltro === "atividade"}
+                                disabled={tipoFiltro === "atividade" || tipoFiltro === "pedido"}
                                 placeholder="Todos os produtos"
                                 options={[
                                     ...(produtos?.map(p => ({ value: p.id, label: p.nome })) || [])
@@ -618,7 +683,7 @@ export default function DesempenhoColaboradores() {
                             <MultiSelect
                                 values={loteIds}
                                 onValuesChange={setLoteIds}
-                                disabled={tipoFiltro === "atividade"}
+                                disabled={tipoFiltro === "atividade" || tipoFiltro === "pedido"}
                                 placeholder="Todos os lotes"
                                 options={[
                                     ...(lotes?.filter(l => produtoIds.length === 0 || produtoIds.includes((l as any).produto_id)).map(l => ({
@@ -637,7 +702,7 @@ export default function DesempenhoColaboradores() {
                                     setEtapaIds(vals);
                                     setSubetapaIds([]);
                                 }}
-                                disabled={tipoFiltro === "atividade"}
+                                disabled={tipoFiltro === "atividade" || tipoFiltro === "pedido"}
                                 placeholder="Todas as etapas"
                                 options={[
                                     ...(etapas?.map(e => ({ value: e.id, label: e.nome })) || [])
@@ -650,7 +715,7 @@ export default function DesempenhoColaboradores() {
                             <MultiSelect
                                 values={subetapaIds}
                                 onValuesChange={setSubetapaIds}
-                                disabled={(etapaIds.length === 0 && (!subetapas || subetapas.length === 0)) || tipoFiltro === "atividade"}
+                                disabled={(etapaIds.length === 0 && (!subetapas || subetapas.length === 0)) || tipoFiltro === "atividade" || tipoFiltro === "pedido"}
                                 placeholder="Todas as subetapas"
                                 options={[
                                     ...(subetapas?.map(s => ({ value: s.id, label: s.nome })) || [])
@@ -771,7 +836,13 @@ export default function DesempenhoColaboradores() {
                                                         <div className="flex items-center gap-2 mt-1">
                                                             {expandedGroups[grupo.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                                             {grupo.isAvulsa && <Badge variant="outline" className="text-[10px] font-mono border-primary/20 bg-primary/5 text-primary">AVULSA</Badge>}
+                                                            {grupo.isPedido && <Badge variant="outline" className="text-[10px] font-mono border-primary/20 bg-primary/5 text-primary">PEDIDO</Badge>}
                                                             <span>{grupo.titulo}</span>
+                                                            {grupo.subtitulo && (
+                                                                <span className="text-xs text-muted-foreground ml-2 font-normal">
+                                                                    {grupo.subtitulo}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
@@ -839,8 +910,14 @@ export default function DesempenhoColaboradores() {
                                                             <TableRow key={prod.id} className="bg-muted/10 text-sm">
                                                                 <TableCell className="pl-10">
                                                                     {prod.atividade ? (
-                                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                                        <div className="flex flex-col text-muted-foreground">
                                                                             <span>Registro de Atividade</span>
+                                                                            <span className="text-xs">{colaboradorRef?.nome}</span>
+                                                                        </div>
+                                                                    ) : prod.pedido_id ? (
+                                                                        <div className="flex flex-col text-muted-foreground">
+                                                                            <span className="font-medium text-foreground">Registro de Pedido</span>
+                                                                            <span className="text-xs">{colaboradorRef?.nome}</span>
                                                                         </div>
                                                                     ) : (
                                                                         <>

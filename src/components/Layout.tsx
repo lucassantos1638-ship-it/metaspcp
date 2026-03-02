@@ -1,7 +1,8 @@
 import { Link, useLocation, Outlet } from "react-router-dom";
-import { ClipboardCheck, Package, Target, BarChart3, Users, Settings, FileText, Menu, Box, TrendingUp, TrendingDown, Activity, LogOut, Shield, KeyRound, UserCog, BookOpen, Layers, LayoutDashboard, Factory, ScrollText, ClipboardList, Calculator, Palette, Calendar, PackagePlus } from "lucide-react";
+import { ClipboardCheck, Package, Target, BarChart3, Users, Settings, FileText, Menu, Box, TrendingUp, TrendingDown, Activity, LogOut, Shield, KeyRound, UserCog, BookOpen, Layers, LayoutDashboard, Factory, ScrollText, ClipboardList, Calculator, Palette, Calendar, PackagePlus, Edit, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,31 +13,144 @@ const Layout = () => {
   const location = useLocation();
   const [open, setOpen] = useState(false); // Restored for mobile menu
   const { user, isGestor, temPermissao, logout } = useAuth();
-  const allNavItems = [
-    { path: "/", icon: LayoutDashboard, label: "Dashboard", permission: "dashboard" },
-    { path: "/entidade", icon: Users, label: "Entidade", permission: "entidade" },
-    { path: "/producao", icon: Factory, label: "Lançar Produção", permission: "producao" },
-    { path: "/lancamento-mp", icon: PackagePlus, label: "Lançar Materiais", permission: "materiais_lancamento" },
-    { path: "/lotes", icon: Package, label: "Lotes", permission: "lotes" },
-    { path: "/acompanhamento-colaboradores", icon: ClipboardList, label: "Monitoramento", permission: "pedidos" },
-    { path: "/produtos", icon: Box, label: "Produtos", permission: "produtos" },
-    { path: "/metas", icon: Target, label: "Metas", permission: "metas" },
-    { path: "/materiais", icon: Palette, label: "Materiais", permission: "materiais_cadastro" },
-    { path: "/projecao-vendas", icon: Activity, label: "Projeção de Vendas", permission: "prog_vendas" },
-    { path: "/vendas-perdidas", icon: TrendingDown, label: "Vendas Perdidas", permission: "prog_vendas" },
-    { path: "/programacao", icon: Calendar, label: "Programação", permission: "programacao" },
-    { path: "/etapas", icon: Layers, label: "Etapas", permission: "etapas" },
-    { path: "/desempenho", icon: TrendingUp, label: "Desempenho", permission: "desempenho" },
-    { path: "/previsao-producao", icon: Calculator, label: "Previsão", permission: "previsao_producao" },
-    { path: "/pop", icon: ScrollText, label: "P.O.P", permission: "pop" },
+  const navigationGroups = [
+    {
+      title: "DASHBOARD",
+      icon: LayoutDashboard,
+      items: [
+        { path: "/", icon: LayoutDashboard, label: "Dashboard", permission: "dashboard" },
+      ]
+    },
+    {
+      title: "LANÇAMENTO",
+      icon: PackagePlus,
+      items: [
+        { path: "/producao", icon: Factory, label: "Lançar Produção", permission: "producao" },
+        { path: "/lancamento-mp", icon: PackagePlus, label: "Lançar Materiais", permission: "materiais_lancamento" },
+      ]
+    },
+    {
+      title: "CADASTROS",
+      icon: Edit,
+      items: [
+        { path: "/entidade", icon: Users, label: "Entidade", permission: "entidade" },
+        { path: "/produtos", icon: Box, label: "Produtos", permission: "produtos" },
+        { path: "/tabelas-preco", icon: BookOpen, label: "Tabelas de Preço", permission: "produtos" },
+        { path: "/materiais", icon: Palette, label: "Materiais", permission: "materiais_cadastro" },
+        { path: "/etapas", icon: Layers, label: "Etapas", permission: "etapas" },
+      ]
+    },
+    {
+      title: "PCP",
+      icon: Activity,
+      items: [
+        { path: "/lotes", icon: Package, label: "Lotes", permission: "lotes" },
+        { path: "/desempenho", icon: TrendingUp, label: "Desempenho", permission: "desempenho" },
+        { path: "/metas", icon: Target, label: "Metas", permission: "metas" },
+        { path: "/acompanhamento-colaboradores", icon: ClipboardList, label: "Monitoramento", permission: "pedidos" },
+        { path: "/pop", icon: ScrollText, label: "P.O.P", permission: "pop" },
+      ]
+    },
+    {
+      title: "PROGRAMAÇÃO",
+      icon: CalendarDays,
+      items: [
+        { path: "/pedidos", icon: ClipboardCheck, label: "Pedidos", permission: "pedidos" },
+        { path: "/projecao-vendas", icon: Activity, label: "Projeção de Vendas", permission: "prog_vendas" },
+        { path: "/vendas-perdidas", icon: TrendingDown, label: "Vendas Perdidas", permission: "prog_vendas" },
+        { path: "/programacao", icon: Calendar, label: "Programação", permission: "programacao" },
+        { path: "/previsao-producao", icon: Calculator, label: "Previsão", permission: "previsao_producao" },
+      ]
+    }
   ];
 
-  // Main Nav Items
-  const navItems = user?.role === 'super_admin'
-    ? allNavItems
-    : allNavItems.filter(item => temPermissao(item.permission));
+  const filteredGroups = navigationGroups.map(group => ({
+    ...group,
+    items: user?.role === 'super_admin'
+      ? group.items
+      : group.items.filter(item => temPermissao(item.permission))
+  })).filter(group => group.items.length > 0);
 
+  const defaultOpenAccordions = filteredGroups
+    .filter(g => g.items.some(i => location.pathname === i.path || (i.path !== '/' && location.pathname.startsWith(i.path))))
+    .map(g => g.title);
 
+  const renderNavMenu = (isMobile = false) => (
+    <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 py-2 px-2 flex flex-col">
+      <Accordion type="multiple" defaultValue={defaultOpenAccordions} className="w-full space-y-1">
+        {filteredGroups.map((group) => {
+          if (group.title === "DASHBOARD" && group.items.length === 1) {
+            const item = group.items[0];
+            const isActive = location.pathname === item.path;
+            return (
+              <div key={group.title} className="px-1 py-0.5">
+                <Link
+                  to={item.path}
+                  onClick={() => isMobile && setOpen(false)}
+                  className={cn(
+                    "flex items-center justify-between px-3 py-2 rounded transition-colors group",
+                    isActive
+                      ? "bg-primary text-primary-foreground font-medium shadow-sm"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground font-medium"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <item.icon className={cn("h-4 w-4 transition-opacity", isActive ? "opacity-100" : "opacity-70 group-hover:opacity-100")} />
+                    <span className="text-xs font-semibold">{group.title}</span>
+                  </div>
+                </Link>
+              </div>
+            );
+          }
+
+          const isGroupActive = group.items.some(item => location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path)));
+          const GroupIcon = group.icon;
+
+          return (
+            <AccordionItem value={group.title} key={group.title} className="border-none px-1 py-0.5">
+              <AccordionTrigger
+                className={cn(
+                  "py-2 px-3 rounded hover:no-underline transition-colors hover:bg-muted",
+                  isGroupActive ? "text-foreground font-bold" : "text-muted-foreground font-medium"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <GroupIcon className={cn("h-4 w-4 transition-opacity", isGroupActive ? "opacity-100" : "opacity-70")} />
+                  <span className="text-xs tracking-wide font-semibold">{group.title}</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-1 pt-0">
+                <div className="flex flex-col space-y-0.5 pl-6 border-l-2 border-border/40 ml-4 mt-1">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
+                    return (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => isMobile && setOpen(false)}
+                        className={cn(
+                          "flex items-center justify-between px-3 py-2 rounded transition-colors group",
+                          isActive
+                            ? "bg-primary text-primary-foreground font-medium shadow-sm"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Icon className={cn("h-3.5 w-3.5 transition-opacity", isActive ? "opacity-100" : "opacity-70 group-hover:opacity-100")} />
+                          <span className="text-[11px] font-medium">{item.label}</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
+    </nav>
+  );
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
@@ -71,32 +185,7 @@ const Layout = () => {
               </div>
 
               {/* Navigation */}
-              <nav className="flex-1 py-2 px-2 space-y-0.5">
-                <nav className="flex-1 py-2 px-2 space-y-0.5">
-                  {navItems.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <Link
-                        key={item.path}
-                        to={item.path}
-                        onClick={() => setOpen(false)}
-                        className={cn(
-                          "flex items-center justify-between px-3 py-2 rounded transition-colors group",
-                          location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path))
-                            ? "text-primary-foreground bg-primary"
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon className={cn("w-4 h-4 transition-opacity", location.pathname === item.path ? "opacity-100" : "opacity-70 group-hover:opacity-100")} />
-                          <span className="text-xs font-medium">{item.label}</span>
-                        </div>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("opacity-0 group-hover:opacity-50", location.pathname === item.path && "text-primary-foreground opacity-50")}><path d="m9 18 6-6-6-6" /></svg>
-                      </Link>
-                    );
-                  })}
-                </nav>
-              </nav>
+              {renderNavMenu(true)}
 
               {/* Bottom Actions (Collapsible Menu) */}
               <div className="border-t border-border bg-card mt-auto flex-none flex flex-col">
@@ -152,31 +241,7 @@ const Layout = () => {
           </div>
 
           {/* Navigation (Takes available space, pushes bottom actions down) */}
-          <nav className="flex-1 py-2 px-2 space-y-0.5">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={cn(
-                    "flex items-center justify-between px-3 py-2 rounded transition-colors group",
-                    isActive
-                      ? "text-primary-foreground bg-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className={cn("w-4 h-4 transition-opacity", isActive ? "opacity-100" : "opacity-70 group-hover:opacity-100")} />
-                    <span className="text-xs font-medium">{item.label}</span>
-                  </div>
-                  {/* Chevron Right (mock) */}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("opacity-0 group-hover:opacity-50", isActive && "text-primary-foreground opacity-50")}><path d="m9 18 6-6-6-6" /></svg>
-                </Link>
-              );
-            })}
-          </nav>
+          {renderNavMenu(false)}
 
           {/* Bottom Actions (Collapsible Menu) */}
           <div className="border-t border-border bg-card mt-auto flex-none flex flex-col">

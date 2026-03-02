@@ -109,17 +109,18 @@ export default function DialogFinalizarAtividade({
 
   const isTerceirizado = !!producao?.terceirizado;
   const isAtividadeGenerica = !!producao?.atividade_id;
+  const isPedido = !!producao?.pedido_id;
 
   // A quantidade deve ser exigida se:
-  // 1. NÃO for atividade genérica
+  // 1. NÃO for atividade genérica e NÃO for pedido
   // 2. E (For a última subetapa da etapa 1 OU não for etapa 1)
-  // Basicamente: Lotes precisam de quantidade. Atividades genéricas não.
+  // Basicamente: Lotes precisam de quantidade. Atividades genéricas e Pedidos não.
   // E no caso de terceirização, a quantidade devolvida é obrigatória.
-  const precisaDefinirQuantidadeLote = !isTerceirizado && !isAtividadeGenerica && isUltimaSubetapaEtapa1();
+  const precisaDefinirQuantidadeLote = !isTerceirizado && !isAtividadeGenerica && !isPedido && isUltimaSubetapaEtapa1();
   const isEtapa1 = producao?.etapa?.ordem === 1;
 
-  // Input visível se: For Terceirizada OU (NÃO for genérica E (não for etapa 1 OU for o momento de definir a qtde do lote))
-  const showQuantityInput = isTerceirizado || (!isAtividadeGenerica && (!isEtapa1 || precisaDefinirQuantidadeLote));
+  // Input visível se: For Terceirizada OU (NÃO for genérica E NÃO for pedido E (não for etapa 1 OU for o momento de definir a qtde do lote))
+  const showQuantityInput = isTerceirizado || (!isAtividadeGenerica && !isPedido && (!isEtapa1 || precisaDefinirQuantidadeLote));
 
   const validarDataHora = () => {
     if (!producao) return false;
@@ -149,12 +150,12 @@ export default function DialogFinalizarAtividade({
 
     if (!validarDataHora()) return;
 
-    // Se estiver visível, usa o valor. Se for genérica ou oculto, usa 1 (para constar produção) ou 0?
-    // Se for atividade genérica, não contabilizamos "unidades", então pode ser 1 para indicar "1 atividade feita".
+    // Se estiver visível, usa o valor. Se for genérica ou pedido ou oculto, usa 1 (para constar produção) ou 0?
+    // Se for atividade genérica/pedido, não contabilizamos "unidades", então pode ser 1 para indicar "1 atividade feita".
     let qtd = 0;
     if (showQuantityInput && !semQuantidade && quantidadeProduzida) {
       qtd = parseInt(quantidadeProduzida);
-    } else if (isAtividadeGenerica) {
+    } else if (isAtividadeGenerica || isPedido) {
       qtd = 1;
     }
 
@@ -246,6 +247,18 @@ export default function DialogFinalizarAtividade({
                     <span className="inline-flex items-center text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full text-xs font-medium">
                       Progresso: {producao.quantidade_devolvida || 0} / {producao.quantidade_enviada}
                     </span>
+                  </div>
+                </>
+              ) : isPedido ? (
+                <>
+                  <div className="col-span-2 sm:col-span-1">
+                    <strong>Colaborador:</strong> {producao.colaborador?.nome || "N/A"}
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <strong>Etapa:</strong> Pedido
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <strong>Pedido:</strong> {producao.pedido?.numero ? `Nº ${producao.pedido.numero} - ` : ""}{producao.pedido?.entidade?.nome || "Cliente não informado"}
                   </div>
                 </>
               ) : (

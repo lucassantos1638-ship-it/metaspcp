@@ -136,7 +136,20 @@ export default function AcompanhamentoColaboradores() {
 
                                             <TableCell>
                                                 {isActive && colab.atividadeAtual ? (
-                                                    colab.atividadeAtual.atividade ? (
+                                                    colab.atividadeAtual.pedido ? (
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <Badge variant="outline" className="h-5 text-[10px] font-mono border-primary/20 bg-primary/5 text-primary whitespace-nowrap">
+                                                                PEDIDO
+                                                            </Badge>
+                                                            <span className="text-sm font-medium truncate max-w-[150px]">
+                                                                {colab.atividadeAtual.pedido.numero ? `Nº ${colab.atividadeAtual.pedido.numero}` : "S/N"}
+                                                            </span>
+                                                            <span className="text-muted-foreground/30 mx-1">-</span>
+                                                            <span className="text-sm text-muted-foreground truncate max-w-[150px]">
+                                                                {colab.atividadeAtual.pedido.entidade?.nome || "Cliente não informado"}
+                                                            </span>
+                                                        </div>
+                                                    ) : colab.atividadeAtual.atividade ? (
                                                         <div className="flex items-center gap-2">
                                                             <Badge variant="outline" className="h-5 text-[10px] font-mono border-primary/20 bg-primary/5 text-primary whitespace-nowrap">
                                                                 AVULSA
@@ -240,7 +253,16 @@ export default function AcompanhamentoColaboradores() {
                                     {/* Body: Activity Details */}
                                     {isActive && colab.atividadeAtual ? (
                                         <div className="pt-2 border-t space-y-2">
-                                            {colab.atividadeAtual.atividade ? (
+                                            {colab.atividadeAtual.pedido ? (
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <Badge variant="outline" className="text-[10px] font-mono border-primary/20 bg-primary/5 text-primary shrink-0">
+                                                        PEDIDO
+                                                    </Badge>
+                                                    <span className="text-sm font-medium line-clamp-1">
+                                                        {colab.atividadeAtual.pedido.numero ? `Nº ${colab.atividadeAtual.pedido.numero} - ` : ""}{colab.atividadeAtual.pedido.entidade?.nome || "Cliente não informado"}
+                                                    </span>
+                                                </div>
+                                            ) : colab.atividadeAtual.atividade ? (
                                                 <div className="flex items-center gap-2">
                                                     <Badge variant="outline" className="text-[10px] font-mono border-primary/20 bg-primary/5 text-primary shrink-0">
                                                         AVULSA

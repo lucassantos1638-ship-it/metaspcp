@@ -194,19 +194,24 @@ export default function ListaAtividadesEmAberto() {
         <div className="space-y-4">
           {Object.entries(
             producoesFiltradas.reduce((acc, producao) => {
-              const loteId = producao.lote_id || 'avulso';
+              const loteId = producao.pedido_id
+                ? `pedido_${producao.pedido_id}`
+                : (producao.lote_id || 'avulso');
+
               if (!acc[loteId]) {
                 acc[loteId] = {
                   lote: producao.lote,
+                  pedido: producao.pedido,
                   atividades: []
                 };
               }
               acc[loteId].atividades.push(producao);
               return acc;
-            }, {} as Record<string, { lote: any, atividades: any[] }>)
-          ).map(([loteId, group]: [string, { lote: any, atividades: any[] }]) => {
+            }, {} as Record<string, { lote: any, pedido?: any, atividades: any[] }>)
+          ).map(([loteId, group]: [string, { lote: any, pedido?: any, atividades: any[] }]) => {
             const isOpen = !!openLotes[loteId] || !!filtroNome;
             const isAvulso = loteId === 'avulso';
+            const isPedidoGroup = loteId.startsWith('pedido_');
 
             return (
               <Collapsible
@@ -225,6 +230,10 @@ export default function ListaAtividadesEmAberto() {
                             <span className="flex items-center gap-2">
                               Atividades Avulsas
                             </span>
+                          ) : isPedidoGroup ? (
+                            <>
+                              Pedido
+                            </>
                           ) : (
                             <>
                               Lote {group.lote?.numero_lote || "N/A"}
@@ -235,7 +244,12 @@ export default function ListaAtividadesEmAberto() {
                           </Badge>
                         </h3>
                         <p className="text-sm text-muted-foreground truncate max-w-[300px] sm:max-w-[500px]">
-                          {isAvulso ? "Atividades diversas sem lote vinculado" : (group.lote?.nome_lote || "Lote sem nome")}
+                          {isAvulso
+                            ? "Atividades diversas sem lote vinculado"
+                            : isPedidoGroup
+                              ? `${group.pedido?.numero ? `Nº ${group.pedido.numero} - ` : ""}${group.pedido?.entidade?.nome || "Cliente não informado"}`
+                              : (group.lote?.nome_lote || "Lote sem nome")
+                          }
                         </p>
                       </div>
                     </div>
@@ -274,6 +288,14 @@ export default function ListaAtividadesEmAberto() {
                                 <div className="flex items-center gap-1.5">
                                   <Badge variant="outline" className="text-xs bg-muted/50">Serviço</Badge>
                                   <span className="font-medium">{producao.servico?.nome || "N/A"}</span>
+                                </div>
+                              ) : producao.pedido_id ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Badge variant="outline" className="text-xs bg-muted/50">Pedido</Badge>
+                                  <span className="font-medium">
+                                    {producao.pedido?.numero ? `[${producao.pedido.numero}] ` : ""}
+                                    {producao.pedido?.entidade?.nome || "Cliente não informado"}
+                                  </span>
                                 </div>
                               ) : producao.atividade ? (
                                 <div className="flex items-center gap-1.5">
@@ -363,11 +385,19 @@ export default function ListaAtividadesEmAberto() {
                           {/* Details */}
                           <div className="bg-background/50 rounded-md p-3 text-xs space-y-2 border border-dashed">
                             <div>
-                              <span className="font-semibold block mb-1">Etapa:</span>
+                              <span className="font-semibold block mb-1">Etapa / Pedido:</span>
                               {producao.terceirizado ? (
                                 <div className="flex items-center gap-1.5">
                                   <Badge variant="outline" className="text-[10px] h-5 px-1">Serviço</Badge>
                                   <span>{producao.servico?.nome || "N/A"}</span>
+                                </div>
+                              ) : producao.pedido_id ? (
+                                <div className="flex items-center gap-1.5">
+                                  <Badge variant="outline" className="text-[10px] h-5 px-1">Pedido</Badge>
+                                  <span>
+                                    {producao.pedido?.numero ? `[${producao.pedido.numero}] ` : ""}
+                                    {producao.pedido?.entidade?.nome || "Cliente não informado"}
+                                  </span>
                                 </div>
                               ) : producao.atividade ? (
                                 <div className="flex items-center gap-1.5">

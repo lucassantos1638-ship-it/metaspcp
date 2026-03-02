@@ -64,7 +64,7 @@ const Lotes = () => {
     nome_lote: "",
     quantidade_total: "",
     produto_id: "",
-    previsao_id: "",
+    pedido_id: "",
   });
   const [estimativa, setEstimativa] = useState<{
     tempoEstimado: number;
@@ -74,16 +74,15 @@ const Lotes = () => {
 
   const { data: produtos } = useProdutos(true);
 
-  const { data: previsoesAtivas } = useQuery({
-    queryKey: ["previsoes_ativas", empresaId],
+  const { data: pedidos } = useQuery({
+    queryKey: ["pedidos_para_lotes", empresaId],
     enabled: !!empresaId,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("previsoes_producao")
-        .select("id, nome_pedido, data_entrega_desejada, status")
+        .from("pedidos")
+        .select("id, numero, cliente_id, data_emissao, status, entidade(nome)")
         .eq("empresa_id", empresaId)
-        .eq("status", "em_andamento")
-        .order("data_entrega_desejada", { ascending: true });
+        .order("data_emissao", { ascending: false });
 
       if (error) throw error;
       return data;
@@ -174,9 +173,9 @@ const Lotes = () => {
         payload.produto_id = novoLote.produto_id;
       }
 
-      // Adicionar previsao_id se selecionado
-      if (novoLote.previsao_id && novoLote.previsao_id !== "sem-pedido") {
-        payload.previsao_id = novoLote.previsao_id;
+      // Adicionar pedido_id se selecionado
+      if (novoLote.pedido_id && novoLote.pedido_id !== "sem-pedido") {
+        payload.pedido_id = novoLote.pedido_id;
       }
 
       const { data, error } = await supabase
@@ -195,7 +194,7 @@ const Lotes = () => {
         nome_lote: "",
         quantidade_total: "",
         produto_id: "",
-        previsao_id: ""
+        pedido_id: ""
       });
       setEstimativa(null);
       setIsDialogOpen(false);
@@ -298,30 +297,32 @@ const Lotes = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="previsao_id">Vincular a Pedido (Opcional)</Label>
+                <Label htmlFor="pedido_id">Vincular a Pedido (Opcional)</Label>
                 <Select
-                  value={novoLote.previsao_id}
+                  value={novoLote.pedido_id}
                   onValueChange={(value) =>
-                    setNovoLote({ ...novoLote, previsao_id: value })
+                    setNovoLote({ ...novoLote, pedido_id: value })
                   }
                 >
-                  <SelectTrigger id="previsao_id">
-                    <SelectValue placeholder="Sem vínculo (lote avulso)" />
+                  <SelectTrigger id="pedido_id">
+                    <SelectValue placeholder="Sem vínculo (avulso)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="sem-pedido">Sem vínculo (lote avulso)</SelectItem>
-                    {previsoesAtivas?.map((previsao) => (
-                      <SelectItem key={previsao.id} value={previsao.id}>
-                        {previsao.nome_pedido} - Entrega: {new Date(previsao.data_entrega_desejada).toLocaleDateString('pt-BR')}
+                    <SelectItem value="sem-pedido">Sem vínculo (avulso)</SelectItem>
+                    {pedidos?.map((pedido) => (
+                      <SelectItem key={pedido.id} value={pedido.id}>
+                        {pedido.numero ? `[${pedido.numero}] ` : ""}
+                        {pedido.entidade?.nome || "Cliente não informado"}
+                        {pedido.data_emissao ? ` - ${new Date(pedido.data_emissao).toLocaleDateString('pt-BR')}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {novoLote.previsao_id && novoLote.previsao_id !== "sem-pedido" && (
-                  <Alert className="mt-2">
+                {novoLote.pedido_id && novoLote.pedido_id !== "sem-pedido" && (
+                  <Alert className="mt-2 text-xs py-2 px-3">
                     <Info className="h-4 w-4" />
                     <AlertDescription>
-                      Este lote será vinculado ao pedido e o progresso será atualizado automaticamente.
+                      Vinculado ao pedido selecionado.
                     </AlertDescription>
                   </Alert>
                 )}
