@@ -97,9 +97,9 @@ export function useDetalhesLote(loteId: string | null) {
       // "Quantidade Produzida" do lote geralmente refere-se à última etapa (embalagem/expedição).
       // Mas vamos manter a lógica anterior de somar apenas 'finalizado' para não quebrar contrato, 
       // embora 'percentualGeral' do lote seja meio ambíguo se não for da última etapa.
-      const quantidadeProduzida = producoes
-        ?.filter(p => p.status === 'finalizado')
-        .reduce((sum, p) => sum + (p.quantidade_produzida || 0), 0) || 0;
+      const quantidadeProduzida = (producoes || [])
+        .filter(p => p.status === 'finalizado')
+        .reduce((sum, p) => sum + (p.quantidade_produzida || 0), 0);
 
       // 5. Buscar consumo de materiais (Safe fetch)
       let custoMateriais = 0;

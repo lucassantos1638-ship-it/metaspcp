@@ -16,6 +16,7 @@ import { useProducoesEmAberto } from "@/hooks/useProducaoStartStop";
 import { differenceInSeconds, parseISO, isFuture } from "date-fns";
 import DialogFinalizarAtividade from "./DialogFinalizarAtividade";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { LoteProgressSummary } from "./LoteProgressSummary";
 
 const Timer = ({ dataInicio, horaInicio, segundosInicio }: { dataInicio: string, horaInicio: string, segundosInicio: number }) => {
   const [display, setDisplay] = useState("00:00:00");
@@ -251,6 +252,11 @@ export default function ListaAtividadesEmAberto() {
                               : (group.lote?.nome_lote || "Lote sem nome")
                           }
                         </p>
+                        {!isAvulso && !isPedidoGroup && group.atividades[0]?.lote_id && (
+                          <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+                            <LoteProgressSummary loteId={group.atividades[0].lote_id} />
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

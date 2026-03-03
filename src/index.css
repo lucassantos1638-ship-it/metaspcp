@@ -124,3 +124,69 @@ All colors MUST be HSL.
   /* slata-200 */
   border-radius: 20px;
 }
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  body,
+  html,
+  #root {
+    background-color: white !important;
+    height: auto !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Forçar backgrounds a aparecerem no navegador */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Esconder botões e elementos que não devem ser impressos */
+  .no-print,
+  button,
+  nav,
+  header,
+  aside,
+  .sidebar {
+    display: none !important;
+  }
+
+  /* Resetar conteineres que causam scroll interno e cortes de pagina */
+  .overflow-hidden,
+  .overflow-y-auto,
+  .overflow-auto,
+  .h-screen,
+  .h-full,
+  main {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Quebras de Tabela e thead */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+}

@@ -106,10 +106,10 @@ const Lotes = () => {
   const lotesFiltrados = lotes?.filter((lote) => {
     const termo = busca.toLowerCase();
     return (
-      lote.numero_lote.toLowerCase().includes(termo) ||
-      lote.nome_lote.toLowerCase().includes(termo) ||
-      (lote.produto?.nome || "").toLowerCase().includes(termo) ||
-      (lote.produto?.sku || "").toLowerCase().includes(termo)
+      (lote?.numero_lote || "").toLowerCase().includes(termo) ||
+      (lote?.nome_lote || "").toLowerCase().includes(termo) ||
+      (lote?.produto?.nome || "").toLowerCase().includes(termo) ||
+      (lote?.produto?.sku || "").toLowerCase().includes(termo)
     );
   });
 

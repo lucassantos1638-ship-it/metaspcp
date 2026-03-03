@@ -107,43 +107,17 @@ export default function EditarProdutoDialog({
                         />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="precoCpf">Preço CPF</Label>
-                            <Input
-                                id="precoCpf"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={precoCpf}
-                                onChange={(e) => setPrecoCpf(e.target.value)}
-                                placeholder="0.00"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="precoCnpj">Preço CNPJ</Label>
-                            <Input
-                                id="precoCnpj"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={precoCnpj}
-                                onChange={(e) => setPrecoCnpj(e.target.value)}
-                                placeholder="0.00"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="estoque">Estoque</Label>
-                            <Input
-                                id="estoque"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={estoque}
-                                onChange={(e) => setEstoque(e.target.value)}
-                                placeholder="0.00"
-                            />
-                        </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="estoque">Estoque</Label>
+                        <Input
+                            id="estoque"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={estoque}
+                            onChange={(e) => setEstoque(e.target.value)}
+                            placeholder="0.00"
+                        />
                     </div>
 
                     <DialogFooter>

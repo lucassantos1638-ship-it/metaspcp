@@ -153,7 +153,7 @@ const Layout = () => {
   );
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
+    <div className="flex print:block h-screen print:h-auto print:min-h-0 w-full overflow-hidden print:overflow-visible bg-background">
       {/* Mobile Header - Fixed at top for mobile */}
       <div className="lg:hidden print:hidden fixed top-0 left-0 right-0 h-16 bg-card border-b border-border z-40 flex items-center px-4">
         <Sheet open={open} onOpenChange={setOpen}>
@@ -268,9 +268,9 @@ const Layout = () => {
       </aside>
 
       {/* Main Content Area - Scrollable */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden pt-16 lg:pt-0">
-        <div className="flex-1 overflow-y-auto w-full">
-          <div className="p-4 sm:p-6 lg:p-8 min-h-full">
+      <main className="flex-1 print:flex-none flex flex-col print:block h-full print:h-auto overflow-hidden print:overflow-visible pt-16 lg:pt-0">
+        <div className="flex-1 print:flex-none overflow-y-auto print:overflow-visible w-full print:h-auto">
+          <div className="p-4 sm:p-6 lg:p-8 print:p-0 min-h-full print:min-h-0">
             <TrialBanner />
             <Outlet />
           </div>

@@ -154,16 +154,47 @@ export function useProdutoComMetricas(produtoId: string) {
         quantidade: m.consumo_padrao || 0,
       })) || [];
 
-      // Calcular totais
-      const tempoTotalMedio = metricas?.reduce(
-        (sum, m) => sum + (m.tempo_medio_por_peca_minutos || 0),
-        0
-      ) || 0;
+      // Novo Cálculo Dinâmico: Ignoramos as médias congeladas da View do Supabase 
+      // e refazemos a matemática baseando as estastísticas globais DA TELA EXATAMENTE E APENAS nos lotes recentes!
 
-      const custoProducaoMedio = metricas?.reduce(
-        (sum, m) => sum + (m.custo_medio_por_peca || 0),
-        0
-      ) || 0;
+      let tempoTotalMedio = 0;
+      let custoProducaoMedio = 0;
+      let metricasDinâmicas: any[] = [];
+      let mappedMetricas = new Map<string, any>();
+
+      const lotesValidos = ultimosLotesCalculados?.filter((l: any) => l && typeof l.tempo_por_peca === 'number' && typeof l.custo_por_peca === 'number') || [];
+
+      if (lotesValidos.length > 0) {
+        // Reduzindo totais mestre do Produto
+        const somaT = lotesValidos.reduce((sum, l) => sum + (l.tempo_por_peca || 0), 0);
+        const somaC = lotesValidos.reduce((sum, l) => sum + (l.custo_por_peca || 0), 0);
+        tempoTotalMedio = somaT / lotesValidos.length;
+        custoProducaoMedio = somaC / lotesValidos.length;
+
+        // As "metricas" da grid de Detalhamento usam a mesma view "congelada". Vamos sobrescrever os valores
+        // de metricas usando a amostra de lote! No entanto, a forma mais rápida de manter a lógica de tela sem mexer em N componentes
+        // é usar as métricas como *gabarito* de lista, e aplicar a proporção (Regra de Três) de tempoTotalMedio sobre elas.
+        // Já que a variação de custo e tempo de sub-sub-etapa tende a ser proporcional, faremos a atualização.
+
+        const tempoTotalView = metricas?.reduce((sum, m) => sum + (m.tempo_medio_por_peca_minutos || 0), 0) || 1;
+        const custoTotalView = metricas?.reduce((sum, m) => sum + (m.custo_medio_por_peca || 0), 0) || 1;
+
+        metricasDinâmicas = metricas ? metricas.map((m: any) => {
+          const pesoTempo = tempoTotalView > 0 ? (m.tempo_medio_por_peca_minutos || 0) / tempoTotalView : 0;
+          const pesoCusto = custoTotalView > 0 ? (m.custo_medio_por_peca || 0) / custoTotalView : 0;
+
+          return {
+            ...m,
+            tempo_medio_por_peca_minutos: pesoTempo * tempoTotalMedio,
+            custo_medio_por_peca: pesoCusto * custoProducaoMedio
+          };
+        }) : [];
+      } else {
+        // Fallback caso não haja nenhum lote finalizado na base
+        tempoTotalMedio = metricas?.reduce((sum, m) => sum + (m.tempo_medio_por_peca_minutos || 0), 0) || 0;
+        custoProducaoMedio = metricas?.reduce((sum, m) => sum + (m.custo_medio_por_peca || 0), 0) || 0;
+        metricasDinâmicas = metricas || [];
+      }
 
       const custoMaterialTotal = materiaisFormatados.reduce((sum, item: any) => {
         const preco = item.material?.preco_custo || 0;
@@ -176,7 +207,7 @@ export function useProdutoComMetricas(produtoId: string) {
         produto,
         etapas: etapas || [],
         materiais: materiaisFormatados,
-        metricas: metricas || [],
+        metricas: metricasDinâmicas,
         ultimosLotes: ultimosLotesCalculados,
         tempoTotalMedio,
         custoProducaoMedio,

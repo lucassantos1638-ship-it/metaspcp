@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -18,17 +19,45 @@ import {
 import { useDetalhesLote } from "@/hooks/useDetalhesLote";
 import { formatarTempoProdutivo } from "@/lib/timeUtils";
 import { formatarCusto } from "@/lib/custoUtils";
-import { Package, Clock, Users, CheckCircle2, Loader2, DollarSign, Calculator, ArrowLeft, Droplet, Layers } from "lucide-react";
+import { Package, Clock, Users, CheckCircle2, Loader2, DollarSign, Calculator, ArrowLeft, Droplet, Layers, Printer, ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import LoteRelatorioA4 from "@/components/producao/LoteRelatorioA4";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePrintReport } from "@/hooks/usePrintReport";
+import { useEmpresaId } from "@/hooks/useEmpresaId";
 
 export default function DetalhesLote() {
     const { id } = useParams();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { data, isLoading } = useDetalhesLote(id || null);
+    const { isPrinting, triggerPrint } = usePrintReport();
+
+    const empresaId = useEmpresaId();
+
+    const { data: empresa } = useQuery({
+        queryKey: ["configuracoes-empresa-print", empresaId],
+        enabled: !!empresaId,
+        queryFn: async () => {
+            const { data, error } = await supabase.from("empresas").select("nome, cnpj").eq("id", empresaId).single();
+            if (error) throw error;
+            return data;
+        },
+    });
+
+    // Estado para controlar expansão das etapas pai no Progresso
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+    const toggleGroup = (grupoNome: string) => {
+        setExpandedGroups(prev => ({ ...prev, [grupoNome]: !prev[grupoNome] }));
+    };
+
+    // Estado para controlar expansão dos materiais
+    const [expandedMateriais, setExpandedMateriais] = useState<Record<string, boolean>>({});
+    const toggleMaterial = (materialId: string) => {
+        setExpandedMateriais(prev => ({ ...prev, [materialId]: !prev[materialId] }));
+    };
 
     if (isLoading) {
         return (
@@ -52,6 +81,7 @@ export default function DetalhesLote() {
             </div>
         )
     }
+
 
     const { lote, progressoPorEtapa, tempoTotal, quantidadeProduzida, custoMateriais, consumos } = data;
 
@@ -87,435 +117,583 @@ export default function DetalhesLote() {
     const custoAgregadoTotal = custoMaoDeObraTotal + custoTerceirizadoTotal + custoMaterialTotal;
     const custoAgregadoUnit = custoUnitMaoDeObra + custoUnitTerceirizado + custoUnitMaterial;
 
+
     return (
-        <div className="container mx-auto py-6 space-y-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="flex items-center gap-2 md:gap-4">
-                    <Button variant="ghost" onClick={() => navigate(-1)} size="sm" className="pl-0 md:pl-4">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Voltar
-                    </Button>
-                    <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-                        <Package className="h-5 w-5 md:h-6 md:w-6" />
-                        Detalhes do Lote
-                    </h1>
+        <>
+            <div className="container mx-auto py-6 space-y-6 no-print">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 md:gap-4">
+                        <Button variant="ghost" onClick={() => navigate(-1)} size="sm" className="pl-0 md:pl-4">
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Voltar
+                        </Button>
+                        <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+                            <Package className="h-5 w-5 md:h-6 md:w-6" />
+                            Detalhes do Lote
+                        </h1>
+                    </div>
+                    {lote.finalizado ? (
+                        <div className="flex w-full md:w-auto mt-4 md:mt-0 gap-2">
+                            <Button variant="outline" onClick={triggerPrint} className="bg-primary text-white hover:bg-primary/90 hover:text-white border-0 shadow-sm print:hidden">
+                                <Printer className="mr-2 h-4 w-4" />
+                                Imprimir Relatório
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="w-full md:w-auto"
+                                onClick={async () => {
+                                    const { error } = await supabase
+                                        .from('lotes')
+                                        .update({
+                                            finalizado: false,
+                                            manually_reopened: true
+                                        })
+                                        .eq('id', lote.id);
+
+                                    if (error) {
+                                        toast.error("Erro ao reabrir lote");
+                                    } else {
+                                        toast.success("Lote reaberto com sucesso!");
+                                        queryClient.invalidateQueries({ queryKey: ["detalhes_lote", id] });
+                                    }
+                                }}
+                            >
+                                Reabrir Lote
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="flex w-full md:w-auto mt-4 md:mt-0 gap-2">
+                            <Button variant="outline" onClick={triggerPrint} className="bg-primary text-white hover:bg-primary/90 hover:text-white border-0 shadow-sm print:hidden">
+                                <Printer className="mr-2 h-4 w-4" />
+                                Imprimir Relatório
+                            </Button>
+                            <Button
+                                variant="default"
+                                className="bg-green-600 hover:bg-green-700 w-full md:w-auto"
+                                onClick={async () => {
+                                    const { error } = await supabase
+                                        .from('lotes')
+                                        .update({
+                                            finalizado: true,
+                                            manually_reopened: false
+                                        })
+                                        .eq('id', lote.id);
+
+                                    if (error) {
+                                        toast.error("Erro ao finalizar lote");
+                                    } else {
+                                        toast.success("Lote finalizado com sucesso!");
+                                        queryClient.invalidateQueries({ queryKey: ["detalhes_lote", id] });
+                                    }
+                                }}
+                            >
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                Finalizar Lote
+                            </Button>
+                        </div>
+                    )}
                 </div>
-                {lote.finalizado ? (
-                    <Button
-                        variant="outline"
-                        className="w-full md:w-auto"
-                        onClick={async () => {
-                            const { error } = await supabase
-                                .from('lotes')
-                                .update({
-                                    finalizado: false,
-                                    manually_reopened: true
-                                })
-                                .eq('id', lote.id);
 
-                            if (error) {
-                                toast.error("Erro ao reabrir lote");
-                            } else {
-                                toast.success("Lote reaberto com sucesso!");
-                                queryClient.invalidateQueries({ queryKey: ["detalhes_lote", id] });
-                            }
-                        }}
-                    >
-                        Reabrir Lote
-                    </Button>
-                ) : (
-                    <Button
-                        variant="default"
-                        className="bg-green-600 hover:bg-green-700 w-full md:w-auto"
-                        onClick={async () => {
-                            const { error } = await supabase
-                                .from('lotes')
-                                .update({
-                                    finalizado: true,
-                                    manually_reopened: false
-                                })
-                                .eq('id', lote.id);
-
-                            if (error) {
-                                toast.error("Erro ao finalizar lote");
-                            } else {
-                                toast.success("Lote finalizado com sucesso!");
-                                queryClient.invalidateQueries({ queryKey: ["detalhes_lote", id] });
-                            }
-                        }}
-                    >
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Finalizar Lote
-                    </Button>
-                )}
-            </div>
-
-            <div className="space-y-6">
-                {/* Informações Gerais */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">Informações Gerais</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                            <div>
-                                <p className="text-sm text-muted-foreground">Número do Lote</p>
-                                <p className="text-lg font-semibold">#{lote.numero_lote}</p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Nome do Lote</p>
-                                <p className="text-lg font-semibold break-words">{lote.nome_lote}</p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Produto</p>
-                                <p className="text-lg font-semibold break-words">
-                                    {lote.produto?.nome || "N/A"}
-                                    {lote.produto?.sku && (
-                                        <span className="text-sm text-muted-foreground ml-2 block sm:inline">
-                                            ({lote.produto.sku})
+                <div className="space-y-6">
+                    {/* Informações Gerais */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Informações Gerais</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Número do Lote</p>
+                                    <p className="text-lg font-semibold">#{lote.numero_lote}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Nome do Lote</p>
+                                    <p className="text-lg font-semibold break-words">{lote.nome_lote}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Produto</p>
+                                    <p className="text-lg font-semibold break-words">
+                                        {lote.produto?.nome || "N/A"}
+                                        {lote.produto?.sku && (
+                                            <span className="text-sm text-muted-foreground ml-2 block sm:inline">
+                                                ({lote.produto.sku})
+                                            </span>
+                                        )}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Datas</p>
+                                    <div className="flex flex-col text-sm mt-1">
+                                        <span className="font-semibold text-foreground">
+                                            I: {lote.data_inicio ? new Date(lote.data_inicio).toLocaleDateString('pt-BR') :
+                                                (lote.created_at ? new Date(lote.created_at).toLocaleDateString('pt-BR') : 'Não informada')}
                                         </span>
-                                    )}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Status</p>
-                                <div className="mt-1">
-                                    {lote.finalizado ? (
-                                        <Badge variant="default" className="bg-green-500">
-                                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                                            Finalizado
-                                        </Badge>
-                                    ) : (
-                                        <Badge variant="default" className="bg-blue-500">
-                                            <Loader2 className="h-3 w-3 mr-1" />
-                                            Em Andamento
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-6 mt-8">
-                            {/* 1. Totais Gerais (Agregados) */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-200 flex items-center justify-between shadow-sm">
-                                    <div>
-                                        <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Custo Total <span className="whitespace-nowrap">(Mat + M.O. + Terc.)</span></p>
-                                        <p className="text-2xl font-bold text-emerald-700 mt-1">
-                                            {formatarCusto(custoAgregadoTotal)}
-                                        </p>
-                                    </div>
-                                    <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0 hidden md:flex">
-                                        <DollarSign className="h-5 w-5 text-emerald-600" />
+                                        <span className="text-muted-foreground">
+                                            F: {lote.data_conclusao ? new Date(lote.data_conclusao).toLocaleDateString('pt-BR') : 'Em andamento'}
+                                        </span>
                                     </div>
                                 </div>
-                                <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-200 flex items-center justify-between shadow-sm">
-                                    <div>
-                                        <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Custo Unitário <span className="whitespace-nowrap">(Mat + M.O. + Terc.)</span></p>
-                                        <p className="text-2xl font-bold text-emerald-700 mt-1">
-                                            {formatarCusto(custoAgregadoUnit)}
-                                        </p>
-                                    </div>
-                                    <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0 hidden md:flex">
-                                        <Calculator className="h-5 w-5 text-emerald-600" />
-                                    </div>
-                                </div>
-                                <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-200 flex items-center justify-between shadow-sm">
-                                    <div>
-                                        <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Tempo Total Lote</p>
-                                        <p className="text-2xl font-bold text-emerald-700 mt-1">
-                                            {formatarTempoProdutivo(tempoTotal)}
-                                        </p>
-                                    </div>
-                                    <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0 hidden md:flex">
-                                        <Clock className="h-5 w-5 text-emerald-600" />
-                                    </div>
-                                </div>
-                                <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-200 flex items-center justify-between shadow-sm">
-                                    <div>
-                                        <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Tempo Unitário Médio</p>
-                                        <p className="text-2xl font-bold text-emerald-700 mt-1">
-                                            {formatarTempoProdutivo(tempoUnitarioGeral)}
-                                        </p>
-                                    </div>
-                                    <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0 hidden md:flex">
-                                        <Clock className="h-5 w-5 text-emerald-600" />
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Status</p>
+                                    <div className="mt-1">
+                                        {lote.finalizado ? (
+                                            <Badge variant="default" className="bg-green-500">
+                                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                                Finalizado
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant="default" className="bg-blue-500">
+                                                <Loader2 className="h-3 w-3 mr-1" />
+                                                Em Andamento
+                                            </Badge>
+                                        )}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* 2. Detalhes Mão de Obra, Material e Tempo */}
-                            <div>
-                                <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">Detalhamento</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    <div className="bg-card p-3 rounded-lg border shadow-sm">
-                                        <div className="flex items-center gap-1.5 mb-1.5">
-                                            <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-                                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Total M.O. Interna</span>
+                            <div className="space-y-6 mt-8">
+                                {/* 1. Totais Gerais (Agregados) */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-200 flex items-center justify-between shadow-sm">
+                                        <div>
+                                            <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Custo Total <span className="whitespace-nowrap">(Mat + M.O. + Terc.)</span></p>
+                                            <p className="text-2xl font-bold text-emerald-700 mt-1">
+                                                {formatarCusto(custoAgregadoTotal)}
+                                            </p>
                                         </div>
-                                        <p className="text-lg font-bold text-foreground">
-                                            {formatarCusto(custoMaoDeObraTotal)}
-                                        </p>
+                                        <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0 hidden md:flex">
+                                            <DollarSign className="h-5 w-5 text-emerald-600" />
+                                        </div>
                                     </div>
-
-                                    <div className="bg-card p-3 rounded-lg border shadow-sm">
-                                        <div className="flex items-center gap-1.5 mb-1.5">
-                                            <Calculator className="h-3.5 w-3.5 text-muted-foreground" />
-                                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Unitário M.O. Interna</span>
+                                    <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-200 flex items-center justify-between shadow-sm">
+                                        <div>
+                                            <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Custo Unitário <span className="whitespace-nowrap">(Mat + M.O. + Terc.)</span></p>
+                                            <p className="text-2xl font-bold text-emerald-700 mt-1">
+                                                {formatarCusto(custoAgregadoUnit)}
+                                            </p>
                                         </div>
-                                        <p className="text-lg font-bold text-foreground">
-                                            {formatarCusto(custoUnitMaoDeObra)}
-                                        </p>
+                                        <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0 hidden md:flex">
+                                            <Calculator className="h-5 w-5 text-emerald-600" />
+                                        </div>
                                     </div>
-
-                                    <div className="bg-card p-3 rounded-lg border shadow-sm">
-                                        <div className="flex items-center gap-1.5 mb-1.5">
-                                            <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-                                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Total Terceirizada</span>
+                                    <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-200 flex items-center justify-between shadow-sm">
+                                        <div>
+                                            <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Tempo Total Lote</p>
+                                            <p className="text-2xl font-bold text-emerald-700 mt-1">
+                                                {formatarTempoProdutivo(tempoTotal)}
+                                            </p>
                                         </div>
-                                        <p className="text-lg font-bold text-foreground">
-                                            {formatarCusto(custoTerceirizadoTotal)}
-                                        </p>
+                                        <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0 hidden md:flex">
+                                            <Clock className="h-5 w-5 text-emerald-600" />
+                                        </div>
                                     </div>
-
-                                    <div className="bg-card p-3 rounded-lg border shadow-sm">
-                                        <div className="flex items-center gap-1.5 mb-1.5">
-                                            <Calculator className="h-3.5 w-3.5 text-muted-foreground" />
-                                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Unitário Terceirizada</span>
+                                    <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-200 flex items-center justify-between shadow-sm">
+                                        <div>
+                                            <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Tempo Unitário Médio</p>
+                                            <p className="text-2xl font-bold text-emerald-700 mt-1">
+                                                {formatarTempoProdutivo(tempoUnitarioGeral)}
+                                            </p>
                                         </div>
-                                        <p className="text-lg font-bold text-foreground">
-                                            {formatarCusto(custoUnitTerceirizado)}
-                                        </p>
+                                        <div className="h-10 w-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0 hidden md:flex">
+                                            <Clock className="h-5 w-5 text-emerald-600" />
+                                        </div>
                                     </div>
+                                </div>
 
-                                    <div className="bg-card p-3 rounded-lg border shadow-sm">
-                                        <div className="flex items-center gap-1.5 mb-1.5">
-                                            <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Custo Total Material</span>
+                                {/* 2. Detalhes Mão de Obra, Material e Tempo */}
+                                <div>
+                                    <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">Detalhamento</h3>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        <div className="bg-card p-3 rounded-lg border shadow-sm">
+                                            <div className="flex items-center gap-1.5 mb-1.5">
+                                                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Total M.O. Interna</span>
+                                            </div>
+                                            <p className="text-lg font-bold text-foreground">
+                                                {formatarCusto(custoMaoDeObraTotal)}
+                                            </p>
                                         </div>
-                                        <p className="text-lg font-bold text-foreground">
-                                            {formatarCusto(custoMaterialTotal)}
-                                        </p>
-                                    </div>
 
-                                    <div className="bg-card p-3 rounded-lg border shadow-sm">
-                                        <div className="flex items-center gap-1.5 mb-1.5">
-                                            <Droplet className="h-3.5 w-3.5 text-muted-foreground" />
-                                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Custo Unitário Material</span>
+                                        <div className="bg-card p-3 rounded-lg border shadow-sm">
+                                            <div className="flex items-center gap-1.5 mb-1.5">
+                                                <Calculator className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Unitário M.O. Interna</span>
+                                            </div>
+                                            <p className="text-lg font-bold text-foreground">
+                                                {formatarCusto(custoUnitMaoDeObra)}
+                                            </p>
                                         </div>
-                                        <p className="text-lg font-bold text-foreground">
-                                            {formatarCusto(custoUnitMaterial)}
-                                        </p>
+
+                                        <div className="bg-card p-3 rounded-lg border shadow-sm">
+                                            <div className="flex items-center gap-1.5 mb-1.5">
+                                                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Total Terceirizada</span>
+                                            </div>
+                                            <p className="text-lg font-bold text-foreground">
+                                                {formatarCusto(custoTerceirizadoTotal)}
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-card p-3 rounded-lg border shadow-sm">
+                                            <div className="flex items-center gap-1.5 mb-1.5">
+                                                <Calculator className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Unitário Terceirizada</span>
+                                            </div>
+                                            <p className="text-lg font-bold text-foreground">
+                                                {formatarCusto(custoUnitTerceirizado)}
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-card p-3 rounded-lg border shadow-sm">
+                                            <div className="flex items-center gap-1.5 mb-1.5">
+                                                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Custo Total Material</span>
+                                            </div>
+                                            <p className="text-lg font-bold text-foreground">
+                                                {formatarCusto(custoMaterialTotal)}
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-card p-3 rounded-lg border shadow-sm">
+                                            <div className="flex items-center gap-1.5 mb-1.5">
+                                                <Droplet className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Custo Unitário Material</span>
+                                            </div>
+                                            <p className="text-lg font-bold text-foreground">
+                                                {formatarCusto(custoUnitMaterial)}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
 
-                {/* Detalhamento por Etapa */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">Progresso por Etapa</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Etapa</TableHead>
-                                    <TableHead>Progresso</TableHead>
-                                    <TableHead>Tempo</TableHead>
-                                    <TableHead>Hora Extra</TableHead>
-                                    <TableHead>Tempo Total</TableHead>
-                                    <TableHead>Tempo Unit. (Médio)</TableHead>
-                                    <TableHead>Custo Total</TableHead>
-                                    <TableHead>Custo Unit.</TableHead>
-                                    <TableHead>Colaboradores</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {progressoPorEtapa.map((etapa, idx) => {
-                                    const tempoUnitarioEtapa = etapa.quantidade_produzida > 0 ? etapa.tempo_total / etapa.quantidade_produzida : 0;
-                                    const custoUnitarioEtapa = etapa.quantidade_produzida > 0 ? etapa.custo_total / etapa.quantidade_produzida : 0;
+                    {/* Detalhamento por Etapa */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Progresso por Etapa</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Etapa</TableHead>
+                                        <TableHead>Progresso</TableHead>
+                                        <TableHead>Tempo</TableHead>
+                                        <TableHead>Hora Extra</TableHead>
+                                        <TableHead>Tempo Total</TableHead>
+                                        <TableHead>Tempo Unit. (Médio)</TableHead>
+                                        <TableHead>Custo Total</TableHead>
+                                        <TableHead>Custo Unit.</TableHead>
+                                        <TableHead>Colaboradores</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {progressoPorEtapa?.length > 0 ? (
+                                        Object.values(
+                                            progressoPorEtapa.reduce((acc: any, curr: any) => {
+                                                const id = curr.etapa_nome || 'avulso';
+                                                if (!acc[id]) {
+                                                    // Aqui garantimos que grupo.nome nunca será undefined
+                                                    acc[id] = { nome: id, itens: [], tempo_total: 0, tempo_normal: 0, tempo_extra: 0, custo_total: 0, quantidade_produzida: 0 };
+                                                }
+                                                acc[id].itens.push(curr);
+                                                acc[id].tempo_total += (curr.tempo_total || 0);
+                                                acc[id].tempo_normal += (curr.tempo_normal || 0);
+                                                acc[id].tempo_extra += (curr.tempo_extra || 0);
+                                                acc[id].custo_total += (curr.custo_total || 0);
+                                                acc[id].quantidade_produzida += (curr.quantidade_produzida || 0);
+                                                return acc;
+                                            }, {})
+                                        ).map((grupo: any, grupoIdx: number) => {
+                                            const tempoUnitarioGrupo = grupo.quantidade_produzida > 0 ? (grupo.tempo_total / grupo.quantidade_produzida) : 0;
+                                            const custoUnitarioGrupo = grupo.quantidade_produzida > 0 ? (grupo.custo_total / grupo.quantidade_produzida) : 0;
+                                            const keySafeguard = grupo.nome || "avulso";
 
-                                    return (
-                                        <TableRow key={idx}>
-                                            <TableCell className="font-medium">
-                                                {etapa.is_terceirizado ? (
-                                                    <Badge variant="outline" className="mr-2 text-xs bg-amber-50 text-amber-700 border-amber-200">
-                                                        Terceirizado
-                                                    </Badge>
-                                                ) : null}
-                                                {etapa.subetapa_nome || etapa.etapa_nome}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="text-sm font-medium">
-                                                    {etapa.quantidade_produzida} / {etapa.quantidade_total}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                                    {formatarTempoProdutivo(etapa.tempo_normal)}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1">
-                                                    {etapa.tempo_extra > 0 ? (
-                                                        <Badge variant="destructive" className="text-xs">
-                                                            {formatarTempoProdutivo(etapa.tempo_extra)}
-                                                        </Badge>
-                                                    ) : (
-                                                        <span className="text-sm text-muted-foreground">-</span>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1 font-semibold">
-                                                    <Clock className="h-3 w-3 text-muted-foreground" />
-                                                    {formatarTempoProdutivo(etapa.tempo_total)}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className="text-muted-foreground text-sm">
-                                                    {formatarTempoProdutivo(tempoUnitarioEtapa)}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className="text-green-600 font-medium text-sm">
-                                                    {formatarCusto(etapa.custo_total)}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className="text-orange-600 text-sm">
-                                                    {formatarCusto(custoUnitarioEtapa)}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                {etapa.colaboradores.length > 0 ? (
-                                                    <Popover>
-                                                        <PopoverTrigger asChild>
-                                                            <Button variant="link" className="p-0 h-auto font-normal text-foreground hover:text-primary">
-                                                                <div className="flex items-center gap-1">
-                                                                    <Users className="h-3 w-3 text-muted-foreground" />
-                                                                    {etapa.colaboradores.length} {etapa.is_terceirizado ? (etapa.colaboradores.length === 1 ? 'terceirizado' : 'terceirizados') : (etapa.colaboradores.length === 1 ? 'colaborador' : 'colaboradores')}
-                                                                </div>
-                                                            </Button>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent className="w-80">
-                                                            <div className="space-y-2">
-                                                                <h4 className="font-medium text-sm border-b pb-2 mb-2">Colaboradores na etapa</h4>
-                                                                {etapa.colaboradores_detalhes?.map((colab, i) => (
-                                                                    <div key={i} className="flex justify-between items-center text-sm border-b border-border/40 pb-1 last:border-0 last:pb-0">
-                                                                        <span className="font-medium">{colab.nome}</span>
-                                                                        <div className="flex flex-col items-end">
-                                                                            {colab.quantidade !== undefined && (
-                                                                                <span className="text-xs font-semibold text-primary">
-                                                                                    {colab.quantidade} un
-                                                                                </span>
-                                                                            )}
-                                                                            <span className="text-muted-foreground flex items-center gap-1 text-xs">
-                                                                                <Clock className="h-3 w-3" />
-                                                                                {formatarTempoProdutivo(colab.tempo)}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </PopoverContent>
-                                                    </Popover>
-                                                ) : (
-                                                    <span className="text-muted-foreground text-sm">-</span>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-
-                {/* Consumo de Matéria Prima */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">Consumo de Matéria Prima</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Material</TableHead>
-                                    <TableHead className="text-right">Quantidade</TableHead>
-                                    <TableHead className="text-right">Preço Unit.</TableHead>
-                                    <TableHead className="text-right">Custo Total</TableHead>
-                                    <TableHead className="text-right">Custo p/ Peça</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {consumos?.length > 0 ? (
-                                    Object.values(consumos.reduce((acc: any, curr: any) => {
-                                        const id = curr.material?.id || 'unknown';
-                                        if (!acc[id]) acc[id] = { material: curr.material, itens: [] };
-                                        acc[id].itens.push(curr);
-                                        return acc;
-                                    }, {})).map((grupo: any) => (
-                                        <>
-                                            {/* Linha do Material (Título) */}
-                                            <TableRow key={`header-${grupo.material?.id}`} className="bg-muted/20 hover:bg-muted/30">
-                                                <TableCell colSpan={5} className="py-3">
-                                                    <div className="flex items-center gap-2 font-medium">
-                                                        {grupo.material?.codigo && (
-                                                            <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-muted-foreground/20">
-                                                                {grupo.material.codigo}
-                                                            </span>
-                                                        )}
-                                                        <span className="text-base text-card-foreground">
-                                                            {grupo.material?.nome || "Material sem nome"}
-                                                        </span>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-
-                                            {/* Linhas das Cores (Detalhes) */}
-                                            {grupo.itens.map((consumo: any) => {
-                                                const custoUnit = consumo.material?.preco_custo || 0;
-                                                const custoTotal = (consumo.quantidade_real || 0) * custoUnit;
-                                                const custoPorPeca = quantidadeParaCalculo > 0 ? custoTotal / quantidadeParaCalculo : 0;
-
-                                                return (
-                                                    <TableRow key={consumo.id} className="hover:bg-transparent">
-                                                        <TableCell className="pl-6 py-1">
-                                                            <div className="flex items-center pl-4 h-full">
-                                                                <span className="text-sm text-muted-foreground">
-                                                                    {consumo.cor?.nome || "Única / Padrão"}
-                                                                </span>
+                                            return (
+                                                <React.Fragment key={grupoIdx}>
+                                                    {/* Row Principal: Total da Etapa Pai (Agora atua como Accordion Header) */}
+                                                    <TableRow
+                                                        className="bg-muted/10 hover:bg-muted/30 font-medium border-b border-border/60 cursor-pointer"
+                                                        onClick={() => toggleGroup(keySafeguard)}
+                                                    >
+                                                        <TableCell className="font-semibold text-primary">
+                                                            <div className="flex items-center gap-2">
+                                                                {expandedGroups[keySafeguard] ?
+                                                                    <ChevronDown className="h-4 w-4 text-muted-foreground" /> :
+                                                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                                                }
+                                                                <span className="capitalize">{keySafeguard}</span>
                                                             </div>
                                                         </TableCell>
-                                                        <TableCell className="text-right py-1 text-muted-foreground">
-                                                            {consumo.quantidade_real} {consumo.material?.unidade_medida}
+                                                        <TableCell className="text-center">-</TableCell>
+                                                        <TableCell className="text-muted-foreground font-medium">
+                                                            {formatarTempoProdutivo(grupo.tempo_normal)}
                                                         </TableCell>
-                                                        <TableCell className="text-right py-1 text-muted-foreground">{formatarCusto(custoUnit)}</TableCell>
-                                                        <TableCell className="text-right py-1 text-muted-foreground">{formatarCusto(custoTotal)}</TableCell>
-                                                        <TableCell className="text-right font-medium text-indigo-600 py-1">
-                                                            {formatarCusto(custoPorPeca)}
+                                                        <TableCell>
+                                                            {grupo.tempo_extra > 0 ? (
+                                                                <Badge variant="destructive" className="text-xs">
+                                                                    {formatarTempoProdutivo(grupo.tempo_extra)}
+                                                                </Badge>
+                                                            ) : (
+                                                                <span className="text-sm text-muted-foreground">-</span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="font-semibold text-primary">
+                                                            <div className="flex items-center gap-1">
+                                                                <Clock className="h-3 w-3" />
+                                                                {formatarTempoProdutivo(grupo.tempo_total)}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-muted-foreground text-sm font-medium">
+                                                            {formatarTempoProdutivo(tempoUnitarioGrupo)}
+                                                        </TableCell>
+                                                        <TableCell className="text-green-600 font-bold text-sm">
+                                                            {formatarCusto(grupo.custo_total)}
+                                                        </TableCell>
+                                                        <TableCell className="text-orange-600 font-semibold text-sm">
+                                                            {formatarCusto(custoUnitarioGrupo)}
+                                                        </TableCell>
+                                                        <TableCell className="text-center">
+                                                            <Badge variant="secondary" className="font-normal text-[10px] px-1.5">
+                                                                {grupo.itens.length} {grupo.itens.length === 1 ? 'subetapa' : 'subetapas'}
+                                                            </Badge>
                                                         </TableCell>
                                                     </TableRow>
-                                                );
-                                            })}
-                                        </>
-                                    ))
-                                ) : (
+
+                                                    {/* Filhos ocultados/exibidos conforme Estado */}
+                                                    {expandedGroups[keySafeguard] && grupo.itens.map((etapa: any, idx: number) => {
+                                                        const tempoUnitarioEtapa = etapa.quantidade_produzida > 0 ? etapa.tempo_total / etapa.quantidade_produzida : 0;
+                                                        const custoUnitarioEtapa = etapa.quantidade_produzida > 0 ? etapa.custo_total / etapa.quantidade_produzida : 0;
+
+                                                        return (
+                                                            <TableRow key={`${grupoIdx}-${idx}`} className="border-b border-border/30 bg-muted/5 hover:bg-muted/20">
+                                                                <TableCell className="font-medium pl-10 border-l-2 border-primary/20 text-muted-foreground">
+                                                                    {etapa.is_terceirizado ? (
+                                                                        <Badge variant="outline" className="mr-2 text-xs bg-amber-50 text-amber-700 border-amber-200">
+                                                                            Terceirizado
+                                                                        </Badge>
+                                                                    ) : null}
+                                                                    {etapa.subetapa_nome || "Processo Geral"}
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <div className="text-sm font-medium text-muted-foreground">
+                                                                        {etapa.quantidade_produzida} / {etapa.quantidade_total}
+                                                                    </div>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <div className="flex items-center gap-1 text-sm text-muted-foreground/80">
+                                                                        {formatarTempoProdutivo(etapa.tempo_normal)}
+                                                                    </div>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <div className="flex items-center gap-1">
+                                                                        {etapa.tempo_extra > 0 ? (
+                                                                            <Badge variant="destructive" className="text-[10px] bg-red-100 text-red-700 border-red-200">
+                                                                                {formatarTempoProdutivo(etapa.tempo_extra)}
+                                                                            </Badge>
+                                                                        ) : (
+                                                                            <span className="text-sm text-muted-foreground/50">-</span>
+                                                                        )}
+                                                                    </div>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <div className="flex items-center gap-1 font-medium text-muted-foreground">
+                                                                        {formatarTempoProdutivo(etapa.tempo_total)}
+                                                                    </div>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <span className="text-muted-foreground/80 text-sm">
+                                                                        {formatarTempoProdutivo(tempoUnitarioEtapa)}
+                                                                    </span>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <span className="text-green-600/80 font-medium text-sm">
+                                                                        {formatarCusto(etapa.custo_total)}
+                                                                    </span>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <span className="text-orange-600/80 text-sm">
+                                                                        {formatarCusto(custoUnitarioEtapa)}
+                                                                    </span>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    {etapa.colaboradores.length > 0 ? (
+                                                                        <Popover>
+                                                                            <PopoverTrigger asChild>
+                                                                                <Button variant="link" className="p-0 h-auto font-normal text-muted-foreground hover:text-primary">
+                                                                                    <div className="flex items-center gap-1">
+                                                                                        <Users className="h-3 w-3 opacity-70" />
+                                                                                        {etapa.colaboradores.length} {etapa.is_terceirizado ? (etapa.colaboradores.length === 1 ? 'terceirizado' : 'terceirizados') : (etapa.colaboradores.length === 1 ? 'colaborador' : 'colaboradores')}
+                                                                                    </div>
+                                                                                </Button>
+                                                                            </PopoverTrigger>
+                                                                            <PopoverContent className="w-80">
+                                                                                <div className="space-y-2">
+                                                                                    <h4 className="font-medium text-sm border-b pb-2 mb-2">Colaboradores na etapa</h4>
+                                                                                    {etapa.colaboradores_detalhes?.map((colab: any, i: number) => (
+                                                                                        <div key={i} className="flex justify-between items-center text-sm border-b border-border/40 pb-1 last:border-0 last:pb-0">
+                                                                                            <span className="font-medium">{colab.nome}</span>
+                                                                                            <div className="flex flex-col items-end">
+                                                                                                {colab.quantidade !== undefined && (
+                                                                                                    <span className="text-xs font-semibold text-primary">
+                                                                                                        {colab.quantidade} un
+                                                                                                    </span>
+                                                                                                )}
+                                                                                                <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                                                                                                    <Clock className="h-3 w-3" />
+                                                                                                    {formatarTempoProdutivo(colab.tempo)}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </PopoverContent>
+                                                                        </Popover>
+                                                                    ) : (
+                                                                        <span className="text-muted-foreground/50 text-sm">-</span>
+                                                                    )}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })}
+                                                </React.Fragment>
+                                            );
+                                        })
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
+                                                Nenhum acompanhamento registrado.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+
+                    {/* Consumo de Matéria Prima */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Consumo de Matéria Prima</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center text-muted-foreground h-24">
-                                            Nenhum material lançado para este lote.
-                                        </TableCell>
+                                        <TableHead>Material</TableHead>
+                                        <TableHead className="text-right">Quantidade</TableHead>
+                                        <TableHead className="text-right">Preço Unit.</TableHead>
+                                        <TableHead className="text-right">Custo Total</TableHead>
+                                        <TableHead className="text-right">Custo p/ Peça</TableHead>
                                     </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                </TableHeader>
+                                <TableBody>
+                                    {consumos?.length > 0 ? (
+                                        Object.values(consumos.reduce((acc: any, curr: any) => {
+                                            const id = curr.material?.id || 'unknown';
+                                            if (!acc[id]) {
+                                                acc[id] = { material: curr.material, itens: [], custo_total: 0, quantidade_total: 0 };
+                                            }
+                                            acc[id].itens.push(curr);
+                                            const custoUnit = curr.material?.preco_custo || 0;
+                                            acc[id].quantidade_total += (curr.quantidade_real || 0);
+                                            acc[id].custo_total += (curr.quantidade_real || 0) * custoUnit;
+                                            return acc;
+                                        }, {})).map((grupo: any) => {
+                                            const materialId = grupo.material?.id || 'unknown';
+                                            const isExpanded = expandedMateriais[materialId];
+                                            const custoUnitMedio = grupo.quantidade_total > 0 ? grupo.custo_total / grupo.quantidade_total : 0;
+                                            const custoPecaMaterial = quantidadeParaCalculo > 0 ? grupo.custo_total / quantidadeParaCalculo : 0;
+
+                                            return (
+                                                <React.Fragment key={`grupo-${materialId}`}>
+                                                    {/* Row Principal: Total do Material */}
+                                                    <TableRow
+                                                        className="bg-muted/10 hover:bg-muted/30 font-medium border-b border-border/60 cursor-pointer"
+                                                        onClick={() => toggleMaterial(materialId)}
+                                                    >
+                                                        <TableCell className="font-semibold text-primary py-3">
+                                                            <div className="flex items-center gap-2 text-base">
+                                                                {isExpanded ?
+                                                                    <ChevronDown className="h-4 w-4 text-muted-foreground" /> :
+                                                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                                                }
+                                                                {grupo.material?.codigo && (
+                                                                    <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-muted-foreground/20">
+                                                                        {grupo.material.codigo}
+                                                                    </span>
+                                                                )}
+                                                                <span className="uppercase">{grupo.material?.nome || "Material sem nome"}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-muted-foreground font-medium">
+                                                            {grupo.quantidade_total} {grupo.material?.unidade_medida}
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-muted-foreground">
+                                                            {formatarCusto(custoUnitMedio)}
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-green-600 font-bold text-sm">
+                                                            {formatarCusto(grupo.custo_total)}
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-indigo-600 font-semibold text-sm">
+                                                            {formatarCusto(custoPecaMaterial)}
+                                                        </TableCell>
+                                                    </TableRow>
+
+                                                    {/* Linhas das Cores (Ocultadas/Exibidas conforme Estado) */}
+                                                    {isExpanded && grupo.itens.map((consumo: any) => {
+                                                        const custoUnit = consumo.material?.preco_custo || 0;
+                                                        const custoTotal = (consumo.quantidade_real || 0) * custoUnit;
+                                                        const custoPorPeca = quantidadeParaCalculo > 0 ? custoTotal / quantidadeParaCalculo : 0;
+
+                                                        return (
+                                                            <TableRow key={consumo.id} className="border-b border-border/30 bg-muted/5 hover:bg-muted/20">
+                                                                <TableCell className="font-medium pl-10 py-2 border-l-2 border-primary/20 text-muted-foreground">
+                                                                    {consumo.cor?.nome || "Única / Padrão"}
+                                                                </TableCell>
+                                                                <TableCell className="text-right py-2 text-muted-foreground text-sm">
+                                                                    {consumo.quantidade_real} {consumo.material?.unidade_medida}
+                                                                </TableCell>
+                                                                <TableCell className="text-right py-2 text-muted-foreground text-sm">{formatarCusto(custoUnit)}</TableCell>
+                                                                <TableCell className="text-right py-2 text-muted-foreground text-sm">{formatarCusto(custoTotal)}</TableCell>
+                                                                <TableCell className="text-right font-medium text-indigo-600/80 py-2 text-sm">
+                                                                    {formatarCusto(custoPorPeca)}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })}
+                                                </React.Fragment>
+                                            );
+                                        })
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="text-center text-muted-foreground h-24">
+                                                Nenhum material lançado para este lote.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
-        </div>
+
+            {isPrinting && (
+                <LoteRelatorioA4
+                    lote={lote}
+                    empresa={empresa}
+                    quantidadeParaCalculo={quantidadeParaCalculo}
+                    custoAgregadoTotal={custoAgregadoTotal}
+                    custoAgregadoUnit={custoAgregadoUnit}
+                    tempoTotal={tempoTotal}
+                    tempoUnitarioGeral={tempoUnitarioGeral}
+                    progressoPorEtapa={progressoPorEtapa}
+                    consumos={consumos}
+                />
+            )}
+        </>
     );
 }
