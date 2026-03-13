@@ -63,11 +63,44 @@ export default function DialogFinalizarAtividade({
     }
   }, [open, producao]);
 
+  // Determina se a etapa atual é a PRIMEIRA etapa do produto
+  const { data: isEtapa1 } = useQuery({
+    queryKey: ["is-primeira-etapa", producao?.etapa_id, producao?.lote?.produto_id],
+    enabled: !!producao?.lote?.produto_id && !!producao?.etapa_id && !producao.atividade_id && !producao.pedido_id && !producao.terceirizado,
+    queryFn: async () => {
+      // 1. Tentar achar o roteiro específico do produto
+      const { data: roteiro } = await supabase
+        .from("produto_etapas")
+        .select("etapa_id")
+        .eq("produto_id", producao.lote.produto_id)
+        .order("ordem")
+        .limit(1);
+
+      if (roteiro && roteiro.length > 0) {
+        return roteiro[0].etapa_id === producao.etapa_id;
+      }
+
+      // 2. Se não tiver roteiro, fallback pra primeira etapa global
+      const { data: etapaGlobal } = await supabase
+        .from("etapas")
+        .select("id")
+        .order("ordem")
+        .limit(1);
+
+      if (etapaGlobal && etapaGlobal.length > 0) {
+        return etapaGlobal[0].id === producao.etapa_id;
+      }
+
+      return false;
+    }
+  });
+
   // Buscar subetapas da etapa atual para verificar se é a última
   const { data: subetapasDaEtapa } = useQuery({
-    queryKey: ["subetapas-verificacao", producao?.etapa_id],
-    enabled: !!producao?.etapa_id && producao?.etapa?.ordem === 1,
+    queryKey: ["subetapas-verificacao", producao?.etapa_id, producao?.lote?.produto_id],
+    enabled: !!producao?.etapa_id && !!isEtapa1, // Só buscar se for a etapa 1 verdadeira do produto
     queryFn: async () => {
+      // Usar a mesma ordem do roteiro do produto se ele tiver um!
       const { data, error } = await supabase
         .from("produto_etapas")
         .select("subetapa_id, ordem")
@@ -82,7 +115,7 @@ export default function DialogFinalizarAtividade({
           .from("subetapas")
           .select("id, nome")
           .eq("etapa_id", producao.etapa_id)
-          .order("nome"); // Ordem alfabética se não houver ordem definida? Ou criar campo ordem em subetapas?
+          .order("nome");
         if (errSub) throw errSub;
         return subGen?.map(s => ({ subetapa_id: s.id, ordem: 0 })) || [];
       }
@@ -91,20 +124,23 @@ export default function DialogFinalizarAtividade({
   });
 
   const isUltimaSubetapaEtapa1 = () => {
-    if (!producao || !producao.etapa || producao.etapa.ordem !== 1) return false;
+    if (!producao || !producao.etapa || !isEtapa1) return false;
 
-    // Se a etapa 1 não tem subetapas, então finalizar a etapa é finalizar tudo da etapa 1
+    // Se a etapa 1 não tem subetapas cadastradas, então finalizar a etapa já finaliza tudo da etapa 1
     if (!subetapasDaEtapa || subetapasDaEtapa.length === 0) return true;
 
-    // Se tem subetapas, verificar se a atual é a última
+    // Verifica se a atual é a última
     const lastSub = subetapasDaEtapa[subetapasDaEtapa.length - 1];
 
-    // Se a produção atual tem subetapa, comparar IDs
     if (producao.subetapa_id) {
-      return producao.subetapa_id === lastSub.subetapa_id;
+      // Quando vem de produto_etapas tem subetapa_id, quando vem de subetapas não
+      const lastId = lastSub.subetapa_id || lastSub.id;
+      return producao.subetapa_id === lastId;
     }
 
-    return false;
+    // Se a produção atual não tem subetapa definida (mas a etapa tem), e o usuário
+    // está finalizando, vamos assumir que ele está finalizando a etapa genérica inteira
+    return true;
   };
 
   const isTerceirizado = !!producao?.terceirizado;
@@ -117,7 +153,6 @@ export default function DialogFinalizarAtividade({
   // Basicamente: Lotes precisam de quantidade. Atividades genéricas e Pedidos não.
   // E no caso de terceirização, a quantidade devolvida é obrigatória.
   const precisaDefinirQuantidadeLote = !isTerceirizado && !isAtividadeGenerica && !isPedido && isUltimaSubetapaEtapa1();
-  const isEtapa1 = producao?.etapa?.ordem === 1;
 
   // Input visível se: For Terceirizada OU (NÃO for genérica E NÃO for pedido E (não for etapa 1 OU for o momento de definir a qtde do lote))
   const showQuantityInput = isTerceirizado || (!isAtividadeGenerica && !isPedido && (!isEtapa1 || precisaDefinirQuantidadeLote));
@@ -189,12 +224,56 @@ export default function DialogFinalizarAtividade({
       );
     } else {
       // A atualização do lote e a propagação para etapas anteriores (backfill)
-      // agora são tratadas automaticamente pelo Trigger 'handle_quantity_propagation' no banco de dados.
-      submitFinalizacao(qtd);
+      // O trigger do banco pode não ter sido aplicado. Fazemos um fallback de segurança:
+      submitFinalizacao(qtd, precisaDefinirQuantidadeLote);
     }
   };
 
-  const submitFinalizacao = (qtd: number) => {
+  const submitFinalizacao = async (qtd: number, isLastSubetapa1: boolean = false) => {
+    if (isLastSubetapa1 && qtd > 0) {
+      console.log("EXECUTANDO FALLBACK NO FRONTEND PARA LOTE:", producao.lote_id, "QTD:", qtd);
+      try {
+        // Fallback garantido no frontend: Atualiza lote
+        const { error: errLote } = await supabase
+          .from("lotes")
+          .update({ quantidade_total: qtd })
+          .eq("id", producao.lote_id);
+
+        if (errLote) {
+          console.error("Erro RLS Lote:", errLote);
+          toast.error("Aviso: Sem permissão para atualizar quantidade total do Lote!");
+        }
+
+        // Fallback garantido no frontend: Propaga para subetapas anteriores que estão nulas
+        const { error: errProdNull } = await supabase
+          .from("producoes")
+          .update({ quantidade_produzida: qtd })
+          .eq("lote_id", producao.lote_id)
+          .eq("etapa_id", producao.etapa_id)
+          .is("quantidade_produzida", null);
+
+        if (errProdNull) console.error("Erro RLS Producoes (Nulas):", errProdNull);
+
+        // Numa requisição separada para os zerados
+        const { error: errProdZero } = await supabase
+          .from("producoes")
+          .update({ quantidade_produzida: qtd })
+          .eq("lote_id", producao.lote_id)
+          .eq("etapa_id", producao.etapa_id)
+          .eq("quantidade_produzida", 0);
+
+        if (errProdZero) console.error("Erro RLS Producoes (Zero):", errProdZero);
+
+        console.log("Fallback executado (com ou sem erros).");
+      } catch (err) {
+        console.error("Erro fatal de fallback ao atualizar quantidades do lote:", err);
+      }
+    } else {
+      console.log("Fallback NÃO executado. isLastSubetapa1:", isLastSubetapa1, "qtd:", qtd);
+      console.log("Detalhes para debug - isEtapa1:", producao?.etapa?.ordem === 1);
+      console.log("subetapasDaEtapa:", subetapasDaEtapa);
+    }
+
     finalizarProducao.mutate(
       {
         id: producao.id,

@@ -1,0 +1,5 @@
+[
+  "/rpc/get_current_empresa_id",
+  "/rpc/calcular_tempo_produtivo",
+  "/rpc/calcular_escala_tempo"
+]

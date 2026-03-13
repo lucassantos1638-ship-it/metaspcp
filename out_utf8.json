@@ -1,0 +1,126 @@
+=== LOTE 2843 ===
+[
+  {
+    "id": "23618527-a304-4458-8698-27be5fb28ee1",
+    "numero_lote": "2843",
+    "nome_lote": "TOALHA BANHO DIAMANTE PREMIUM",
+    "quantidade_total": 0,
+    "finalizado": false,
+    "created_at": "2026-03-11T10:49:08.057552+00:00",
+    "produto_id": "816fa1bb-7b28-45ce-9322-97c786fe0e22",
+    "previsao_id": null,
+    "empresa_id": "3c0cc958-b4e2-4d8c-973f-4e9a36e1c66b",
+    "manually_reopened": false,
+    "pedido_id": null
+  }
+]
+=== PRODUCOES ===
+[
+  {
+    "id": "ec21edef-65af-469f-9433-699d64708907",
+    "colaborador_id": "a5f4b7a8-def1-4d79-9fe1-af386c0be6e5",
+    "lote_id": "23618527-a304-4458-8698-27be5fb28ee1",
+    "etapa_id": "d87e161e-0346-4ff4-b36a-89d450270c42",
+    "subetapa_id": "5961850f-730a-47ba-82ec-2c2c01dbb518",
+    "quantidade_produzida": 2737,
+    "data_inicio": "2026-03-11",
+    "hora_inicio": "08:29:00",
+    "data_fim": "2026-03-11",
+    "hora_fim": "08:32:00",
+    "created_at": "2026-03-11T11:31:53.381431+00:00",
+    "segundos_inicio": 0,
+    "segundos_fim": 0,
+    "empresa_id": "3c0cc958-b4e2-4d8c-973f-4e9a36e1c66b",
+    "status": "finalizado",
+    "observacao": null,
+    "minutos_normais": 3,
+    "minutos_extras": 0,
+    "atividade_id": null,
+    "terceirizado": false,
+    "entidade_id": null,
+    "servico_id": null,
+    "quantidade_enviada": null,
+    "quantidade_devolvida": 0,
+    "pedido_id": null
+  },
+  {
+    "id": "11def19e-7650-4bfc-97b3-c94d62acbccc",
+    "colaborador_id": "e62ede9b-2b03-4460-a539-f04bd205780c",
+    "lote_id": "23618527-a304-4458-8698-27be5fb28ee1",
+    "etapa_id": "d87e161e-0346-4ff4-b36a-89d450270c42",
+    "subetapa_id": "5961850f-730a-47ba-82ec-2c2c01dbb518",
+    "quantidade_produzida": 2737,
+    "data_inicio": "2026-03-12",
+    "hora_inicio": "10:00:00",
+    "data_fim": "2026-03-12",
+    "hora_fim": "10:10:00",
+    "created_at": "2026-03-13T00:48:20.812384+00:00",
+    "segundos_inicio": 0,
+    "segundos_fim": 0,
+    "empresa_id": "3c0cc958-b4e2-4d8c-973f-4e9a36e1c66b",
+    "status": "finalizado",
+    "observacao": null,
+    "minutos_normais": 10,
+    "minutos_extras": 0,
+    "atividade_id": null,
+    "terceirizado": false,
+    "entidade_id": null,
+    "servico_id": null,
+    "quantidade_enviada": null,
+    "quantidade_devolvida": 0,
+    "pedido_id": null
+  }
+]
+=== PRODUTO ETAPAS ===
+[
+  {
+    "id": "bad834ed-3cf4-476b-aed5-f46d898b87b8",
+    "produto_id": "816fa1bb-7b28-45ce-9322-97c786fe0e22",
+    "etapa_id": "d87e161e-0346-4ff4-b36a-89d450270c42",
+    "subetapa_id": "5961850f-730a-47ba-82ec-2c2c01dbb518",
+    "ordem": 1,
+    "obrigatoria": true,
+    "empresa_id": "3c0cc958-b4e2-4d8c-973f-4e9a36e1c66b",
+    "created_at": "2026-03-11T11:23:55.550815+00:00"
+  },
+  {
+    "id": "b77c3fad-6a03-44d4-9204-ae1e1d6ee0f5",
+    "produto_id": "816fa1bb-7b28-45ce-9322-97c786fe0e22",
+    "etapa_id": "3de7f7fe-c6c8-4130-8cab-deecc650b7a2",
+    "subetapa_id": "15a88fab-2df7-44be-89d4-0148e371087a",
+    "ordem": 2,
+    "obrigatoria": true,
+    "empresa_id": "3c0cc958-b4e2-4d8c-973f-4e9a36e1c66b",
+    "created_at": "2026-03-11T11:23:55.550815+00:00"
+  },
+  {
+    "id": "a5fc3a5a-6686-4e25-9e3c-d478f7cedad1",
+    "produto_id": "816fa1bb-7b28-45ce-9322-97c786fe0e22",
+    "etapa_id": "3de7f7fe-c6c8-4130-8cab-deecc650b7a2",
+    "subetapa_id": "0e829255-2a5d-4de8-9e0c-0b3ed92a8915",
+    "ordem": 3,
+    "obrigatoria": true,
+    "empresa_id": "3c0cc958-b4e2-4d8c-973f-4e9a36e1c66b",
+    "created_at": "2026-03-11T11:23:55.550815+00:00"
+  },
+  {
+    "id": "b06e7feb-9fd8-47be-8e08-0d26c17fbe6e",
+    "produto_id": "816fa1bb-7b28-45ce-9322-97c786fe0e22",
+    "etapa_id": "3de7f7fe-c6c8-4130-8cab-deecc650b7a2",
+    "subetapa_id": "8f311b80-f00d-4689-84eb-808566ccaf69",
+    "ordem": 4,
+    "obrigatoria": true,
+    "empresa_id": "3c0cc958-b4e2-4d8c-973f-4e9a36e1c66b",
+    "created_at": "2026-03-11T11:23:55.550815+00:00"
+  },
+  {
+    "id": "b363eda1-749a-45fe-bb3e-07563bc29ebf",
+    "produto_id": "816fa1bb-7b28-45ce-9322-97c786fe0e22",
+    "etapa_id": "3de7f7fe-c6c8-4130-8cab-deecc650b7a2",
+    "subetapa_id": "ff45dd4a-278a-4bbb-bc72-134d38fcec49",
+    "ordem": 5,
+    "obrigatoria": true,
+    "empresa_id": "3c0cc958-b4e2-4d8c-973f-4e9a36e1c66b",
+    "created_at": "2026-03-11T11:23:55.550815+00:00"
+  }
+]

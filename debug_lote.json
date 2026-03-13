@@ -1,0 +1,33 @@
+{
+  "loteId": "3bcb5518-ef8b-47d4-92ee-f6e89b1bb688",
+  "produtoId": "816fa1bb-7b28-45ce-9322-97c786fe0e22",
+  "primeiraEtapaId": "d87e161e-0346-4ff4-b36a-89d450270c42",
+  "primeiraEtapaOrdem": 4,
+  "config": [
+    {
+      "etapa_id": "d87e161e-0346-4ff4-b36a-89d450270c42",
+      "subetapa_id": "5961850f-730a-47ba-82ec-2c2c01dbb518",
+      "ordem": 1
+    },
+    {
+      "etapa_id": "3de7f7fe-c6c8-4130-8cab-deecc650b7a2",
+      "subetapa_id": "15a88fab-2df7-44be-89d4-0148e371087a",
+      "ordem": 2
+    },
+    {
+      "etapa_id": "3de7f7fe-c6c8-4130-8cab-deecc650b7a2",
+      "subetapa_id": "0e829255-2a5d-4de8-9e0c-0b3ed92a8915",
+      "ordem": 3
+    },
+    {
+      "etapa_id": "3de7f7fe-c6c8-4130-8cab-deecc650b7a2",
+      "subetapa_id": "8f311b80-f00d-4689-84eb-808566ccaf69",
+      "ordem": 4
+    },
+    {
+      "etapa_id": "3de7f7fe-c6c8-4130-8cab-deecc650b7a2",
+      "subetapa_id": "ff45dd4a-278a-4bbb-bc72-134d38fcec49",
+      "ordem": 5
+    }
+  ]
+}

@@ -95,7 +95,9 @@ export default function LoteRelatorioA4({
                     <tbody>
                         {gruposEtapas.length > 0 ? (
                             gruposEtapas.map((grupo: any, grupoIdx: number) => {
-                                const tempoUnitGrupo = grupo.quantidade_produzida > 0 ? (grupo.tempo_total / grupo.quantidade_produzida) : 0;
+                                const tempoUnitGrupo = grupo.itens.reduce((sum: number, etapa: any) => {
+                                    return sum + (etapa.quantidade_produzida > 0 ? etapa.tempo_total / etapa.quantidade_produzida : 0);
+                                }, 0);
 
                                 return (
                                     <Fragment key={grupoIdx}>

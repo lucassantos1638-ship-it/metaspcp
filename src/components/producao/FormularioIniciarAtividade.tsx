@@ -236,6 +236,26 @@ export default function FormularioIniciarAtividade() {
   const listaEtapas = (loteId && selectedLote) ? etapasFiltradas : etapas;
   const listaSubetapas = (loteId && selectedLote) ? subetapasFiltradas : subetapas;
 
+  const primeiraEtapaId = listaEtapas?.[0]?.id;
+
+  // Verificar se já existe produção na primeira etapa do produto para este lote com quantidade > 0
+  const { data: temProducaoEtapa1 } = useQuery({
+    queryKey: ["producao-etapa1", loteId, primeiraEtapaId],
+    enabled: !!loteId && !isAtividadeAvulsa && !isPedido && !!primeiraEtapaId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("producoes")
+        .select("id")
+        .eq("lote_id", loteId)
+        .eq("etapa_id", primeiraEtapaId)
+        .gt("quantidade_produzida", 0)
+        .limit(1);
+
+      if (error) throw error;
+      return data && data.length > 0;
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -685,7 +705,7 @@ export default function FormularioIniciarAtividade() {
       </div>
 
       {/* Aviso de Bloqueio por Quantidade não definida (apenas para produção normal) */}
-      {!isAtividadeAvulsa && !isPedido && selectedLote && selectedLote.quantidade_total <= 0 && isEtapaPosterior && (
+      {!isAtividadeAvulsa && !isPedido && selectedLote && (selectedLote.quantidade_total === null || selectedLote.quantidade_total <= 0) && !temProducaoEtapa1 && isEtapaPosterior && (
         <Alert variant="destructive" className="mt-4">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -694,7 +714,7 @@ export default function FormularioIniciarAtividade() {
         </Alert>
       )}
 
-      {!isAtividadeAvulsa && !isPedido && selectedLote && selectedLote.quantidade_total <= 0 && isPrimeiraEtapaDoProduto && (
+      {!isAtividadeAvulsa && !isPedido && selectedLote && (selectedLote.quantidade_total === null || selectedLote.quantidade_total <= 0) && !temProducaoEtapa1 && isPrimeiraEtapaDoProduto && (
         <Alert className="mt-4 bg-yellow-50 text-yellow-800 border-yellow-200">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
@@ -709,7 +729,7 @@ export default function FormularioIniciarAtividade() {
         disabled={
           iniciarProducao.isPending ||
           temAtividadeAberta ||
-          (!isAtividadeAvulsa && !isPedido && !isTerceirizado && selectedLote && selectedLote.quantidade_total <= 0 && isEtapaPosterior)
+          (!isAtividadeAvulsa && !isPedido && !isTerceirizado && selectedLote && (selectedLote.quantidade_total === null || selectedLote.quantidade_total <= 0) && !temProducaoEtapa1 && isEtapaPosterior)
         }
       >
         <Play className="mr-2 h-4 w-4" />

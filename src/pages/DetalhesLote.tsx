@@ -407,8 +407,12 @@ export default function DetalhesLote() {
                                                 return acc;
                                             }, {})
                                         ).map((grupo: any, grupoIdx: number) => {
-                                            const tempoUnitarioGrupo = grupo.quantidade_produzida > 0 ? (grupo.tempo_total / grupo.quantidade_produzida) : 0;
-                                            const custoUnitarioGrupo = grupo.quantidade_produzida > 0 ? (grupo.custo_total / grupo.quantidade_produzida) : 0;
+                                            const tempoUnitarioGrupo = grupo.itens.reduce((sum: number, etapa: any) => {
+                                                return sum + (etapa.quantidade_produzida > 0 ? etapa.tempo_total / etapa.quantidade_produzida : 0);
+                                            }, 0);
+                                            const custoUnitarioGrupo = grupo.itens.reduce((sum: number, etapa: any) => {
+                                                return sum + (etapa.quantidade_produzida > 0 ? etapa.custo_total / etapa.quantidade_produzida : 0);
+                                            }, 0);
                                             const keySafeguard = grupo.nome || "avulso";
 
                                             return (

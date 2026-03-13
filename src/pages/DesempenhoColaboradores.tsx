@@ -272,8 +272,6 @@ export default function DesempenhoColaboradores() {
         queryKey: ["producoes-desempenho", empresaId, colaboradorIds, dataInicio, dataFim, loteIds, produtoIds, etapaIds, subetapaIds, tipoFiltro, atividadeIds, pedidoIds],
         enabled: false, // Só busca quando clicar em Consultar
         queryFn: async () => {
-            if (colaboradorIds.length === 0) return [];
-
             let query = supabase
                 .from("producoes")
                 .select(`
@@ -284,8 +282,11 @@ export default function DesempenhoColaboradores() {
                 atividade:atividades(nome),
                 pedido:pedidos(id, numero, entidade(nome))
             `)
-                .eq("empresa_id", empresaId)
-                .in("colaborador_id", colaboradorIds);
+                .eq("empresa_id", empresaId);
+
+            if (colaboradorIds.length > 0) {
+                query = query.in("colaborador_id", colaboradorIds);
+            }
 
             const fromStr = format(dataInicio, "yyyy-MM-dd");
             const toStr = format(dataFim, "yyyy-MM-dd");
@@ -295,7 +296,7 @@ export default function DesempenhoColaboradores() {
                 query = query.gte("data_inicio", fromStr);
             }
             if (dataFim) {
-                query = query.lte("data_inicio", `${toStr} 23:59:59`);
+                query = query.lte("data_inicio", toStr);
             }
 
             // Filtro por Tipo (Produção vs Atividade vs Pedido)
@@ -317,29 +318,32 @@ export default function DesempenhoColaboradores() {
                 query = query.in("pedido_id", pedidoIds);
             }
 
+            if (loteIds.length > 0) {
+                query = query.in("lote_id", loteIds);
+            }
+
+            if (etapaIds.length > 0) {
+                query = query.in("etapa_id", etapaIds);
+            }
+
+            if (subetapaIds.length > 0) {
+                query = query.in("subetapa_id", subetapaIds);
+            }
+
+            // Aumentar o limite para não cortar resultados em períodos grandes (padrão é 1000)
+            query = query.limit(10000);
+
             const { data, error } = await query;
             if (error) {
                 console.error("Erro na busca de produções:", error);
                 throw error;
             }
 
-            // Filtro de client side para o resto dos arrays
+            // Filtro de client side para o que depende de tabelas joinadas
             let filteredData = data;
 
             if (produtoIds.length > 0) {
                 filteredData = filteredData?.filter(p => p.lote && produtoIds.includes(p.lote.produto_id)) || [];
-            }
-
-            if (loteIds.length > 0) {
-                filteredData = filteredData?.filter(p => p.lote_id && loteIds.includes(p.lote_id)) || [];
-            }
-
-            if (etapaIds.length > 0) {
-                filteredData = filteredData?.filter(p => p.etapa_id && etapaIds.includes(p.etapa_id)) || [];
-            }
-
-            if (subetapaIds.length > 0) {
-                filteredData = filteredData?.filter(p => p.subetapa_id && subetapaIds.includes(p.subetapa_id)) || [];
             }
 
             return filteredData;
@@ -347,14 +351,12 @@ export default function DesempenhoColaboradores() {
     });
 
     const handleConsultar = () => {
-        if (colaboradorIds.length > 0) {
-            setFiltrosAplicados(true);
-            refetch();
-        }
+        setFiltrosAplicados(true);
+        refetch();
     };
 
     const grupos = useMemo(() => {
-        if (!producoes || !colaboradores || colaboradorIds.length === 0) return [];
+        if (!producoes || !colaboradores) return [];
 
         const map = new Map<string, any>();
         const lotesPorGrupo = new Map<string, Map<string, number>>(); // Controlar max qtd de Lote por Grupo
@@ -438,7 +440,7 @@ export default function DesempenhoColaboradores() {
 
     // Cálculos de Totais
     const totais = useMemo(() => {
-        if (!producoes || !colaboradores || colaboradorIds.length === 0) return null;
+        if (!producoes || !colaboradores) return null;
 
         let qtdProduzida = 0;
         let tempoNormal = 0;
@@ -709,7 +711,7 @@ export default function DesempenhoColaboradores() {
                             </div>
 
                             <div className="flex gap-2 items-end">
-                                <Button onClick={handleConsultar} disabled={colaboradorIds.length === 0 || isLoading} className="flex-1">
+                                <Button onClick={handleConsultar} disabled={isLoading} className="flex-1">
                                     {isLoading ? "Consultando..." : "Consultar"}
                                     <Search className="ml-2 h-4 w-4" />
                                 </Button>
