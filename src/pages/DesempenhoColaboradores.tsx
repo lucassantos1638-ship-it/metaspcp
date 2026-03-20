@@ -19,6 +19,8 @@ import { useEmpresaId } from "@/hooks/useEmpresaId";
 import { formatarMoeda } from "@/lib/utils";
 import { usePrintReport } from "@/hooks/usePrintReport";
 import DesempenhoRelatorioA4 from "@/components/desempenho/DesempenhoRelatorioA4";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { VisaoGeralColaborador } from "@/components/desempenho/VisaoGeralColaborador";
 
 // Função auxiliar para formatar tempo (minutos -> HH:mm)
 const formatarTempo = (minutos: number) => {
@@ -515,8 +517,21 @@ export default function DesempenhoColaboradores() {
                     </p>
                 </div>
 
-                {/* Filtros */}
-                <Card className="print:hidden">
+                <Tabs defaultValue="relatorio" className="space-y-6 print:block">
+                    <div className="print:hidden flex items-center justify-between">
+                        <TabsList>
+                            <TabsTrigger value="relatorio">Relatório Detalhado</TabsTrigger>
+                            <TabsTrigger value="visao-geral">Visão Geral (Calendário)</TabsTrigger>
+                        </TabsList>
+                    </div>
+
+                    <TabsContent value="visao-geral" className="mt-0 ring-offset-background outline-none">
+                        <VisaoGeralColaborador colaboradores={colaboradores || []} empresaId={empresaId} />
+                    </TabsContent>
+
+                    <TabsContent value="relatorio" className="mt-0 space-y-6 ring-offset-background outline-none print:block">
+                        {/* Filtros */}
+                        <Card className="print:hidden">
                     <CardContent className="pt-6">
                         <div className="grid gap-4 md:grid-cols-4 items-end mb-4">
                             <div className="space-y-2">
@@ -975,6 +990,8 @@ export default function DesempenhoColaboradores() {
                         </Card>
                     )
                 }
+                    </TabsContent>
+                </Tabs>
             </div>
 
             {isPrinting && filtrosAplicados && (
