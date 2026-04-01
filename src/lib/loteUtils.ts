@@ -1,4 +1,6 @@
 interface Producao {
+  id?: string;
+  created_at?: string;
   etapa_id: string;
   subetapa_id: string | null;
   etapa: { nome: string; ordem: number };
@@ -36,7 +38,21 @@ export interface EtapaProgresso {
   tempo_extra: number;
   custo_total: number;
   colaboradores: string[];
-  colaboradores_detalhes: { nome: string; tempo: number; quantidade: number }[];
+  colaboradores_detalhes: { 
+    nome: string; 
+    tempo: number; 
+    quantidade: number;
+    colaborador_id?: string;
+    registros: {
+      id: string;
+      quantidade: number;
+      tempo: number;
+      minutos_normais: number;
+      minutos_extras: number;
+      data: string;
+      status: string;
+    }[];
+  }[];
   status: 'concluida' | 'em_andamento' | 'pendente';
   is_terceirizado?: boolean;
 }
@@ -179,15 +195,26 @@ export function agruparPorEtapa(
         const colabIndex = etapa.colaboradores_detalhes.findIndex(c => c.nome === prod.colaborador_nome);
         const tempoProd = Number(prod.tempo_produtivo_minutos) || 0;
         const qtdProd = Number(prod.quantidade_produzida) || 0;
+        const novoRegistro = {
+          id: prod.id || Math.random().toString(),
+          quantidade: qtdProd,
+          tempo: tempoProd,
+          minutos_normais: minutosNormais,
+          minutos_extras: minutosExtras,
+          data: prod.created_at || new Date().toISOString(),
+          status: prod.status || 'finalizado'
+        };
 
         if (colabIndex >= 0) {
           etapa.colaboradores_detalhes[colabIndex].tempo += tempoProd;
           etapa.colaboradores_detalhes[colabIndex].quantidade += qtdProd;
+          etapa.colaboradores_detalhes[colabIndex].registros.push(novoRegistro);
         } else {
           etapa.colaboradores_detalhes.push({
             nome: prod.colaborador_nome,
             tempo: tempoProd,
-            quantidade: qtdProd
+            quantidade: qtdProd,
+            registros: [novoRegistro]
           });
         }
       }

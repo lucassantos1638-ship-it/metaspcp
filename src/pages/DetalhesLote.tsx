@@ -19,7 +19,16 @@ import {
 import { useDetalhesLote } from "@/hooks/useDetalhesLote";
 import { formatarTempoProdutivo } from "@/lib/timeUtils";
 import { formatarCusto } from "@/lib/custoUtils";
-import { Package, Clock, Users, CheckCircle2, Loader2, DollarSign, Calculator, ArrowLeft, Droplet, Layers, Printer, ChevronDown, ChevronRight } from "lucide-react";
+import { Package, Clock, Users, CheckCircle2, Loader2, DollarSign, Calculator, ArrowLeft, Droplet, Layers, Printer, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import LoteRelatorioA4 from "@/components/producao/LoteRelatorioA4";
 import { toast } from "sonner";
@@ -57,6 +66,56 @@ export default function DetalhesLote() {
     const [expandedMateriais, setExpandedMateriais] = useState<Record<string, boolean>>({});
     const toggleMaterial = (materialId: string) => {
         setExpandedMateriais(prev => ({ ...prev, [materialId]: !prev[materialId] }));
+    };
+
+    // Estado para edição de registro de produção
+    const [editRegistro, setEditRegistro] = useState<any>(null);
+    const [editData, setEditData] = useState({ quantidade: 0, minutos_normais: 0, minutos_extras: 0 });
+
+    const openEditRegistro = (registro: any) => {
+        setEditRegistro(registro);
+        setEditData({
+            quantidade: registro.quantidade,
+            minutos_normais: registro.minutos_normais,
+            minutos_extras: registro.minutos_extras
+        });
+    };
+
+    const handleUpdateRegistro = async () => {
+        if (!editRegistro) return;
+        
+        const { error } = await supabase
+            .from("producoes")
+            .update({
+                quantidade_produzida: editData.quantidade,
+                minutos_normais: editData.minutos_normais,
+                minutos_extras: editData.minutos_extras
+            })
+            .eq("id", editRegistro.id);
+            
+        if (error) {
+            toast.error("Erro ao atualizar registro");
+        } else {
+            toast.success("Registro atualizado com sucesso!");
+            setEditRegistro(null);
+            queryClient.invalidateQueries({ queryKey: ["detalhes_lote", id] });
+        }
+    };
+
+    const handleDeleteRegistro = async (registroId: string) => {
+        if (!window.confirm("Deseja realmente excluir este lançamento?")) return;
+        
+        const { error } = await supabase
+            .from("producoes")
+            .delete()
+            .eq("id", registroId);
+            
+        if (error) {
+            toast.error("Erro ao excluir registro");
+        } else {
+            toast.success("Registro excluído com sucesso!");
+            queryClient.invalidateQueries({ queryKey: ["detalhes_lote", id] });
+        }
     };
 
     if (isLoading) {
@@ -533,25 +592,51 @@ export default function DetalhesLote() {
                                                                                     </div>
                                                                                 </Button>
                                                                             </PopoverTrigger>
-                                                                            <PopoverContent className="w-80">
-                                                                                <div className="space-y-2">
-                                                                                    <h4 className="font-medium text-sm border-b pb-2 mb-2">Colaboradores na etapa</h4>
-                                                                                    {etapa.colaboradores_detalhes?.map((colab: any, i: number) => (
-                                                                                        <div key={i} className="flex justify-between items-center text-sm border-b border-border/40 pb-1 last:border-0 last:pb-0">
-                                                                                            <span className="font-medium">{colab.nome}</span>
-                                                                                            <div className="flex flex-col items-end">
-                                                                                                {colab.quantidade !== undefined && (
-                                                                                                    <span className="text-xs font-semibold text-primary">
-                                                                                                        {colab.quantidade} un
-                                                                                                    </span>
-                                                                                                )}
-                                                                                                <span className="text-muted-foreground flex items-center gap-1 text-xs">
-                                                                                                    <Clock className="h-3 w-3" />
-                                                                                                    {formatarTempoProdutivo(colab.tempo)}
-                                                                                                </span>
+                                                                            <PopoverContent className="w-80 p-3">
+                                                                                <div className="space-y-3">
+                                                                                    <h4 className="font-medium text-sm border-b pb-2">Colaboradores na etapa</h4>
+                                                                                    <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
+                                                                                        {etapa.colaboradores_detalhes?.map((colab: any, i: number) => (
+                                                                                            <div key={i} className="space-y-1">
+                                                                                                <div className="flex justify-between items-center text-sm bg-muted/30 px-2 py-1.5 rounded">
+                                                                                                    <span className="font-semibold text-primary">{colab.nome}</span>
+                                                                                                    <div className="flex flex-col items-end">
+                                                                                                        {colab.quantidade !== undefined && (
+                                                                                                            <span className="text-xs font-semibold">
+                                                                                                                Total: {colab.quantidade} un
+                                                                                                            </span>
+                                                                                                        )}
+                                                                                                        <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                                                                                                            <Clock className="h-3 w-3" />
+                                                                                                            {formatarTempoProdutivo(colab.tempo)}
+                                                                                                        </span>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                {colab.registros?.map((registro: any, rIdx: number) => (
+                                                                                                    <div key={rIdx} className="flex justify-between items-center text-xs pl-3 py-1 border-b border-border/40 last:border-0 last:pb-0">
+                                                                                                        <div className="flex flex-col text-muted-foreground">
+                                                                                                            <span>{new Date(registro.data).toLocaleDateString('pt-BR')} {new Date(registro.data).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
+                                                                                                            {registro.status !== 'finalizado' && <span className="text-[10px] text-amber-600">{registro.status}</span>}
+                                                                                                        </div>
+                                                                                                        <div className="flex items-center gap-2">
+                                                                                                            <div className="text-right flex flex-col items-end">
+                                                                                                                <span className="font-medium text-primary">{registro.quantidade} un</span>
+                                                                                                                <span className="flex items-center gap-1"><Clock className="h-3 w-3"/> {formatarTempoProdutivo(registro.tempo)}</span>
+                                                                                                            </div>
+                                                                                                            <div className="flex gap-0.5 ml-1">
+                                                                                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-600 hover:text-blue-800 hover:bg-blue-100" onClick={() => openEditRegistro(registro)}>
+                                                                                                                    <Pencil className="h-3 w-3" />
+                                                                                                                </Button>
+                                                                                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-800 hover:bg-red-100" onClick={() => handleDeleteRegistro(registro.id)}>
+                                                                                                                    <Trash2 className="h-3 w-3" />
+                                                                                                                </Button>
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                ))}
                                                                                             </div>
-                                                                                        </div>
-                                                                                    ))}
+                                                                                        ))}
+                                                                                    </div>
                                                                                 </div>
                                                                             </PopoverContent>
                                                                         </Popover>
@@ -684,6 +769,47 @@ export default function DetalhesLote() {
                     </Card>
                 </div>
             </div>
+
+            <Dialog open={!!editRegistro} onOpenChange={(open) => !open && setEditRegistro(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Editar Lançamento de Produção</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="quantidade">Quantidade Produzida</Label>
+                            <Input
+                                id="quantidade"
+                                type="number"
+                                value={editData.quantidade}
+                                onChange={(e) => setEditData({ ...editData, quantidade: Number(e.target.value) })}
+                            />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="minutos_normais">Minutos Normais</Label>
+                            <Input
+                                id="minutos_normais"
+                                type="number"
+                                value={editData.minutos_normais}
+                                onChange={(e) => setEditData({ ...editData, minutos_normais: Number(e.target.value) })}
+                            />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="minutos_extras">Minutos Extras</Label>
+                            <Input
+                                id="minutos_extras"
+                                type="number"
+                                value={editData.minutos_extras}
+                                onChange={(e) => setEditData({ ...editData, minutos_extras: Number(e.target.value) })}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditRegistro(null)}>Cancelar</Button>
+                        <Button onClick={handleUpdateRegistro}>Salvar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {isPrinting && (
                 <LoteRelatorioA4

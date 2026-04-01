@@ -49,10 +49,10 @@ export const useColaboradorTemAtividadeAberta = (colaboradorId: string) => {
         `)
         .eq("colaborador_id", colaboradorId)
         .eq("status", "em_aberto")
-        .maybeSingle();
+        .limit(1);
 
       if (error) throw error;
-      return data;
+      return data && data.length > 0 ? data[0] : null;
     },
     enabled: !!colaboradorId,
   });

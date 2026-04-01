@@ -11,7 +11,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Check, ChevronDown, Search, Calendar as CalendarIcon } from "lucide-react";
+import { Check, ChevronDown, Search, Calendar as CalendarIcon, Printer } from "lucide-react";
+import { usePrintReport } from "@/hooks/usePrintReport";
+import MetasRelatorioA4 from "./MetasRelatorioA4";
 
 interface AtividadeMeta {
     nome: string;
@@ -147,6 +149,18 @@ const ListaProgressoMetas = () => {
     const [mesAno, setMesAno] = useState(mesAtualFormatado);
     const [colaboradorId, setColaboradorId] = useState("all");
     const [hasConsulted, setHasConsulted] = useState(false);
+    
+    const { isPrinting, triggerPrint } = usePrintReport();
+
+    const { data: empresa } = useQuery({
+        queryKey: ["configuracoes-empresa-print", empresaId],
+        enabled: !!empresaId,
+        queryFn: async () => {
+            const { data, error } = await supabase.from("empresas").select("nome, cnpj").eq("id", empresaId).single();
+            if (error) throw error;
+            return data;
+        },
+    });
 
     const { data: colaboradoresList } = useQuery({
         queryKey: ["colaboradores-metas-lista", empresaId],
@@ -262,7 +276,8 @@ const ListaProgressoMetas = () => {
     });
 
     return (
-        <Card>
+        <>
+        <Card className="no-print">
             <CardHeader>
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
@@ -285,18 +300,28 @@ const ListaProgressoMetas = () => {
                             <MonthYearPicker
                                 value={mesAno}
                                 onChange={(val) => {
-                                    setMesAno(val);
-                                    setHasConsulted(false);
-                                }}
-                            />
-                        </div>
-                        <Button
-                            onClick={() => {
-                                setHasConsulted(true);
-                                refetch();
+                                setMesAno(val);
+                                setHasConsulted(false);
                             }}
-                            disabled={isLoading}
+                        />
+                    </div>
+                    {hasConsulted && progresso && progresso.length > 0 && (
+                        <Button
+                            variant="outline"
+                            onClick={triggerPrint}
+                            className="bg-primary text-white hover:bg-primary/90 hover:text-white border-0 shadow-sm print:hidden shrink-0"
                         >
+                            <Printer className="h-4 w-4 mr-2" />
+                            Imprimir
+                        </Button>
+                    )}
+                    <Button
+                        onClick={() => {
+                            setHasConsulted(true);
+                            refetch();
+                        }}
+                        disabled={isLoading}
+                    >
                             <Search className="h-4 w-4 mr-2" />
                             Consultar
                         </Button>
@@ -414,6 +439,15 @@ const ListaProgressoMetas = () => {
                 )}
             </CardContent>
         </Card>
+        
+        {isPrinting && progresso && (
+            <MetasRelatorioA4
+                empresa={empresa}
+                mesAno={mesAno}
+                progresso={progresso.filter(item => colaboradorId === "all" || item.colaborador.id === colaboradorId)}
+            />
+        )}
+        </>
     );
 };
 

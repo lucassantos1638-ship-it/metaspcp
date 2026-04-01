@@ -6,16 +6,16 @@ import ListaProgressoMetas from "@/components/metas/ListaProgressoMetas";
 
 const Metas = () => {
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div>
+    <div className="space-y-6 sm:space-y-8 print:space-y-0 print:block">
+      <div className="print:hidden">
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-2">Metas</h1>
         <p className="text-sm sm:text-base text-muted-foreground">
           Gerencie metas mensais e acompanhe o desempenho dos colaboradores
         </p>
       </div>
 
-      <Tabs defaultValue="acompanhamento" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="acompanhamento" className="space-y-6 print:space-y-0">
+        <TabsList className="grid w-full grid-cols-3 print:hidden">
           <TabsTrigger value="acompanhamento" className="py-2">Acompanhamento</TabsTrigger>
           <TabsTrigger value="detalhes" className="py-2">Detalhes</TabsTrigger>
           <TabsTrigger value="configuracao" className="py-2">Gerenciar Metas</TabsTrigger>
