@@ -396,6 +396,7 @@ const Lotes = () => {
                   <TableHead className="w-[100px]">Número</TableHead>
                   <TableHead>Lote</TableHead>
                   <TableHead>Produto</TableHead>
+                  <TableHead>Data Criação</TableHead>
                   <TableHead className="text-right">Qtd.</TableHead>
                   <TableHead className="w-[150px]">Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -419,6 +420,9 @@ const Lotes = () => {
                       ) : (
                         "-"
                       )}
+                    </TableCell>
+                    <TableCell className="py-1 text-sm text-muted-foreground">
+                      {new Date(lote.created_at).toLocaleDateString('pt-BR')}
                     </TableCell>
                     <TableCell className="py-1 text-right font-medium">{lote.quantidade_total}</TableCell>
                     <TableCell className="py-1">

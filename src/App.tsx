@@ -178,6 +178,15 @@ const App = () => (
               />
 
               <Route
+                path="/relatorios"
+                element={
+                  <ProtectedRoute requiredPermission="lotes">
+                    <Relatorios />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/lancamento-mp"
                 element={
                   <ProtectedRoute requiredPermission="materiais_lancamento">

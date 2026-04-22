@@ -455,7 +455,7 @@ export default function DetalhesLote() {
                                                 const id = curr.etapa_nome || 'avulso';
                                                 if (!acc[id]) {
                                                     // Aqui garantimos que grupo.nome nunca será undefined
-                                                    acc[id] = { nome: id, itens: [], tempo_total: 0, tempo_normal: 0, tempo_extra: 0, custo_total: 0, quantidade_produzida: 0 };
+                                                    acc[id] = { nome: id, itens: [], tempo_total: 0, tempo_normal: 0, tempo_extra: 0, custo_total: 0, quantidade_produzida: 0, colaboradores_unicos: new Set() };
                                                 }
                                                 acc[id].itens.push(curr);
                                                 acc[id].tempo_total += (curr.tempo_total || 0);
@@ -463,6 +463,13 @@ export default function DetalhesLote() {
                                                 acc[id].tempo_extra += (curr.tempo_extra || 0);
                                                 acc[id].custo_total += (curr.custo_total || 0);
                                                 acc[id].quantidade_produzida += (curr.quantidade_produzida || 0);
+                                                
+                                                if (curr.colaboradores_detalhes && Array.isArray(curr.colaboradores_detalhes)) {
+                                                    curr.colaboradores_detalhes.forEach((c: any) => acc[id].colaboradores_unicos.add(c.nome));
+                                                } else if (curr.colaboradores && Array.isArray(curr.colaboradores)) {
+                                                    curr.colaboradores.forEach((c: any) => acc[id].colaboradores_unicos.add(c));
+                                                }
+                                                
                                                 return acc;
                                             }, {})
                                         ).map((grupo: any, grupoIdx: number) => {
@@ -520,7 +527,7 @@ export default function DetalhesLote() {
                                                         </TableCell>
                                                         <TableCell className="text-center">
                                                             <Badge variant="secondary" className="font-normal text-[10px] px-1.5">
-                                                                {grupo.itens.length} {grupo.itens.length === 1 ? 'subetapa' : 'subetapas'}
+                                                                {grupo.colaboradores_unicos.size} {grupo.colaboradores_unicos.size === 1 ? 'colaborador' : 'colaboradores'}
                                                             </Badge>
                                                         </TableCell>
                                                     </TableRow>

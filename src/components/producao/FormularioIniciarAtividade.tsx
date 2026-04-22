@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -267,6 +268,10 @@ export default function FormularioIniciarAtividade() {
       if (!colaboradorId || !pedidoId) return;
     } else {
       if (!colaboradorId || !loteId || !etapaId) return;
+      if (listaSubetapas && listaSubetapas.length > 0 && !subetapaId) {
+        toast.error("A seleção da subetapa é obrigatória para esta etapa.");
+        return;
+      }
     }
 
     iniciarProducao.mutate(
@@ -655,10 +660,10 @@ export default function FormularioIniciarAtividade() {
 
             {listaSubetapas && listaSubetapas.length > 0 && (
               <div className="space-y-2">
-                <Label htmlFor="subetapa">Subetapa</Label>
+                <Label htmlFor="subetapa">Subetapa *</Label>
                 <Select value={subetapaId} onValueChange={setSubetapaId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione a subetapa (opcional)" />
+                    <SelectValue placeholder="Selecione a subetapa" />
                   </SelectTrigger>
                   <SelectContent>
                     {listaSubetapas.map((sub) => (

@@ -45,6 +45,7 @@ const Layout = () => {
       icon: Activity,
       items: [
         { path: "/lotes", icon: Package, label: "Lotes", permission: "lotes" },
+        { path: "/relatorios", icon: BarChart3, label: "Relatórios", permission: "lotes" },
         { path: "/desempenho", icon: TrendingUp, label: "Desempenho", permission: "desempenho" },
         { path: "/metas", icon: Target, label: "Metas", permission: "metas" },
         { path: "/acompanhamento-colaboradores", icon: ClipboardList, label: "Monitoramento", permission: "pedidos" },
