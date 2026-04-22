@@ -8,7 +8,7 @@ import { useEmpresaId } from "@/hooks/useEmpresaId";
 import { usePrintReport } from "@/hooks/usePrintReport";
 import { formatarTempoProdutivo } from "@/lib/timeUtils";
 import { startOfDay, endOfDay, isWithinInterval, parseISO, format } from "date-fns";
-import { Package, ChevronDown, ChevronRight, Printer } from "lucide-react";
+import { Package, ChevronDown, ChevronRight, Printer, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,7 @@ const RelatorioProdutosFabricados = () => {
   const [expandido, setExpandido] = useState<string | null>(null);
   const { isPrinting, triggerPrint } = usePrintReport();
   const [printMode, setPrintMode] = useState<"detalhado" | "resumido">("detalhado");
+  const [filtroProduto, setFiltroProduto] = useState("");
 
   const { data: empresa } = useQuery({
     queryKey: ["configuracoes-empresa-print", empresaId],
@@ -248,6 +249,24 @@ const RelatorioProdutosFabricados = () => {
     }
   });
 
+  const dadosFiltrados = useMemo(() => {
+    if (!dadosAgrupados) return [];
+    if (!filtroProduto.trim()) return dadosAgrupados;
+    const termo = filtroProduto.toLowerCase();
+    return dadosAgrupados.filter(item =>
+      item.nome?.toLowerCase().includes(termo) ||
+      item.sku?.toLowerCase().includes(termo)
+    );
+  }, [dadosAgrupados, filtroProduto]);
+
+  const totalUnidades = useMemo(() => {
+    return (dadosFiltrados || []).reduce((sum, item) => sum + (item.quantidade || 0), 0);
+  }, [dadosFiltrados]);
+
+  const totalLotesGeral = useMemo(() => {
+    return (dadosFiltrados || []).reduce((sum, item) => sum + (item.totalLotes || 0), 0);
+  }, [dadosFiltrados]);
+
   return (
     <>
       <div className="print:hidden">
@@ -301,9 +320,37 @@ const RelatorioProdutosFabricados = () => {
           </div>
         </CardHeader>
         <CardContent>
+          {/* Filtro e Totais */}
+          {dadosAgrupados && dadosAgrupados.length > 0 && (
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+              <div className="relative w-full sm:w-[300px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filtrar por produto ou SKU..."
+                  value={filtroProduto}
+                  onChange={(e) => setFiltroProduto(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <div className="flex gap-4 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground">Produtos:</span>
+                  <span className="font-bold">{dadosFiltrados.length}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground">Lotes:</span>
+                  <span className="font-bold">{totalLotesGeral}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground">Total Fabricado:</span>
+                  <span className="font-bold text-primary text-base">{totalUnidades.toLocaleString('pt-BR')} un.</span>
+                </div>
+              </div>
+            </div>
+          )}
           {isLoading ? (
             <p className="text-center text-muted-foreground py-8">Carregando...</p>
-          ) : dadosAgrupados && dadosAgrupados.length > 0 ? (
+          ) : dadosFiltrados && dadosFiltrados.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -316,7 +363,7 @@ const RelatorioProdutosFabricados = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dadosAgrupados.map((item) => (
+                  {dadosFiltrados.map((item) => (
                     <React.Fragment key={item.produtoId}>
                       <TableRow 
                         className="cursor-pointer hover:bg-muted/50"
