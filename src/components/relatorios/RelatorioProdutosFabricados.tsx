@@ -13,6 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import ProdutosFabricadosRelatorioA4 from "@/components/relatorios/ProdutosFabricadosRelatorioA4";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const RelatorioProdutosFabricados = () => {
   const empresaId = useEmpresaId();
@@ -24,6 +30,7 @@ const RelatorioProdutosFabricados = () => {
   const [dataFim, setDataFim] = useState<string>(hojeStr);
   const [expandido, setExpandido] = useState<string | null>(null);
   const { isPrinting, triggerPrint } = usePrintReport();
+  const [printMode, setPrintMode] = useState<"detalhado" | "resumido">("detalhado");
 
   const { data: empresa } = useQuery({
     queryKey: ["configuracoes-empresa-print", empresaId],
@@ -243,7 +250,7 @@ const RelatorioProdutosFabricados = () => {
 
   return (
     <>
-      <div className={isPrinting ? "hidden" : ""}>
+      <div className="print:hidden">
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -273,10 +280,22 @@ const RelatorioProdutosFabricados = () => {
                 />
               </div>
               {dadosAgrupados && dadosAgrupados.length > 0 && (
-                <Button variant="outline" size="sm" onClick={triggerPrint} className="gap-1">
-                  <Printer className="h-4 w-4" />
-                  Imprimir
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1">
+                      <Printer className="h-4 w-4" />
+                      Imprimir
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => { setPrintMode("detalhado"); setTimeout(triggerPrint, 50); }}>
+                      Detalhado (com lotes)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setPrintMode("resumido"); setTimeout(triggerPrint, 50); }}>
+                      Resumido (só produtos)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           </div>
@@ -365,6 +384,7 @@ const RelatorioProdutosFabricados = () => {
           empresa={empresa}
           dataInicio={dataInicio}
           dataFim={dataFim}
+          modo={printMode}
         />
       )}
     </>

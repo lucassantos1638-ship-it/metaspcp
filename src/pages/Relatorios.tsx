@@ -7,7 +7,7 @@ import RelatorioProdutosFabricados from "@/components/relatorios/RelatorioProdut
 const Relatorios = () => {
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div>
+      <div className="print:hidden">
         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-2">Relatórios</h1>
         <p className="text-sm sm:text-base text-muted-foreground">
           Visualize relatórios de produção, finalização e desempenho
@@ -15,7 +15,7 @@ const Relatorios = () => {
       </div>
 
       <Tabs defaultValue="lotes" className="space-y-4 sm:space-y-6">
-        <TabsList className="grid w-full grid-cols-4 text-xs sm:text-sm">
+        <TabsList className="grid w-full grid-cols-4 text-xs sm:text-sm print:hidden">
           <TabsTrigger value="lotes">Lotes</TabsTrigger>
           <TabsTrigger value="produtos">Produtos Fabricados</TabsTrigger>
           <TabsTrigger value="corte">Finalização de Corte</TabsTrigger>

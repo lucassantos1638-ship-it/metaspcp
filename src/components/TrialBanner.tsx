@@ -41,7 +41,7 @@ export function TrialBanner() {
   if (diasRestantes < 0) return null
 
   return (
-    <Alert className="border-primary/50 bg-primary/5">
+    <Alert className="border-primary/50 bg-primary/5 print:hidden">
       <Clock className="h-4 w-4 text-primary" />
       <AlertDescription className="ml-2">
         <strong>Período de teste:</strong> Você tem {diasRestantes} dia{diasRestantes !== 1 ? 's' : ''} restante{diasRestantes !== 1 ? 's' : ''} no seu trial gratuito.

@@ -7,6 +7,7 @@ interface ProdutosFabricadosRelatorioA4Props {
     empresa: any;
     dataInicio: string;
     dataFim: string;
+    modo?: "detalhado" | "resumido";
 }
 
 function formatarData(dateStr: string) {
@@ -20,6 +21,7 @@ export default function ProdutosFabricadosRelatorioA4({
     empresa,
     dataInicio,
     dataFim,
+    modo = "detalhado",
 }: ProdutosFabricadosRelatorioA4Props) {
     const totalQuantidade = dados.reduce((sum, item) => sum + (item.quantidade || 0), 0);
     const totalLotes = dados.reduce((sum, item) => sum + (item.totalLotes || 0), 0);
@@ -57,7 +59,7 @@ export default function ProdutosFabricadosRelatorioA4({
                         {dados.map((item, idx) => (
                             <React.Fragment key={idx}>
                                 {/* Linha do Produto */}
-                                <tr className="border-b-2 border-gray-300 bg-gray-50 break-inside-avoid font-semibold text-gray-800">
+                                <tr className={`border-b${modo === "detalhado" ? "-2" : ""} border-gray-300 bg-gray-50 break-inside-avoid font-semibold text-gray-800`}>
                                     <td className="py-2 px-3 border-r border-gray-300">
                                         {item.nome}
                                         {item.sku && <span className="text-xs font-normal text-gray-500 ml-2">({item.sku})</span>}
@@ -66,8 +68,9 @@ export default function ProdutosFabricadosRelatorioA4({
                                     <td className="py-2 px-3 text-right border-r border-gray-300 text-blue-700 font-bold">{item.quantidade.toLocaleString('pt-BR')}</td>
                                     <td className="py-2 px-3 text-right text-blue-700">{formatarTempoProdutivo(item.tempoMedio)}</td>
                                 </tr>
-                                {/* Linhas dos Lotes */}
-                                {item.lotesRelacionados?.map((lote: any, loteIdx: number) => (
+
+                                {/* Linhas dos Lotes (apenas no modo detalhado) */}
+                                {modo === "detalhado" && item.lotesRelacionados?.map((lote: any, loteIdx: number) => (
                                     <tr key={`${idx}-${loteIdx}`} className="border-b border-gray-100 hover:bg-gray-50 break-inside-avoid text-gray-600">
                                         <td className="py-1 px-3 border-r border-gray-200 pl-6 border-l-2 border-l-blue-300">
                                             <span className="font-medium">{lote.numero_lote}</span>
