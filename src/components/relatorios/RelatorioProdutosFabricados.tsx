@@ -93,7 +93,7 @@ const RelatorioProdutosFabricados = () => {
         const chunk = loteIds.slice(i, i + chunkSize);
         const { data, error } = await supabase
           .from("producoes_com_tempo")
-          .select("lote_id, etapa_id, subetapa_id, quantidade_produzida, tempo_produtivo_minutos")
+          .select("lote_id, etapa_id, subetapa_id, quantidade_produzida, tempo_produtivo_minutos, status")
           .in("lote_id", chunk);
 
         if (error) throw error;
@@ -115,33 +115,46 @@ const RelatorioProdutosFabricados = () => {
          const qtdFabricada = prodsDoLote.reduce((s, p) => s + (p.quantidade_produzida || 0), 0);
          if (qtdFabricada === 0) return;
 
-         // Tempo unitário do lote = soma dos tempos unitários de cada etapa/subetapa
-         // (mesma lógica do DetalhesLote: tempoUnitarioGeral = Σ (etapa.tempo_total / etapa.quantidade_produzida))
+         // Tempo unitário do lote = EXATA mesma lógica do DetalhesLote (agruparPorEtapa + tempoUnitarioGeral)
+         // tempo_total: conta finalizado + em_aberto
+         // quantidade_produzida: conta APENAS finalizado
          const todasProdsLote = allProds.filter(p => p.lote_id === lote.id);
          const loteQtdTotal = lote.quantidade_total || qtdFabricada;
          
-         // Agrupar por etapa+subetapa
+         // Agrupar por etapa+subetapa (mesma lógica do agruparPorEtapa em loteUtils.ts)
          const etapasMap = new Map<string, { tempo: number; quantidade: number; records: any[] }>();
          todasProdsLote.forEach(p => {
            const key = `${p.etapa_id}-${p.subetapa_id || 'main'}`;
            if (!etapasMap.has(key)) etapasMap.set(key, { tempo: 0, quantidade: 0, records: [] });
            const obj = etapasMap.get(key)!;
-           obj.tempo += p.tempo_produtivo_minutos || 0;
-           obj.quantidade += p.quantidade_produzida || 0;
+           // Tempo: soma para finalizado E em_aberto (igual agruparPorEtapa linhas 177-186)
+           if (p.status === 'finalizado' || p.status === 'em_aberto') {
+             obj.tempo += p.tempo_produtivo_minutos || 0;
+           }
+           // Quantidade: soma APENAS para finalizado (igual agruparPorEtapa linha 178)
+           if (p.status === 'finalizado') {
+             obj.quantidade += p.quantidade_produzida || 0;
+           }
            obj.records.push(p);
          });
 
-         // Corrigir duplicação de equipe e calcular tempo unitário por etapa
-         const tempoMedioLote = Array.from(etapasMap.values()).reduce((sum, obj) => {
-           let qtd = obj.quantidade;
-           // Se a quantidade excede 120% do total do lote, pode ser trabalho em equipe
-           if (qtd > loteQtdTotal * 1.2) {
-             const registrosFull = obj.records.filter(p => (Number(p.quantidade_produzida) || 0) >= loteQtdTotal * 0.9);
+         // Corrigir duplicação por equipe (igual agruparPorEtapa linhas 229-249)
+         etapasMap.forEach((etapa) => {
+           if (etapa.quantidade > loteQtdTotal * 1.2) {
+             const registrosFull = etapa.records.filter(p =>
+               p.status === 'finalizado' && (Number(p.quantidade_produzida) || 0) >= loteQtdTotal * 0.9
+             );
              if (registrosFull.length > 1) {
-               qtd = Math.max(...obj.records.map(p => Number(p.quantidade_produzida) || 0));
+               etapa.quantidade = Math.max(...etapa.records
+                 .filter(p => p.status === 'finalizado')
+                 .map(p => Number(p.quantidade_produzida) || 0));
              }
            }
-           return sum + (qtd > 0 ? obj.tempo / qtd : 0);
+         });
+
+         // tempoUnitarioGeral = Σ (etapa.tempo_total / etapa.quantidade_produzida) (DetalhesLote linhas 161-164)
+         const tempoMedioLote = Array.from(etapasMap.values()).reduce((sum, obj) => {
+           return sum + (obj.quantidade > 0 ? obj.tempo / obj.quantidade : 0);
          }, 0);
 
          // Última data de produção (embalagem)
