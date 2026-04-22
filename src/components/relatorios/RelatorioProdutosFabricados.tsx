@@ -86,7 +86,21 @@ const RelatorioProdutosFabricados = () => {
       if (err2) throw err2;
       const validLotes = lotes || [];
 
-      // 4. Agrupar por produto
+      // 4. Buscar TODAS as produções dos lotes (para calcular tempo médio do lote inteiro)
+      let allProds: any[] = [];
+      const chunkSize = 50;
+      for (let i = 0; i < loteIds.length; i += chunkSize) {
+        const chunk = loteIds.slice(i, i + chunkSize);
+        const { data, error } = await supabase
+          .from("producoes_com_tempo")
+          .select("lote_id, quantidade_produzida, tempo_produtivo_minutos")
+          .in("lote_id", chunk);
+
+        if (error) throw error;
+        if (data) allProds.push(...data);
+      }
+
+      // 5. Agrupar por produto
       const agrupamento: Record<string, any> = {};
 
       validLotes.forEach(lote => {
@@ -97,22 +111,17 @@ const RelatorioProdutosFabricados = () => {
          const prodsDoLote = prodsEmbalagem.filter(p => p.lote_id === lote.id);
          if (prodsDoLote.length === 0) return;
 
-         // Quantidade fabricada = soma das produções de embalagem, limitada ao total do lote
-         const sumQtd = prodsDoLote.reduce((s, p) => s + (p.quantidade_produzida || 0), 0);
-         let qtdFabricada = sumQtd;
-         const loteQtdTotal = lote.quantidade_total || 0;
-         
-         if (qtdFabricada > loteQtdTotal && loteQtdTotal > 0) {
-            qtdFabricada = loteQtdTotal;
-         }
-
+         // Quantidade fabricada = soma do que foi lançado na embalagem (sem limitar)
+         const qtdFabricada = prodsDoLote.reduce((s, p) => s + (p.quantidade_produzida || 0), 0);
          if (qtdFabricada === 0) return;
 
-         // Tempo médio unitário do lote (baseado nas produções de embalagem)
-         const tempoTotal = prodsDoLote.reduce((s, p) => s + (p.tempo_produtivo_minutos || 0), 0);
-         const tempoMedioLote = qtdFabricada > 0 ? tempoTotal / qtdFabricada : 0;
+         // Tempo médio unitário do lote INTEIRO (todas as etapas, não só embalagem)
+         const todasProdsLote = allProds.filter(p => p.lote_id === lote.id);
+         const tempoTotalLote = todasProdsLote.reduce((s, p) => s + (p.tempo_produtivo_minutos || 0), 0);
+         const loteQtdTotal = lote.quantidade_total || qtdFabricada;
+         const tempoMedioLote = loteQtdTotal > 0 ? tempoTotalLote / loteQtdTotal : 0;
 
-         // Última data de produção
+         // Última data de produção (embalagem)
          const ultimaData = prodsDoLote.reduce((max, p) => {
              if (!p.data_fim) return max;
              const d = p.data_fim.split('T')[0];
