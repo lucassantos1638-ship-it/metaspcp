@@ -80,42 +80,66 @@ const RelatorioProdutosFabricados = () => {
         }
       }
 
-      // 4. Buscar roteiros (produto_etapas) para descobrir qual a última etapa de cada produto
-      const produtoIds = [...new Set(validLotes.map(l => l.produto_id).filter(Boolean))];
-      const { data: rotas, error: err4 } = await supabase
-        .from("produto_etapas")
-        .select("produto_id, etapa_id, subetapa_id, ordem")
-        .in("produto_id", produtoIds);
+      // 4. Buscar todas as etapas da empresa (tabela global) para saber a ordem correta
+      const { data: etapasGlobais, error: err4 } = await supabase
+        .from("etapas")
+        .select("id, nome, ordem")
+        .eq("empresa_id", empresaId)
+        .order("ordem", { ascending: false });
 
       if (err4) throw err4;
 
-      const lastSteps: Record<string, { etapa_id: string, subetapa_id: string | null }> = {};
-      produtoIds.forEach(pid => {
-         const rotasProd = rotas?.filter(e => e.produto_id === pid) || [];
-         if (rotasProd.length > 0) {
-            rotasProd.sort((a, b) => b.ordem - a.ordem);
-            lastSteps[pid] = { etapa_id: rotasProd[0].etapa_id, subetapa_id: rotasProd[0].subetapa_id };
-         }
-      });
-      
-      console.log("Roteiros (Last Steps) carregados:", lastSteps);
-
-      // 5. Agrupar e calcular
+      // 5. Para cada lote, encontrar a última etapa (maior ordem global) que teve produção,
+      //    e dentro dela, a última subetapa produzida
       const agrupamento: Record<string, any> = {};
 
       validLotes.forEach(lote => {
          const prodId = lote.produto_id;
          if (!prodId) return;
-         
-         const lastStep = lastSteps[prodId];
-         if (!lastStep) return;
 
          const prodDoLote = allProds.filter(p => p.lote_id === lote.id);
+         if (prodDoLote.length === 0) return;
          
-         // Verificar se a última etapa foi produzida NO PERÍODO
-         const lastStepProds = prodDoLote.filter(p => 
-            p.etapa_id === lastStep.etapa_id && 
-            (p.subetapa_id || null) === (lastStep.subetapa_id || null)
+         // Descobrir qual a última etapa global que tem produção neste lote
+         let lastEtapaId: string | null = null;
+         for (const etapa of (etapasGlobais || [])) {
+            const temProd = prodDoLote.some(p => p.etapa_id === etapa.id);
+            if (temProd) {
+               lastEtapaId = etapa.id;
+               break; // etapasGlobais já está ordenado DESC, então o primeiro match é a maior ordem
+            }
+         }
+         if (!lastEtapaId) return;
+
+         // Dentro da última etapa, encontrar a última subetapa com produção
+         const prodsUltimaEtapa = prodDoLote.filter(p => p.etapa_id === lastEtapaId);
+         const subetapaIds = [...new Set(prodsUltimaEtapa.map(p => p.subetapa_id).filter(Boolean))];
+         
+         let lastSubetapaId: string | null = null;
+         if (subetapaIds.length > 1) {
+            // Buscar a ordem dessas subetapas no produto_etapas para pegar a de maior ordem
+            // Ou se não achar, pegar pela última produção registrada
+            const prodEtapasDoLote = prodDoLote.filter(p => p.etapa_id === lastEtapaId);
+            // Pegar a subetapa que aparece por último cronologicamente
+            let maxDate = "";
+            subetapaIds.forEach(subId => {
+               const prodsSubetapa = prodEtapasDoLote.filter(p => p.subetapa_id === subId);
+               const maxDataSub = prodsSubetapa.reduce((max, p) => {
+                  if (!p.data_fim) return max;
+                  return p.data_fim > max ? p.data_fim : max;
+               }, "");
+               if (maxDataSub > maxDate) {
+                  maxDate = maxDataSub;
+                  lastSubetapaId = subId;
+               }
+            });
+         } else if (subetapaIds.length === 1) {
+            lastSubetapaId = subetapaIds[0];
+         }
+
+         // Filtrar produções da última subetapa da última etapa
+         const lastStepProds = prodsUltimaEtapa.filter(p => 
+            (p.subetapa_id || null) === (lastSubetapaId || null)
          );
 
          const lastStepProdsInRange = lastStepProds.filter(p => {
