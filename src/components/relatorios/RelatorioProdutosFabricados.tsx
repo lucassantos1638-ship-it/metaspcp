@@ -47,140 +47,58 @@ const RelatorioProdutosFabricados = () => {
     queryKey: ["relatorio-produtos-fabricados", empresaId, dataInicio, dataFim],
     enabled: !!empresaId && !!dataInicio && !!dataFim,
     queryFn: async () => {
-      // 1. Buscar produções no período para encontrar lotes ativos
-      const { data: prodsRange, error: err1 } = await supabase
+      // 1. Buscar a subetapa "EMBALAGEM" da empresa
+      const { data: subEmbalagem, error: errSub } = await supabase
+        .from("subetapas")
+        .select("id")
+        .eq("empresa_id", empresaId)
+        .ilike("nome", "embalagem")
+        .maybeSingle();
+
+      if (errSub) throw errSub;
+      if (!subEmbalagem) return []; // Se não existe subetapa EMBALAGEM, não há dados
+
+      const embalagemId = subEmbalagem.id;
+
+      // 2. Buscar produções da subetapa EMBALAGEM no período
+      const { data: prodsEmbalagem, error: err1 } = await supabase
         .from("producoes_com_tempo")
-        .select("lote_id")
+        .select("lote_id, quantidade_produzida, tempo_produtivo_minutos, data_fim")
+        .eq("subetapa_id", embalagemId)
         .gte("data_fim", dataInicio)
         .lte("data_fim", dataFim);
 
       if (err1) throw err1;
-      if (!prodsRange || prodsRange.length === 0) return [];
+      if (!prodsEmbalagem || prodsEmbalagem.length === 0) return [];
 
-      const activeLoteIds = [...new Set(prodsRange.map(p => p.lote_id).filter(Boolean))];
+      // 3. Buscar os lotes dessas produções
+      const loteIds = [...new Set(prodsEmbalagem.map(p => p.lote_id).filter(Boolean))];
 
-      // 2. Buscar os lotes ativos
       const { data: lotes, error: err2 } = await supabase
         .from("lotes")
         .select(`
           id, numero_lote, nome_lote, quantidade_total, produto_id,
           produto:produtos (nome, sku)
         `)
-        .in("id", activeLoteIds)
+        .in("id", loteIds)
         .eq("empresa_id", empresaId);
 
       if (err2) throw err2;
       const validLotes = lotes || [];
-      const validLoteIds = validLotes.map(l => l.id);
-      
-      if (validLoteIds.length === 0) return [];
 
-      // 3. Buscar TODAS as produções desses lotes (em chunks) para cálculo correto do tempo médio
-      let allProds: any[] = [];
-      const chunkSize = 50;
-      for (let i = 0; i < validLoteIds.length; i += chunkSize) {
-        const chunk = validLoteIds.slice(i, i + chunkSize);
-        let hasMore = true;
-        let page = 0;
-        const pageSize = 1000;
-        while (hasMore) {
-          const { data, error } = await supabase
-            .from("producoes_com_tempo")
-            .select("lote_id, etapa_id, subetapa_id, quantidade_produzida, tempo_produtivo_minutos, data_fim")
-            .in("lote_id", chunk)
-            .range(page * pageSize, (page + 1) * pageSize - 1);
-
-          if (error) throw error;
-          if (data && data.length > 0) {
-            allProds.push(...data);
-            if (data.length < pageSize) hasMore = false;
-            else page++;
-          } else {
-            hasMore = false;
-          }
-        }
-      }
-
-      // 4. Buscar todas as etapas da empresa (tabela global) para saber a ordem correta
-      const { data: etapasGlobais, error: err4 } = await supabase
-        .from("etapas")
-        .select("id, nome, ordem")
-        .eq("empresa_id", empresaId)
-        .order("ordem", { ascending: false });
-
-      if (err4) throw err4;
-
-      // 5. Para cada lote, encontrar a última etapa (maior ordem global) que teve produção,
-      //    e dentro dela, a última subetapa produzida
+      // 4. Agrupar por produto
       const agrupamento: Record<string, any> = {};
 
       validLotes.forEach(lote => {
          const prodId = lote.produto_id;
          if (!prodId) return;
 
-         const prodDoLote = allProds.filter(p => p.lote_id === lote.id);
-         if (prodDoLote.length === 0) return;
-         
-         // Descobrir qual a última etapa global que tem produção neste lote
-         let lastEtapaId: string | null = null;
-         for (const etapa of (etapasGlobais || [])) {
-            const temProd = prodDoLote.some(p => p.etapa_id === etapa.id);
-            if (temProd) {
-               lastEtapaId = etapa.id;
-               break; // etapasGlobais já está ordenado DESC, então o primeiro match é a maior ordem
-            }
-         }
-         if (!lastEtapaId) return;
+         // Produções de EMBALAGEM deste lote no período
+         const prodsDoLote = prodsEmbalagem.filter(p => p.lote_id === lote.id);
+         if (prodsDoLote.length === 0) return;
 
-         // Dentro da última etapa, encontrar a última subetapa com produção
-         const prodsUltimaEtapa = prodDoLote.filter(p => p.etapa_id === lastEtapaId);
-         const subetapaIds = [...new Set(prodsUltimaEtapa.map(p => p.subetapa_id).filter(Boolean))];
-         
-         let lastSubetapaId: string | null = null;
-         if (subetapaIds.length > 1) {
-            // Buscar a ordem dessas subetapas no produto_etapas para pegar a de maior ordem
-            // Ou se não achar, pegar pela última produção registrada
-            const prodEtapasDoLote = prodDoLote.filter(p => p.etapa_id === lastEtapaId);
-            // Pegar a subetapa que aparece por último cronologicamente
-            let maxDate = "";
-            subetapaIds.forEach(subId => {
-               const prodsSubetapa = prodEtapasDoLote.filter(p => p.subetapa_id === subId);
-               const maxDataSub = prodsSubetapa.reduce((max, p) => {
-                  if (!p.data_fim) return max;
-                  return p.data_fim > max ? p.data_fim : max;
-               }, "");
-               if (maxDataSub > maxDate) {
-                  maxDate = maxDataSub;
-                  lastSubetapaId = subId;
-               }
-            });
-         } else if (subetapaIds.length === 1) {
-            lastSubetapaId = subetapaIds[0];
-         }
-
-         // Filtrar produções da última subetapa da última etapa
-         const lastStepProds = prodsUltimaEtapa.filter(p => 
-            (p.subetapa_id || null) === (lastSubetapaId || null)
-         );
-
-         const lastStepProdsInRange = lastStepProds.filter(p => {
-             if (!p.data_fim) return false;
-             // p.data_fim costuma vir no formato YYYY-MM-DD. 
-             // Ajustar comparação caso venha com horas (YYYY-MM-DDTHH:MM:SS)
-             const dataFimProd = p.data_fim.split('T')[0];
-             return dataFimProd >= dataInicio && dataFimProd <= dataFim;
-         });
-         
-         console.log(`Lote ${lote.numero_lote}:`, { lastStepProds: lastStepProds.length, inRange: lastStepProdsInRange.length });
-
-         // Se a última etapa não foi tocada neste período, ignoramos o lote neste relatório
-         if (lastStepProdsInRange.length === 0) return;
-
-         // A quantidade fabricada é a soma do que foi produzido na última etapa/subetapa.
-         // Como algumas subetapas (ex: dobrar fronha) possuem multiplicadores (2 fronhas por jogo),
-         // a soma pode passar muito do total do lote (ex: 1350 fronhas num lote de 741 jogos).
-         // Para evitar essa distorção no relatório, limitamos a quantidade ao total esperado do lote.
-         const sumQtd = lastStepProds.reduce((s, p) => s + (p.quantidade_produzida || 0), 0);
+         // Quantidade fabricada = soma das produções de embalagem, limitada ao total do lote
+         const sumQtd = prodsDoLote.reduce((s, p) => s + (p.quantidade_produzida || 0), 0);
          let qtdFabricada = sumQtd;
          const loteQtdTotal = lote.quantidade_total || 0;
          
@@ -190,29 +108,12 @@ const RelatorioProdutosFabricados = () => {
 
          if (qtdFabricada === 0) return;
 
-         // Calcular o Tempo Médio Unitário do Lote (todas as etapas)
-         const mapEtapas = new Map<string, { t: number, q: number, records: any[] }>();
-         prodDoLote.forEach(p => {
-           const key = `${p.etapa_id}-${p.subetapa_id || 'main'}`;
-           if (!mapEtapas.has(key)) mapEtapas.set(key, { t: 0, q: 0, records: [] });
-           const obj = mapEtapas.get(key)!;
-           obj.t += p.tempo_produtivo_minutos || 0;
-           obj.q += p.quantidade_produzida || 0;
-           obj.records.push(p);
-         });
+         // Tempo médio unitário do lote (baseado nas produções de embalagem)
+         const tempoTotal = prodsDoLote.reduce((s, p) => s + (p.tempo_produtivo_minutos || 0), 0);
+         const tempoMedioLote = qtdFabricada > 0 ? tempoTotal / qtdFabricada : 0;
 
-         const tempoMedioLote = Array.from(mapEtapas.values()).reduce((sum, obj) => {
-           let qtd = obj.q;
-           if (qtd > loteQtdTotal * 1.2) {
-             const registrosFull = obj.records.filter(p => (Number(p.quantidade_produzida) || 0) >= loteQtdTotal * 0.9);
-             if (registrosFull.length > 1) {
-               qtd = Math.max(...obj.records.map(p => Number(p.quantidade_produzida) || 0));
-             }
-           }
-           return sum + (qtd > 0 ? obj.t / qtd : 0);
-         }, 0);
-
-         const ultimaData = lastStepProdsInRange.reduce((max, p) => {
+         // Última data de produção
+         const ultimaData = prodsDoLote.reduce((max, p) => {
              if (!p.data_fim) return max;
              const d = p.data_fim.split('T')[0];
              return d > max ? d : max;
@@ -236,7 +137,7 @@ const RelatorioProdutosFabricados = () => {
          agrupamento[prodId].tempoTotalMinutos += tempoMedioLote;
          agrupamento[prodId].lotesRelacionados.push({
            ...lote,
-           quantidade_total: qtdFabricada, // Mostra a qtd da última etapa em vez da expectativa do lote
+           quantidade_total: qtdFabricada,
            tempoMedioLote,
            ultimaData
          });
