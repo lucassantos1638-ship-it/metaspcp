@@ -86,14 +86,14 @@ const RelatorioProdutosFabricados = () => {
       if (err2) throw err2;
       const validLotes = lotes || [];
 
-      // 4. Buscar TODAS as produções dos lotes (para calcular tempo médio do lote inteiro)
+      // 4. Buscar TODAS as produções dos lotes (para calcular tempo unitário igual ao DetalhesLote)
       let allProds: any[] = [];
       const chunkSize = 50;
       for (let i = 0; i < loteIds.length; i += chunkSize) {
         const chunk = loteIds.slice(i, i + chunkSize);
         const { data, error } = await supabase
           .from("producoes_com_tempo")
-          .select("lote_id, quantidade_produzida, tempo_produtivo_minutos")
+          .select("lote_id, etapa_id, subetapa_id, quantidade_produzida, tempo_produtivo_minutos")
           .in("lote_id", chunk);
 
         if (error) throw error;
@@ -115,11 +115,34 @@ const RelatorioProdutosFabricados = () => {
          const qtdFabricada = prodsDoLote.reduce((s, p) => s + (p.quantidade_produzida || 0), 0);
          if (qtdFabricada === 0) return;
 
-         // Tempo médio unitário do lote INTEIRO (todas as etapas, não só embalagem)
+         // Tempo unitário do lote = soma dos tempos unitários de cada etapa/subetapa
+         // (mesma lógica do DetalhesLote: tempoUnitarioGeral = Σ (etapa.tempo_total / etapa.quantidade_produzida))
          const todasProdsLote = allProds.filter(p => p.lote_id === lote.id);
-         const tempoTotalLote = todasProdsLote.reduce((s, p) => s + (p.tempo_produtivo_minutos || 0), 0);
          const loteQtdTotal = lote.quantidade_total || qtdFabricada;
-         const tempoMedioLote = loteQtdTotal > 0 ? tempoTotalLote / loteQtdTotal : 0;
+         
+         // Agrupar por etapa+subetapa
+         const etapasMap = new Map<string, { tempo: number; quantidade: number; records: any[] }>();
+         todasProdsLote.forEach(p => {
+           const key = `${p.etapa_id}-${p.subetapa_id || 'main'}`;
+           if (!etapasMap.has(key)) etapasMap.set(key, { tempo: 0, quantidade: 0, records: [] });
+           const obj = etapasMap.get(key)!;
+           obj.tempo += p.tempo_produtivo_minutos || 0;
+           obj.quantidade += p.quantidade_produzida || 0;
+           obj.records.push(p);
+         });
+
+         // Corrigir duplicação de equipe e calcular tempo unitário por etapa
+         const tempoMedioLote = Array.from(etapasMap.values()).reduce((sum, obj) => {
+           let qtd = obj.quantidade;
+           // Se a quantidade excede 120% do total do lote, pode ser trabalho em equipe
+           if (qtd > loteQtdTotal * 1.2) {
+             const registrosFull = obj.records.filter(p => (Number(p.quantidade_produzida) || 0) >= loteQtdTotal * 0.9);
+             if (registrosFull.length > 1) {
+               qtd = Math.max(...obj.records.map(p => Number(p.quantidade_produzida) || 0));
+             }
+           }
+           return sum + (qtd > 0 ? obj.tempo / qtd : 0);
+         }, 0);
 
          // Última data de produção (embalagem)
          const ultimaData = prodsDoLote.reduce((max, p) => {
