@@ -3,14 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
+import { Button } from "@/components/ui/button";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
+import { usePrintReport } from "@/hooks/usePrintReport";
 import { formatarTempoProdutivo } from "@/lib/timeUtils";
 import { startOfDay, endOfDay, isWithinInterval, parseISO, format } from "date-fns";
-import { Package, ChevronDown, ChevronRight } from "lucide-react";
+import { Package, ChevronDown, ChevronRight, Printer } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import ProdutosFabricadosRelatorioA4 from "@/components/relatorios/ProdutosFabricadosRelatorioA4";
 
 const RelatorioProdutosFabricados = () => {
   const empresaId = useEmpresaId();
@@ -21,6 +23,17 @@ const RelatorioProdutosFabricados = () => {
   const [dataInicio, setDataInicio] = useState<string>(primeiroDiaMesStr);
   const [dataFim, setDataFim] = useState<string>(hojeStr);
   const [expandido, setExpandido] = useState<string | null>(null);
+  const { isPrinting, triggerPrint } = usePrintReport();
+
+  const { data: empresa } = useQuery({
+    queryKey: ["configuracoes-empresa-print", empresaId],
+    enabled: !!empresaId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("empresas").select("nome, cnpj").eq("id", empresaId).single();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const { data: dadosAgrupados, isLoading } = useQuery({
     queryKey: ["relatorio-produtos-fabricados", empresaId, dataInicio, dataFim],
@@ -229,6 +242,8 @@ const RelatorioProdutosFabricados = () => {
   });
 
   return (
+    <>
+      <div className={isPrinting ? "hidden" : ""}>
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -257,6 +272,12 @@ const RelatorioProdutosFabricados = () => {
                   className="w-[140px]"
                 />
               </div>
+              {dadosAgrupados && dadosAgrupados.length > 0 && (
+                <Button variant="outline" size="sm" onClick={triggerPrint} className="gap-1">
+                  <Printer className="h-4 w-4" />
+                  Imprimir
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -336,8 +357,18 @@ const RelatorioProdutosFabricados = () => {
           )}
         </CardContent>
       </Card>
+      </div>
+
+      {isPrinting && dadosAgrupados && (
+        <ProdutosFabricadosRelatorioA4
+          dados={dadosAgrupados}
+          empresa={empresa}
+          dataInicio={dataInicio}
+          dataFim={dataFim}
+        />
+      )}
+    </>
   );
 };
 
 export default RelatorioProdutosFabricados;
-
