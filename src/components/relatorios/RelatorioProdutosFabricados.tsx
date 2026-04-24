@@ -48,13 +48,25 @@ const RelatorioProdutosFabricados = () => {
     queryKey: ["relatorio-produtos-fabricados", empresaId, dataInicio, dataFim],
     enabled: !!empresaId && !!dataInicio && !!dataFim,
     queryFn: async () => {
-      // 1. Buscar a subetapa "EMBALAGEM" da empresa
-      const { data: subEmbalagem, error: errSub } = await supabase
+      // 1. Buscar a etapa "Acabamento" e sua subetapa "Embalagem"
+      const { data: etapaAcabamento } = await supabase
+        .from("etapas")
+        .select("id")
+        .eq("empresa_id", empresaId)
+        .ilike("nome", "%acabamento%")
+        .maybeSingle();
+
+      let querySubEmbalagem = supabase
         .from("subetapas")
         .select("id")
         .eq("empresa_id", empresaId)
-        .ilike("nome", "embalagem")
-        .maybeSingle();
+        .ilike("nome", "%embalagem%");
+
+      if (etapaAcabamento?.id) {
+        querySubEmbalagem = querySubEmbalagem.eq("etapa_id", etapaAcabamento.id);
+      }
+
+      const { data: subEmbalagem, error: errSub } = await querySubEmbalagem.maybeSingle();
 
       if (errSub) throw errSub;
       if (!subEmbalagem) return []; // Se não existe subetapa EMBALAGEM, não há dados
@@ -107,7 +119,7 @@ const RelatorioProdutosFabricados = () => {
 
       // 6. Buscar TODAS as produções dos lotes com joins completos (igual useDetalhesLote)
       let allProds: any[] = [];
-      const chunkSize = 50;
+      const chunkSize = 5; // Reduzido de 50 para 5 para evitar o limite de 1000 linhas da API do Supabase
       for (let i = 0; i < loteIds.length; i += chunkSize) {
         const chunk = loteIds.slice(i, i + chunkSize);
         const { data, error } = await supabase
@@ -133,11 +145,15 @@ const RelatorioProdutosFabricados = () => {
          if (!prodId) return;
 
          // Produções de EMBALAGEM deste lote no período
-         const prodsDoLote = prodsEmbalagem.filter(p => p.lote_id === lote.id);
-         if (prodsDoLote.length === 0) return;
+         const prodsDoLoteNoPeriodo = prodsEmbalagem.filter(p => p.lote_id === lote.id);
+         if (prodsDoLoteNoPeriodo.length === 0) return;
 
-         // Quantidade fabricada = soma do que foi lançado na embalagem
-         const qtdFabricada = prodsDoLote.reduce((s, p) => s + (p.quantidade_produzida || 0), 0);
+         const producoesDoLote = allProds.filter(p => p.lote_id === lote.id);
+
+         // Quantidade fabricada = soma TOTAL do que foi lançado na embalagem para este lote (ignorando o filtro de data para mostrar o valor total real do lote)
+         const todasEmbalagemDoLote = producoesDoLote.filter(p => p.subetapa_id === embalagemId);
+         const qtdFabricada = todasEmbalagemDoLote.reduce((s, p) => s + (Number(p.quantidade_produzida) || 0), 0);
+         
          if (qtdFabricada === 0) return;
 
          // === TEMPO UNITÁRIO: EXATAMENTE IGUAL AO DETALHES DO LOTE ===
@@ -165,7 +181,6 @@ const RelatorioProdutosFabricados = () => {
          }
 
          // Usar agruparPorEtapa (mesma função do DetalhesLote)
-         const producoesDoLote = allProds.filter(p => p.lote_id === lote.id);
          const progressoPorEtapa = agruparPorEtapa(
            producoesDoLote as any[],
            lote.quantidade_total,
@@ -178,8 +193,12 @@ const RelatorioProdutosFabricados = () => {
            return acc + unitarioEtapa;
          }, 0);
 
+         const tempoCorteLote = progressoPorEtapa.filter(e => e.etapa_nome?.toLowerCase().includes('corte')).reduce((acc, curr) => acc + (curr.quantidade_produzida > 0 ? curr.tempo_total / curr.quantidade_produzida : 0), 0);
+         const tempoCosturaLote = progressoPorEtapa.filter(e => e.etapa_nome?.toLowerCase().includes('costura')).reduce((acc, curr) => acc + (curr.quantidade_produzida > 0 ? curr.tempo_total / curr.quantidade_produzida : 0), 0);
+         const tempoAcabamentoLote = progressoPorEtapa.filter(e => e.etapa_nome?.toLowerCase().includes('acabamento')).reduce((acc, curr) => acc + (curr.quantidade_produzida > 0 ? curr.tempo_total / curr.quantidade_produzida : 0), 0);
+
          // Última data de produção (embalagem)
-         const ultimaData = prodsDoLote.reduce((max, p) => {
+         const ultimaData = prodsDoLoteNoPeriodo.reduce((max, p) => {
              if (!p.data_fim) return max;
              const d = p.data_fim.split('T')[0];
              return d > max ? d : max;
@@ -193,6 +212,9 @@ const RelatorioProdutosFabricados = () => {
              sku: lote.produto?.sku || "",
              quantidade: 0,
              tempoTotalMinutos: 0,
+             tempoCorteMinutos: 0,
+             tempoCosturaMinutos: 0,
+             tempoAcabamentoMinutos: 0,
              totalLotes: 0,
              lotesRelacionados: []
            };
@@ -201,17 +223,26 @@ const RelatorioProdutosFabricados = () => {
          agrupamento[prodId].quantidade += qtdFabricada;
          agrupamento[prodId].totalLotes += 1;
          agrupamento[prodId].tempoTotalMinutos += tempoMedioLote;
+         agrupamento[prodId].tempoCorteMinutos += tempoCorteLote;
+         agrupamento[prodId].tempoCosturaMinutos += tempoCosturaLote;
+         agrupamento[prodId].tempoAcabamentoMinutos += tempoAcabamentoLote;
          agrupamento[prodId].lotesRelacionados.push({
            ...lote,
            quantidade_total: qtdFabricada,
            tempoMedioLote,
+           tempoCorteLote,
+           tempoCosturaLote,
+           tempoAcabamentoLote,
            ultimaData
          });
       });
 
       return Object.values(agrupamento).map((item: any) => {
         const tempoMedio = item.totalLotes > 0 ? item.tempoTotalMinutos / item.totalLotes : 0;
-        return { ...item, tempoMedio };
+        const tempoMedioCorte = item.totalLotes > 0 ? item.tempoCorteMinutos / item.totalLotes : 0;
+        const tempoMedioCostura = item.totalLotes > 0 ? item.tempoCosturaMinutos / item.totalLotes : 0;
+        const tempoMedioAcabamento = item.totalLotes > 0 ? item.tempoAcabamentoMinutos / item.totalLotes : 0;
+        return { ...item, tempoMedio, tempoMedioCorte, tempoMedioCostura, tempoMedioAcabamento };
       }).sort((a, b) => b.quantidade - a.quantidade);
     }
   });
@@ -346,7 +377,16 @@ const RelatorioProdutosFabricados = () => {
                         <TableCell className="text-right">{item.totalLotes}</TableCell>
                         <TableCell className="text-right font-bold text-primary">{item.quantidade}</TableCell>
                         <TableCell className="text-right text-muted-foreground font-medium">
-                          {formatarTempoProdutivo(item.tempoMedio)}
+                          <div className="flex flex-col items-end">
+                            <span className="font-bold">{formatarTempoProdutivo(item.tempoMedio)}</span>
+                            <span className="text-[11px] text-muted-foreground/80 flex items-center gap-1 mt-1 font-normal">
+                               <span>Cort: {formatarTempoProdutivo(item.tempoMedioCorte)}</span>
+                               <span className="text-border/50">|</span>
+                               <span>Cost: {formatarTempoProdutivo(item.tempoMedioCostura)}</span>
+                               <span className="text-border/50">|</span>
+                               <span>Acab: {formatarTempoProdutivo(item.tempoMedioAcabamento)}</span>
+                            </span>
+                          </div>
                         </TableCell>
                       </TableRow>
                       
@@ -355,23 +395,33 @@ const RelatorioProdutosFabricados = () => {
                           <TableCell colSpan={5} className="p-0">
                             <div className="px-10 py-4">
                               <h4 className="font-semibold text-sm mb-2 text-muted-foreground">Lotes Fabricados:</h4>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                {item.lotesRelacionados.map(lote => (
-                                  <div key={lote.id} className="bg-background border rounded p-2 text-sm flex justify-between items-center">
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">{lote.numero_lote}</span>
-                                      <span className="text-xs text-muted-foreground truncate max-w-[120px]">{lote.nome_lote}</span>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                                {item.lotesRelacionados.map((lote: any) => (
+                                  <div key={lote.id} className="bg-background border rounded p-3 text-sm flex flex-col justify-between h-full shadow-sm">
+                                    <div className="flex justify-between items-start mb-2">
+                                      <div className="flex flex-col">
+                                        <span className="font-bold text-primary">{lote.numero_lote}</span>
+                                        <span className="text-xs text-muted-foreground truncate max-w-[150px]">{lote.nome_lote}</span>
+                                      </div>
+                                      <Badge variant="outline" className="font-bold bg-muted/50">{lote.quantidade_total} un.</Badge>
+                                    </div>
+                                    
+                                    <div className="flex flex-col mt-auto pt-2 border-t border-border/40">
                                       {lote.ultimaData && lote.ultimaData !== "0000-00-00" && (
-                                        <span className="text-[10px] text-muted-foreground mt-0.5">
+                                        <span className="text-[10px] text-muted-foreground mb-1">
                                           Fabricado em: {format(parseISO(lote.ultimaData), 'dd/MM/yyyy')}
                                         </span>
                                       )}
-                                    </div>
-                                    <div className="flex flex-col items-end">
-                                      <Badge variant="outline" className="font-bold">{lote.quantidade_total} un.</Badge>
-                                      <span className="text-[11px] text-blue-600/80 font-medium text-right mt-1">
-                                        Médio: {formatarTempoProdutivo(lote.tempoMedioLote)}/un
-                                      </span>
+                                      <div className="flex justify-between items-center mt-1">
+                                        <span className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
+                                          <span>Cort: {formatarTempoProdutivo(lote.tempoCorteLote)}</span>
+                                          <span>Cost: {formatarTempoProdutivo(lote.tempoCosturaLote)}</span>
+                                          <span>Acab: {formatarTempoProdutivo(lote.tempoAcabamentoLote)}</span>
+                                        </span>
+                                        <span className="text-xs text-blue-600/90 font-bold bg-blue-50 px-2 py-1 rounded">
+                                          {formatarTempoProdutivo(lote.tempoMedioLote)}/un
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
                                 ))}

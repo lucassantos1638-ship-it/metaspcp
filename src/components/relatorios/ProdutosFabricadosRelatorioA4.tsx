@@ -66,22 +66,32 @@ export default function ProdutosFabricadosRelatorioA4({
                                     </td>
                                     <td className="py-2 px-3 text-center border-r border-gray-300">{item.totalLotes}</td>
                                     <td className="py-2 px-3 text-right border-r border-gray-300 text-blue-700 font-bold">{item.quantidade.toLocaleString('pt-BR')}</td>
-                                    <td className="py-2 px-3 text-right text-blue-700">{formatarTempoProdutivo(item.tempoMedio)}</td>
+                                    <td className="py-2 px-3 text-right">
+                                        <div className="font-bold text-blue-700">{formatarTempoProdutivo(item.tempoMedio)}</div>
+                                        <div className="text-[9px] text-gray-500 font-normal leading-tight mt-1 whitespace-nowrap">
+                                            Cort: {formatarTempoProdutivo(item.tempoMedioCorte)} | Cost: {formatarTempoProdutivo(item.tempoMedioCostura)} | Acab: {formatarTempoProdutivo(item.tempoMedioAcabamento)}
+                                        </div>
+                                    </td>
                                 </tr>
 
                                 {/* Linhas dos Lotes (apenas no modo detalhado) */}
                                 {modo === "detalhado" && item.lotesRelacionados?.map((lote: any, loteIdx: number) => (
                                     <tr key={`${idx}-${loteIdx}`} className="border-b border-gray-100 hover:bg-gray-50 break-inside-avoid text-gray-600">
-                                        <td className="py-1 px-3 border-r border-gray-200 pl-6 border-l-2 border-l-blue-300">
+                                        <td className="py-1.5 px-3 border-r border-gray-200 pl-6 border-l-2 border-l-blue-300">
                                             <span className="font-medium">{lote.numero_lote}</span>
-                                            {lote.nome_lote && <span className="text-xs text-gray-400 ml-2">- {lote.nome_lote}</span>}
+                                            {lote.nome_lote && <span className="text-[11px] text-gray-400 ml-2">- {lote.nome_lote}</span>}
                                             {lote.ultimaData && lote.ultimaData !== "0000-00-00" && (
-                                                <span className="text-xs text-gray-400 ml-2">(Fabricado: {formatarData(lote.ultimaData)})</span>
+                                                <div className="text-[10px] text-gray-400 mt-0.5">Fabricado em: {formatarData(lote.ultimaData)}</div>
                                             )}
                                         </td>
-                                        <td className="py-1 px-3 text-center border-r border-gray-200">-</td>
-                                        <td className="py-1 px-3 text-right border-r border-gray-200">{(lote.quantidade_total || 0).toLocaleString('pt-BR')}</td>
-                                        <td className="py-1 px-3 text-right">{formatarTempoProdutivo(lote.tempoMedioLote)}</td>
+                                        <td className="py-1.5 px-3 text-center border-r border-gray-200">-</td>
+                                        <td className="py-1.5 px-3 text-right border-r border-gray-200">{(lote.quantidade_total || 0).toLocaleString('pt-BR')}</td>
+                                        <td className="py-1.5 px-3 text-right">
+                                            <div className="text-gray-700 font-medium">{formatarTempoProdutivo(lote.tempoMedioLote)}</div>
+                                            <div className="text-[8px] text-gray-400 font-normal mt-0.5 whitespace-nowrap">
+                                                Cort: {formatarTempoProdutivo(lote.tempoCorteLote)} | Cost: {formatarTempoProdutivo(lote.tempoCosturaLote)} | Acab: {formatarTempoProdutivo(lote.tempoAcabamentoLote)}
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </React.Fragment>
