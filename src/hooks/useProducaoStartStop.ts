@@ -182,3 +182,171 @@ export const useFinalizarProducao = () => {
     },
   });
 };
+
+// Hook para fazer um lançamento parcial (Adiciona nova produção finalizada com a quantidade, sem fechar o tempo da atual)
+export const useLancarProducaoParcial = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      producaoAtual: any;
+      quantidade_produzida: number;
+      data_fim: string;
+      hora_fim: string;
+      segundos_fim: number;
+    }) => {
+      const { producaoAtual, quantidade_produzida, data_fim, hora_fim, segundos_fim } = payload;
+      
+      // Cria uma nova produção apenas para registrar a quantidade lançada
+      const { error: errIniciar } = await supabase
+        .from("producoes")
+        .insert([{
+          colaborador_id: producaoAtual.colaborador_id,
+          empresa_id: producaoAtual.empresa_id,
+          lote_id: producaoAtual.lote_id,
+          etapa_id: producaoAtual.etapa_id,
+          subetapa_id: producaoAtual.subetapa_id,
+          atividade_id: producaoAtual.atividade_id,
+          pedido_id: producaoAtual.pedido_id,
+          terceirizado: producaoAtual.terceirizado,
+          entidade_id: producaoAtual.entidade_id,
+          servico_id: producaoAtual.servico_id,
+          quantidade_enviada: producaoAtual.quantidade_enviada,
+          quantidade_produzida: quantidade_produzida,
+          data_inicio: data_fim, // Usamos o mesmo tempo para não gerar tempo decorrido longo
+          hora_inicio: hora_fim,
+          segundos_inicio: segundos_fim,
+          status: "finalizado",
+          data_fim: data_fim,
+          hora_fim: hora_fim,
+          segundos_fim: segundos_fim,
+        }]);
+
+      if (errIniciar) throw errIniciar;
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["historico-lancamentos"] });
+      queryClient.invalidateQueries({ queryKey: ["detalhes_lote"] });
+      toast.success("Lançamento parcial registrado!");
+    },
+    onError: (error) => {
+      console.error("Erro ao fazer lançamento parcial:", error);
+      toast.error(`Erro ao fazer lançamento parcial: ${error.message || "Erro desconhecido"}`);
+    },
+  });
+};
+
+// Hook para buscar histórico de lançamentos do colaborador no lote/etapa
+export const useHistoricoLancamentosLote = (producaoAtual: any) => {
+  return useQuery({
+    queryKey: ["historico-lancamentos", producaoAtual?.lote_id, producaoAtual?.etapa_id, producaoAtual?.colaborador_id],
+    queryFn: async () => {
+      if (!producaoAtual) return { meusLancamentos: [], totalLote: 0, totalEtapa: 0 };
+
+      // Se for atividade genérica ou pedido que não tem lote, ignora o saldo total
+      if (!producaoAtual.lote_id) {
+         // Busca só os do colaborador hoje
+         const { data, error } = await supabase
+          .from("producoes")
+          .select("*")
+          .eq("colaborador_id", producaoAtual.colaborador_id)
+          .eq("status", "finalizado")
+          .eq("etapa_id", producaoAtual.etapa_id || "")
+          .eq("atividade_id", producaoAtual.atividade_id || "")
+          .eq("pedido_id", producaoAtual.pedido_id || "")
+          .eq("data_inicio", new Date().toISOString().split('T')[0])
+          .order("created_at", { ascending: false });
+          
+          if (error) throw error;
+          return { meusLancamentos: data || [], totalLote: 0, totalEtapa: 0 };
+      }
+
+      // 1. Busca todos os lançamentos finalizados DESSA subetapa (para somar tudo e achar o saldo)
+      let queryTotal = supabase
+        .from("producoes")
+        .select("quantidade_produzida")
+        .eq("lote_id", producaoAtual.lote_id)
+        .eq("etapa_id", producaoAtual.etapa_id)
+        .eq("status", "finalizado");
+        
+      if (producaoAtual.subetapa_id) {
+        queryTotal = queryTotal.eq("subetapa_id", producaoAtual.subetapa_id);
+      } else {
+        queryTotal = queryTotal.is("subetapa_id", null);
+      }
+
+      const { data: todosLancamentos, error: errTodos } = await queryTotal;
+      if (errTodos) throw errTodos;
+
+      const totalEtapa = todosLancamentos?.reduce((acc, curr) => acc + (curr.quantidade_produzida || 0), 0) || 0;
+
+      // 2. Busca o histórico de lançamentos de TODOS OS COLABORADORES para exibir na lista (da subetapa atual)
+      let queryMeus = supabase
+        .from("producoes")
+        .select(`
+          *,
+          colaborador:colaboradores(nome)
+        `)
+        .eq("lote_id", producaoAtual.lote_id)
+        .eq("etapa_id", producaoAtual.etapa_id)
+        .eq("status", "finalizado")
+        .gt("quantidade_produzida", 0) // Oculta as linhas de 0 (fechamento de tempo)
+        .order("data_fim", { ascending: false })
+        .order("hora_fim", { ascending: false });
+
+      if (producaoAtual.subetapa_id) {
+        queryMeus = queryMeus.eq("subetapa_id", producaoAtual.subetapa_id);
+      } else {
+        queryMeus = queryMeus.is("subetapa_id", null);
+      }
+      
+      const { data: meusLancamentos, error: errMeus } = await queryMeus;
+      if (errMeus) throw errMeus;
+
+      // 3. Busca a quantidade total do lote
+      const { data: lote, error: errLote } = await supabase
+        .from("lotes")
+        .select("quantidade_total")
+        .eq("id", producaoAtual.lote_id)
+        .single();
+        
+      if (errLote) throw errLote;
+
+      return {
+        meusLancamentos: meusLancamentos || [],
+        totalLote: lote?.quantidade_total || 0,
+        totalEtapa
+      };
+    },
+    enabled: !!producaoAtual,
+  });
+};
+
+// Hook para atualizar apenas a quantidade de um lançamento finalizado
+export const useAtualizarQuantidadeLancamento = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, quantidade_produzida }: { id: string, quantidade_produzida: number }) => {
+      const { data, error } = await supabase
+        .from("producoes")
+        .update({ quantidade_produzida })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["historico-lancamentos"] });
+      queryClient.invalidateQueries({ queryKey: ["detalhes_lote"] });
+      toast.success("Quantidade atualizada com sucesso!");
+    },
+    onError: (error) => {
+      toast.error(`Erro ao atualizar quantidade: ${error.message}`);
+    },
+  });
+};
+

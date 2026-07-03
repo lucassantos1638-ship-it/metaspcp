@@ -14,7 +14,7 @@ import { Check, Clock, Search, X, ChevronDown, ChevronRight } from "lucide-react
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useProducoesEmAberto } from "@/hooks/useProducaoStartStop";
 import { differenceInSeconds, parseISO, isFuture } from "date-fns";
-import DialogFinalizarAtividade from "./DialogFinalizarAtividade";
+import DialogLancamentosAtividade from "./DialogLancamentosAtividade";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LoteProgressSummary } from "./LoteProgressSummary";
 
@@ -346,7 +346,7 @@ export default function ListaAtividadesEmAberto() {
                                 variant="default"
                               >
                                 <Check className="mr-1 h-4 w-4" />
-                                Finalizar
+                                Lançamentos
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -442,7 +442,7 @@ export default function ListaAtividadesEmAberto() {
                             className="w-full"
                           >
                             <Check className="mr-1 h-4 w-4" />
-                            Finalizar Atividade
+                            Lançamentos
                           </Button>
                         </div>
                       ))}
@@ -456,7 +456,7 @@ export default function ListaAtividadesEmAberto() {
       </div>
 
       {producaoSelecionada && (
-        <DialogFinalizarAtividade
+        <DialogLancamentosAtividade
           producao={producaoSelecionada}
           open={dialogAberto}
           onOpenChange={setDialogAberto}

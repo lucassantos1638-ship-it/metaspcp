@@ -168,14 +168,6 @@ export default function DialogFinalizarAtividade({
       return false;
     }
 
-    // A validação de quantidade só é necessária se o campo estiver visível
-    if (showQuantityInput && !semQuantidade) {
-      if (!quantidadeProduzida || parseInt(quantidadeProduzida) <= 0) {
-        setErro(isTerceirizado ? "A quantidade devolvida deve ser maior que zero" : "A quantidade produzida deve ser maior que zero");
-        return false;
-      }
-    }
-
     setErro("");
     return true;
   };
@@ -185,22 +177,11 @@ export default function DialogFinalizarAtividade({
 
     if (!validarDataHora()) return;
 
-    // Se estiver visível, usa o valor. Se for genérica ou pedido ou oculto, usa 1 (para constar produção) ou 0?
-    // Se for atividade genérica/pedido, não contabilizamos "unidades", então pode ser 1 para indicar "1 atividade feita".
+    // Como os lançamentos agora são feitos na tela anterior, na finalização a quantidade enviada na atividade em si é 0
     let qtd = 0;
-    if (showQuantityInput && !semQuantidade && quantidadeProduzida) {
-      qtd = parseInt(quantidadeProduzida);
-    } else if (isAtividadeGenerica || isPedido) {
-      qtd = 1;
-    }
-
-    // Se estiver no modo "Sem Quantidade", garantimos que é 0
-    if (semQuantidade) {
-      qtd = 0;
-    }
 
     if (isTerceirizado) {
-      const devolvidaTotal = (producao.quantidade_devolvida || 0) + qtd;
+      const devolvidaTotal = producao.quantidade_devolvida || 0;
       const enviada = producao.quantidade_enviada || 0;
       const isFinalizado = devolvidaTotal >= enviada;
 
@@ -210,7 +191,7 @@ export default function DialogFinalizarAtividade({
           data_fim: isFinalizado ? dataFim : null,
           hora_fim: isFinalizado ? horaFim : null,
           segundos_fim: isFinalizado ? parseInt(segundosFim) : null,
-          quantidade_produzida: devolvidaTotal, // Preenchemos igual p/ controle
+          quantidade_produzida: devolvidaTotal,
           quantidade_devolvida: devolvidaTotal,
           observacao: observacao || undefined,
           status: isFinalizado ? "finalizado" : "em_aberto",
@@ -223,55 +204,61 @@ export default function DialogFinalizarAtividade({
         }
       );
     } else {
-      // A atualização do lote e a propagação para etapas anteriores (backfill)
-      // O trigger do banco pode não ter sido aplicado. Fazemos um fallback de segurança:
-      submitFinalizacao(qtd, precisaDefinirQuantidadeLote);
+      submitFinalizacao(precisaDefinirQuantidadeLote);
     }
   };
 
-  const submitFinalizacao = async (qtd: number, isLastSubetapa1: boolean = false) => {
-    if (isLastSubetapa1 && qtd > 0) {
-      console.log("EXECUTANDO FALLBACK NO FRONTEND PARA LOTE:", producao.lote_id, "QTD:", qtd);
-      try {
-        // Fallback garantido no frontend: Atualiza lote
-        const { error: errLote } = await supabase
-          .from("lotes")
-          .update({ quantidade_total: qtd })
-          .eq("id", producao.lote_id);
+  const submitFinalizacao = async (isLastSubetapa1: boolean = false) => {
+    let qtdParaLote = 0;
 
-        if (errLote) {
-          console.error("Erro RLS Lote:", errLote);
-          toast.error("Aviso: Sem permissão para atualizar quantidade total do Lote!");
+    if (isLastSubetapa1) {
+      try {
+        // Busca a soma de todos os lançamentos já feitos para este lote, etapa E SUBETAPA específica
+        let queryProds = supabase
+          .from("producoes")
+          .select("quantidade_produzida")
+          .eq("lote_id", producao.lote_id)
+          .eq("etapa_id", producao.etapa_id)
+          .eq("status", "finalizado");
+
+        if (producao.subetapa_id) {
+          queryProds = queryProds.eq("subetapa_id", producao.subetapa_id);
+        } else {
+          queryProds = queryProds.is("subetapa_id", null);
         }
 
-        // Fallback garantido no frontend: Propaga para subetapas anteriores que estão nulas
-        const { error: errProdNull } = await supabase
-          .from("producoes")
-          .update({ quantidade_produzida: qtd })
-          .eq("lote_id", producao.lote_id)
-          .eq("etapa_id", producao.etapa_id)
-          .is("quantidade_produzida", null);
+        const { data: prods } = await queryProds;
 
-        if (errProdNull) console.error("Erro RLS Producoes (Nulas):", errProdNull);
+        qtdParaLote = prods?.reduce((acc, curr) => acc + (curr.quantidade_produzida || 0), 0) || 0;
+        
+        console.log("QTD calculada dos parciais da subetapa para atualizar o lote:", qtdParaLote);
 
-        // Numa requisição separada para os zerados
-        const { error: errProdZero } = await supabase
-          .from("producoes")
-          .update({ quantidade_produzida: qtd })
-          .eq("lote_id", producao.lote_id)
-          .eq("etapa_id", producao.etapa_id)
-          .eq("quantidade_produzida", 0);
-
-        if (errProdZero) console.error("Erro RLS Producoes (Zero):", errProdZero);
-
-        console.log("Fallback executado (com ou sem erros).");
+        if (qtdParaLote > 0) {
+          const { error: errLote } = await supabase
+            .from("lotes")
+            .update({ quantidade_total: qtdParaLote })
+            .eq("id", producao.lote_id);
+            
+          if (errLote) console.error("Erro RLS Lote:", errLote);
+          
+          // Regra da Primeira Etapa: Preenche as subetapas anteriores que não tiveram quantidade lançada
+          const { error: errProdNull } = await supabase
+            .from("producoes")
+            .update({ quantidade_produzida: qtdParaLote })
+            .eq("lote_id", producao.lote_id)
+            .eq("etapa_id", producao.etapa_id)
+            .is("quantidade_produzida", null);
+            
+          const { error: errProdZero } = await supabase
+            .from("producoes")
+            .update({ quantidade_produzida: qtdParaLote })
+            .eq("lote_id", producao.lote_id)
+            .eq("etapa_id", producao.etapa_id)
+            .eq("quantidade_produzida", 0);
+        }
       } catch (err) {
         console.error("Erro fatal de fallback ao atualizar quantidades do lote:", err);
       }
-    } else {
-      console.log("Fallback NÃO executado. isLastSubetapa1:", isLastSubetapa1, "qtd:", qtd);
-      console.log("Detalhes para debug - isEtapa1:", producao?.etapa?.ordem === 1);
-      console.log("subetapasDaEtapa:", subetapasDaEtapa);
     }
 
     finalizarProducao.mutate(
@@ -280,7 +267,7 @@ export default function DialogFinalizarAtividade({
         data_fim: dataFim,
         hora_fim: horaFim,
         segundos_fim: parseInt(segundosFim),
-        quantidade_produzida: qtd,
+        quantidade_produzida: 0, // A quantidade real já foi lançada nos parciais
         observacao: observacao || undefined,
       },
       {
@@ -289,7 +276,7 @@ export default function DialogFinalizarAtividade({
         },
       }
     );
-  }
+  };
 
   const formatarData = (data: string) => {
     return new Date(data + "T00:00:00").toLocaleDateString("pt-BR");
@@ -418,43 +405,7 @@ export default function DialogFinalizarAtividade({
               </div>
             </div>
 
-            {showQuantityInput && (
-              <div className="space-y-4 md:col-span-2">
-                <div className="flex items-center space-x-2 border p-3 rounded-md bg-muted/20">
-                  <Switch
-                    id="sem-quantidade"
-                    checked={!semQuantidade}
-                    onCheckedChange={(c) => setSemQuantidade(!c)}
-                  />
-                  <div className="flex items-center gap-2">
-                    <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                    <Label htmlFor="sem-quantidade" className="font-medium cursor-pointer">
-                      Lançar Quantidade
-                    </Label>
-                  </div>
-                </div>
-
-                {!semQuantidade && (
-                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <Label htmlFor="quantidade">
-                      {isTerceirizado ? "Quantidade Devolvida *" : precisaDefinirQuantidadeLote ? "Quantidade Real do Lote *" : "Quantidade Produzida *"}
-                    </Label>
-                    <Input
-                      type="number"
-                      id="quantidade"
-                      value={quantidadeProduzida}
-                      onChange={(e) => setQuantidadeProduzida(e.target.value)}
-                      min="1"
-                      required={!semQuantidade}
-                      autoFocus
-                    />
-                    {precisaDefinirQuantidadeLote && (
-                      <p className="text-xs text-muted-foreground">Isso definirá a quantidade para as próximas etapas.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Input de quantidade removido pois é feito na aba de Lançamentos */}
 
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="observacao">Observação (opcional)</Label>
