@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Plus, Edit2, Check, X, Clock, Play } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   useLancarProducaoParcial,
   useHistoricoLancamentosLote,
@@ -41,6 +43,37 @@ export default function DialogLancamentosAtividade({
   const atualizarQuantidade = useAtualizarQuantidadeLancamento();
   const { data: historico, isLoading } = useHistoricoLancamentosLote(open ? producao : null);
 
+  // Determina se a etapa atual é a PRIMEIRA etapa do produto
+  const { data: isEtapa1 } = useQuery({
+    queryKey: ["is-primeira-etapa", producao?.etapa_id, producao?.lote?.produto_id],
+    enabled: !!producao?.lote?.produto_id && !!producao?.etapa_id && !producao.atividade_id && !producao.pedido_id && !producao.terceirizado,
+    queryFn: async () => {
+      const { data: roteiro } = await supabase
+        .from("produto_etapas")
+        .select("etapa_id")
+        .eq("produto_id", producao.lote.produto_id)
+        .order("ordem")
+        .limit(1);
+
+      if (roteiro && roteiro.length > 0) {
+        return roteiro[0].etapa_id === producao.etapa_id;
+      }
+
+      const { data: etapaGlobal } = await supabase
+        .from("etapas")
+        .select("id")
+        .eq("empresa_id", producao.empresa_id)
+        .order("ordem")
+        .limit(1);
+
+      if (etapaGlobal && etapaGlobal.length > 0) {
+        return etapaGlobal[0].id === producao.etapa_id;
+      }
+
+      return false;
+    }
+  });
+
   useEffect(() => {
     if (open) {
       setQuantidadeParcial("");
@@ -54,6 +87,8 @@ export default function DialogLancamentosAtividade({
   const isPedido = !!producao.pedido_id;
   const isAtividadeGenerica = !!producao.atividade_id;
   const temLote = !!producao.lote_id;
+  
+  const isPrimeiraEtapaOcultarParcial = isEtapa1 && !isTerceirizado && !isAtividadeGenerica && !isPedido;
 
   const handleSubmitLancamento = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,128 +175,139 @@ export default function DialogLancamentosAtividade({
              )}
           </div>
 
-          {exibirSaldo && (
-            <div className="flex gap-4 p-4 border rounded-lg bg-blue-50/50">
-              <div className="flex-1">
-                <span className="text-xs text-muted-foreground uppercase font-semibold">Total do Lote</span>
-                <p className="text-2xl font-bold text-blue-900">{totalLote}</p>
-              </div>
-              <div className="flex-1">
-                <span className="text-xs text-muted-foreground uppercase font-semibold">Produzido (Todos)</span>
-                <p className="text-2xl font-bold text-green-700">{totalEtapa}</p>
-              </div>
-              <div className="flex-1">
-                <span className="text-xs text-muted-foreground uppercase font-semibold">Saldo Restante</span>
-                <p className={`text-2xl font-bold ${saldoRestante > 0 ? "text-orange-600" : "text-gray-500"}`}>
-                  {saldoRestante}
-                </p>
-              </div>
-            </div>
-          )}
-          {!exibirSaldo && temLote && (
+          {isPrimeiraEtapaOcultarParcial ? (
              <Alert className="bg-blue-50 text-blue-800 border-blue-200">
                <AlertCircle className="h-4 w-4" />
                <AlertDescription>
-                 A quantidade total deste lote ainda não foi definida (será definida na última subetapa da Etapa 1 ao finalizar).
+                 Nesta etapa (Etapa 1), a quantidade do lote só será definida ao finalizar a última subetapa. Não são permitidos lançamentos parciais para evitar descontrole da quantidade do lote.
                </AlertDescription>
              </Alert>
-          )}
+          ) : (
+            <>
+              {exibirSaldo && (
+                <div className="flex gap-4 p-4 border rounded-lg bg-blue-50/50">
+                  <div className="flex-1">
+                    <span className="text-xs text-muted-foreground uppercase font-semibold">Total do Lote</span>
+                    <p className="text-2xl font-bold text-blue-900">{totalLote}</p>
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-xs text-muted-foreground uppercase font-semibold">Produzido (Todos)</span>
+                    <p className="text-2xl font-bold text-green-700">{totalEtapa}</p>
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-xs text-muted-foreground uppercase font-semibold">Saldo Restante</span>
+                    <p className={`text-2xl font-bold ${saldoRestante > 0 ? "text-orange-600" : "text-gray-500"}`}>
+                      {saldoRestante}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {!exibirSaldo && temLote && (
+                 <Alert className="bg-blue-50 text-blue-800 border-blue-200">
+                   <AlertCircle className="h-4 w-4" />
+                   <AlertDescription>
+                     A quantidade total deste lote ainda não foi definida (será definida na última subetapa da Etapa 1 ao finalizar).
+                   </AlertDescription>
+                 </Alert>
+              )}
 
-          <form onSubmit={handleSubmitLancamento} className="flex gap-3 items-end bg-card p-4 border rounded-lg shadow-sm">
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="quantidade_parcial">Informar Produção Parcial</Label>
-              <Input
-                id="quantidade_parcial"
-                type="number"
-                min="1"
-                placeholder="Ex: 15"
-                value={quantidadeParcial}
-                onChange={(e) => setQuantidadeParcial(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" disabled={lancarParcial.isPending} className="bg-green-600 hover:bg-green-700">
-              <Plus className="mr-2 h-4 w-4" />
-              {lancarParcial.isPending ? "Lançando..." : "Lançar"}
-            </Button>
-          </form>
+              <form onSubmit={handleSubmitLancamento} className="flex gap-3 items-end bg-card p-4 border rounded-lg shadow-sm">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="quantidade_parcial">Informar Produção Parcial</Label>
+                  <Input
+                    id="quantidade_parcial"
+                    type="number"
+                    min="1"
+                    placeholder="Ex: 15"
+                    value={quantidadeParcial}
+                    onChange={(e) => setQuantidadeParcial(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" disabled={lancarParcial.isPending} className="bg-green-600 hover:bg-green-700">
+                  <Plus className="mr-2 h-4 w-4" />
+                  {lancarParcial.isPending ? "Lançando..." : "Lançar"}
+                </Button>
+              </form>
 
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 mb-2 font-medium text-slate-800">
-              <Clock className="h-4 w-4" />
-              <span>Histórico desta Subetapa (Todos Colaboradores)</span>
-            </div>
-            {isLoading ? (
-              <p className="text-sm text-muted-foreground">Carregando histórico...</p>
-            ) : historico?.meusLancamentos.length === 0 ? (
-              <p className="text-sm text-muted-foreground bg-muted p-4 rounded-lg text-center">
-                Nenhum lançamento feito ainda.
-              </p>
-            ) : (
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="p-2 text-left font-medium">Data/Hora</th>
-                      <th className="p-2 text-left font-medium">Colaborador</th>
-                      <th className="p-2 text-center font-medium">Quantidade</th>
-                      <th className="p-2 text-right font-medium">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {historico?.meusLancamentos.map((lanc: any) => (
-                      <tr key={lanc.id} className="hover:bg-muted/50">
-                        <td className="p-2 text-muted-foreground">
-                          {formatarDataHora(lanc.data_fim, lanc.hora_fim, lanc.segundos_fim)}
-                        </td>
-                        <td className="p-2 text-muted-foreground">
-                          {lanc.colaborador?.nome || producao.colaborador?.nome || "Desconhecido"}
-                        </td>
-                        <td className="p-2 text-center font-mono">
-                          {editandoLancamentoId === lanc.id ? (
-                            <Input
-                              type="number"
-                              min="0"
-                              className="w-20 mx-auto h-8 text-center"
-                              value={quantidadeEditada}
-                              onChange={(e) => setQuantidadeEditada(e.target.value)}
-                              autoFocus
-                            />
-                          ) : (
-                            <Badge variant="outline" className="text-sm px-3">{lanc.quantidade_produzida}</Badge>
-                          )}
-                        </td>
-                        <td className="p-2 text-right">
-                          {editandoLancamentoId === lanc.id ? (
-                            <div className="flex justify-end gap-1">
-                              <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => handleSalvarEdicao(lanc.id)}>
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={() => setEditandoLancamentoId(null)}>
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8"
-                              onClick={() => {
-                                setEditandoLancamentoId(lanc.id);
-                                setQuantidadeEditada(lanc.quantidade_produzida?.toString() || "");
-                              }}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-2 font-medium text-slate-800">
+                  <Clock className="h-4 w-4" />
+                  <span>Histórico desta Subetapa (Todos Colaboradores)</span>
+                </div>
+                {isLoading ? (
+                  <p className="text-sm text-muted-foreground">Carregando histórico...</p>
+                ) : historico?.meusLancamentos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground bg-muted p-4 rounded-lg text-center">
+                    Nenhum lançamento feito ainda.
+                  </p>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="p-2 text-left font-medium">Data/Hora</th>
+                          <th className="p-2 text-left font-medium">Colaborador</th>
+                          <th className="p-2 text-center font-medium">Quantidade</th>
+                          <th className="p-2 text-right font-medium">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {historico?.meusLancamentos.map((lanc: any) => (
+                          <tr key={lanc.id} className="hover:bg-muted/50">
+                            <td className="p-2 text-muted-foreground">
+                              {formatarDataHora(lanc.data_fim, lanc.hora_fim, lanc.segundos_fim)}
+                            </td>
+                            <td className="p-2 text-muted-foreground">
+                              {lanc.colaborador?.nome || producao.colaborador?.nome || "Desconhecido"}
+                            </td>
+                            <td className="p-2 text-center font-mono">
+                              {editandoLancamentoId === lanc.id ? (
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  className="w-20 mx-auto h-8 text-center"
+                                  value={quantidadeEditada}
+                                  onChange={(e) => setQuantidadeEditada(e.target.value)}
+                                  autoFocus
+                                />
+                              ) : (
+                                <Badge variant="outline" className="text-sm px-3">{lanc.quantidade_produzida}</Badge>
+                              )}
+                            </td>
+                            <td className="p-2 text-right">
+                              {editandoLancamentoId === lanc.id ? (
+                                <div className="flex justify-end gap-1">
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => handleSalvarEdicao(lanc.id)}>
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={() => setEditandoLancamentoId(null)}>
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8"
+                                  onClick={() => {
+                                    setEditandoLancamentoId(lanc.id);
+                                    setQuantidadeEditada(lanc.quantidade_produzida?.toString() || "");
+                                  }}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
 
           <Separator />
           

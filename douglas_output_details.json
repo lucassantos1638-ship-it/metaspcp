@@ -1,0 +1,74 @@
+[
+  {
+    "id": "78f452ef-4776-4dc1-a7f4-851fd1c93c78",
+    "colaborador_id": "651f22c5-88e0-441c-a0c0-7006db760efc",
+    "colaborador_nome": "DOUGLAS DE ALMEIDA",
+    "colaborador_custo_hora": 10.51,
+    "colaborador_custo_extra": 17.86,
+    "lote_id": "f27708d9-bfc0-405b-83d3-ac3bdbe5ec84",
+    "etapa_id": "170566be-b6b4-4461-a154-2cc2e5cc5cdc",
+    "subetapa_id": "4653cf14-e89c-447e-84aa-fc08677265cc",
+    "atividade_id": null,
+    "quantidade_produzida": 741,
+    "data_inicio": "2026-03-04",
+    "hora_inicio": "08:23:00",
+    "data_fim": "2026-03-04",
+    "hora_fim": "10:35:00",
+    "created_at": "2026-03-04T12:42:33.041029+00:00",
+    "segundos_inicio": 0,
+    "segundos_fim": 0,
+    "observacao": null,
+    "empresa_id": "3c0cc958-b4e2-4d8c-973f-4e9a36e1c66b",
+    "status": "finalizado",
+    "terceirizado": false,
+    "entidade_id": null,
+    "servico_id": null,
+    "quantidade_enviada": null,
+    "quantidade_devolvida": 0,
+    "tempo_produtivo_minutos": 132,
+    "minutos_normais": 132,
+    "minutos_extras": 0,
+    "etapa": {
+      "nome": "CORTE"
+    },
+    "subetapa": {
+      "nome": "SEPARAR CORTE"
+    }
+  },
+  {
+    "id": "6243f99d-b92c-4298-a9ea-ff35005a8ca0",
+    "colaborador_id": "651f22c5-88e0-441c-a0c0-7006db760efc",
+    "colaborador_nome": "DOUGLAS DE ALMEIDA",
+    "colaborador_custo_hora": 10.51,
+    "colaborador_custo_extra": 17.86,
+    "lote_id": "f27708d9-bfc0-405b-83d3-ac3bdbe5ec84",
+    "etapa_id": "170566be-b6b4-4461-a154-2cc2e5cc5cdc",
+    "subetapa_id": "e452390d-ae27-40c7-83af-d88b15ecadcb",
+    "atividade_id": null,
+    "quantidade_produzida": 741,
+    "data_inicio": "2026-03-05",
+    "hora_inicio": "08:08:00",
+    "data_fim": "2026-03-05",
+    "hora_fim": "10:38:00",
+    "created_at": "2026-03-05T11:09:46.158651+00:00",
+    "segundos_inicio": 0,
+    "segundos_fim": 0,
+    "observacao": null,
+    "empresa_id": "3c0cc958-b4e2-4d8c-973f-4e9a36e1c66b",
+    "status": "finalizado",
+    "terceirizado": false,
+    "entidade_id": null,
+    "servico_id": null,
+    "quantidade_enviada": null,
+    "quantidade_devolvida": 0,
+    "tempo_produtivo_minutos": 150,
+    "minutos_normais": 150,
+    "minutos_extras": 0,
+    "etapa": {
+      "nome": "CORTE"
+    },
+    "subetapa": {
+      "nome": "TIRAR O CORTE DA MESA"
+    }
+  }
+]

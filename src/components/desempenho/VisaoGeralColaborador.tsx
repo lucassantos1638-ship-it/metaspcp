@@ -1,14 +1,16 @@
 import React, { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Clock, DollarSign, Package } from "lucide-react";
+import { Clock, DollarSign, Package, Pencil, Trash2 } from "lucide-react";
 import { format, getDaysInMonth, startOfMonth, endOfMonth, getDay, isSameDay, addDays, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatarMoeda, cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import DialogEditarRegistroProducao from "@/components/producao/DialogEditarRegistroProducao";
 
 // Função auxiliar
 const formatarTempo = (minutos: number) => {
@@ -29,6 +31,21 @@ export function VisaoGeralColaborador({ colaboradores, empresaId }: VisaoGeralCo
     const [mesAno, setMesAno] = useState<string>(format(new Date(), "yyyy-MM"));
     
     const [diaSelecionado, setDiaSelecionado] = useState<Date | null>(null);
+    const [editRegistro, setEditRegistro] = useState<any>(null);
+    const queryClient = useQueryClient();
+
+    const handleDeleteRegistro = async (registroId: string) => {
+        if (!window.confirm("Deseja realmente excluir este lançamento?")) return;
+        
+        const { error } = await supabase.from("producoes").delete().eq("id", registroId);
+        
+        if (error) {
+            toast.error("Erro ao excluir registro.");
+        } else {
+            toast.success("Registro excluído com sucesso!");
+            queryClient.invalidateQueries({ queryKey: ["producoes-visao-geral"] });
+        }
+    };
 
     const year = parseInt(mesAno.split("-")[0]);
     const month = parseInt(mesAno.split("-")[1]) - 1; // 0-indexed
@@ -296,7 +313,7 @@ export function VisaoGeralColaborador({ colaboradores, empresaId }: VisaoGeralCo
                              const titulo = prod.atividade ? (prod.atividade as any).nome : prod.pedido_id ? `Pedido ${(prod.pedido as any)?.numero || ''}` : `${prod.lote?.numero_lote || ''} - ${prod.etapa?.nome || ''}${subetapaStr}`;
                              
                              return (
-                                <div key={idx} className="relative pl-6 pb-6">
+                                <div key={idx} className="relative pl-6 pb-6 group">
                                     {/* Linha vertical */}
                                     {idx !== prodsModal.length - 1 && (
                                         <div className="absolute left-[7px] top-5 bottom-0 w-px bg-border"></div>
@@ -315,15 +332,27 @@ export function VisaoGeralColaborador({ colaboradores, empresaId }: VisaoGeralCo
                                             </div>
                                         </div>
                                         
-                                        <div className="mt-2 text-sm font-medium">
-                                            {titulo}
-                                        </div>
-                                        
-                                        {prod.quantidade_produzida > 0 && (
-                                            <div className="text-xs text-muted-foreground mt-2 font-medium bg-background inline-block px-2 py-1 rounded shadow-sm border border-border/50">
-                                                Quantidade: {prod.quantidade_produzida} un
+                                        <div className="flex justify-between items-end mt-2">
+                                            <div>
+                                                <div className="text-sm font-medium">
+                                                    {titulo}
+                                                </div>
+                                                
+                                                {prod.quantidade_produzida > 0 && (
+                                                    <div className="text-xs text-muted-foreground mt-2 font-medium bg-background inline-block px-2 py-1 rounded shadow-sm border border-border/50">
+                                                        Quantidade: {prod.quantidade_produzida} un
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 bg-background border shadow-sm hover:text-primary" onClick={() => setEditRegistro(prod)}>
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 bg-background border shadow-sm hover:text-destructive" onClick={() => handleDeleteRegistro(prod.id)}>
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                              )
@@ -331,6 +360,13 @@ export function VisaoGeralColaborador({ colaboradores, empresaId }: VisaoGeralCo
                     </div>
                 </DialogContent>
             </Dialog>
+
+            <DialogEditarRegistroProducao
+                registro={editRegistro}
+                produtoId={editRegistro?.lote?.produto_id || null}
+                open={!!editRegistro}
+                onOpenChange={(open) => !open && setEditRegistro(null)}
+            />
         </div>
     );
 }

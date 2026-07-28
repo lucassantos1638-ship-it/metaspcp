@@ -6,6 +6,7 @@ interface Producao {
   etapa: { nome: string; ordem: number };
   subetapa: { nome: string } | null;
 
+  colaborador_id?: string;
   colaborador_nome?: string;
   colaborador_custo_hora?: number;
   colaborador_custo_extra?: number;
@@ -202,7 +203,16 @@ export function agruparPorEtapa(
           minutos_normais: minutosNormais,
           minutos_extras: minutosExtras,
           data: prod.created_at || new Date().toISOString(),
-          status: prod.status || 'finalizado'
+          status: prod.status || 'finalizado',
+          colaborador_id: prod.colaborador_nome ? prod.colaborador_id || null : null,
+          subetapa_id: prod.subetapa_id || null,
+          etapa_id: prod.etapa_id || null,
+          data_inicio: (prod as any).data_inicio || null,
+          hora_inicio: (prod as any).hora_inicio || null,
+          segundos_inicio: (prod as any).segundos_inicio || 0,
+          data_fim: (prod as any).data_fim || null,
+          hora_fim: (prod as any).hora_fim || null,
+          segundos_fim: (prod as any).segundos_fim || 0,
         };
 
         if (colabIndex >= 0) {
