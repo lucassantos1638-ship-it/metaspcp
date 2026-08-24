@@ -28,6 +28,7 @@ interface Grupo {
     minutosExtras: number;
     custoNormal: number;
     custoExtra: number;
+    items?: any[];
 }
 
 interface DesempenhoRelatorioA4Props {
@@ -61,7 +62,57 @@ export default function DesempenhoRelatorioA4({
 
     const nomesColaboradores = colaboradorIds.length === 1
         ? colaboradores?.find(c => c.id === colaboradorIds[0])?.nome
-        : `${colaboradorIds.length} colaboradores selecionados`;
+        : `${colaboradorIds.length === 0 ? 'Todos os' : colaboradorIds.length} colaboradores selecionados`;
+
+    // Calcula resumo por colaborador para a tabela final
+    const resumoColaboradores = React.useMemo(() => {
+        const map = new Map<string, any>();
+        (grupos || []).forEach(grupo => {
+            if (!grupo.items) return;
+            grupo.items.forEach((item: any) => {
+                const cId = item.colaborador_id;
+                if (!cId) return;
+                
+                if (!map.has(cId)) {
+                    map.set(cId, {
+                        id: cId,
+                        nome: colaboradores?.find(c => c.id === cId)?.nome || 'Desconhecido',
+                        qtd: 0,
+                        tempo: 0,
+                        custo: 0,
+                        atividades: new Map<string, any>()
+                    });
+                }
+                const cData = map.get(cId);
+                const qtdItem = (item.quantidade_produzida || 0);
+                cData.qtd += qtdItem;
+                
+                const minN = item.minutos_normais || 0;
+                const minE = item.minutos_extras || 0;
+                cData.tempo += minN + minE;
+                
+                const ref = colaboradores?.find(c => c.id === cId);
+                const cHN = Number(ref?.custo_por_hora || 0);
+                const cHE = Number(ref?.custo_hora_extra || 0);
+                cData.custo += (minN / 60) * cHN + (minE / 60) * cHE;
+
+                // Salvar a atividade e quantidade
+                if (!cData.atividades.has(grupo.id)) {
+                    cData.atividades.set(grupo.id, {
+                        titulo: grupo.titulo,
+                        subtitulo: grupo.subtitulo,
+                        qtd: 0
+                    });
+                }
+                cData.atividades.get(grupo.id).qtd += qtdItem;
+            });
+        });
+        
+        return Array.from(map.values()).map(c => ({
+             ...c,
+             atividades: Array.from(c.atividades.values()).sort((a: any, b: any) => b.qtd - a.qtd)
+        })).sort((a, b) => b.qtd - a.qtd);
+    }, [grupos, colaboradores]);
 
     return (
         <ReportA4Layout title="Relatório de Desempenho" empresa={empresa}>
@@ -159,6 +210,61 @@ export default function DesempenhoRelatorioA4({
                     )}
                 </tbody>
             </table>
+
+            {colaboradorIds.length !== 1 && resumoColaboradores.length > 0 && (
+                <div className="mt-8 break-inside-avoid">
+                    <h3 className="text-lg font-bold text-gray-800 mb-3 border-b-2 border-gray-200 pb-1">Desempenho Individual por Colaborador</h3>
+                    <table className="w-full text-sm border-collapse border border-gray-300">
+                        <thead>
+                            <tr className="bg-gray-100 uppercase text-xs text-left">
+                                <th className="border border-gray-300 p-2">Colaborador</th>
+                                <th className="border border-gray-300 p-2 text-center">Quantidade Produzida</th>
+                                <th className="border border-gray-300 p-2 text-center">Tempo Total</th>
+                                <th className="border border-gray-300 p-2 text-center">Tempo Médio/Un</th>
+                                <th className="border border-gray-300 p-2 text-right">Custo Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {resumoColaboradores.map(c => {
+                                const tempUnit = c.qtd > 0 ? c.tempo / c.qtd : 0;
+                                return (
+                                    <React.Fragment key={c.id}>
+                                        <tr className="border-t-2 border-b border-gray-300 bg-gray-50/50">
+                                            <td className="p-2 border border-gray-300 font-bold text-gray-800">{c.nome}</td>
+                                            <td className="p-2 border border-gray-300 text-center font-bold">{Math.round(c.qtd)} un</td>
+                                            <td className="p-2 border border-gray-300 text-center font-semibold">{formatarTempo(c.tempo)}</td>
+                                            <td className="p-2 border border-gray-300 text-center font-semibold text-purple-700">
+                                                {(() => {
+                                                    const secTot = tempUnit * 60;
+                                                    if (isNaN(secTot) || !isFinite(secTot) || secTot === 0) return "-";
+                                                    const mx = Math.floor(secTot / 60);
+                                                    const sx = Math.round(secTot % 60);
+                                                    return `${mx}m ${sx}s`;
+                                                })()}
+                                            </td>
+                                            <td className="p-2 border border-gray-300 text-right text-green-700 font-bold">
+                                                {formatarMoeda(c.custo)}
+                                            </td>
+                                        </tr>
+                                        {c.atividades.map((ativ: any, idx: number) => (
+                                            <tr key={idx} className="border-b border-gray-200 text-gray-600 text-[13px] bg-white">
+                                                <td className="py-1 px-4 border border-gray-300">
+                                                    <span className="text-gray-400 mr-2">↳</span>
+                                                    {ativ.titulo} {ativ.subtitulo ? <span className="text-gray-400 ml-1">({ativ.subtitulo})</span> : ''}
+                                                </td>
+                                                <td className="py-1 px-2 border border-gray-300 text-center">{Math.round(ativ.qtd)} un</td>
+                                                <td className="py-1 px-2 border border-gray-300 text-center text-gray-300">-</td>
+                                                <td className="py-1 px-2 border border-gray-300 text-center text-gray-300">-</td>
+                                                <td className="py-1 px-2 border border-gray-300 text-right text-gray-300">-</td>
+                                            </tr>
+                                        ))}
+                                    </React.Fragment>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </ReportA4Layout>
     );
 }

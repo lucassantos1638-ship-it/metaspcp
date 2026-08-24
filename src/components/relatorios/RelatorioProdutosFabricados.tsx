@@ -150,9 +150,8 @@ const RelatorioProdutosFabricados = () => {
 
          const producoesDoLote = allProds.filter(p => p.lote_id === lote.id);
 
-         // Quantidade fabricada = soma TOTAL do que foi lançado na embalagem para este lote (ignorando o filtro de data para mostrar o valor total real do lote)
-         const todasEmbalagemDoLote = producoesDoLote.filter(p => p.subetapa_id === embalagemId);
-         const qtdFabricada = todasEmbalagemDoLote.reduce((s, p) => s + (Number(p.quantidade_produzida) || 0), 0);
+         // Quantidade fabricada = soma do que foi lançado na embalagem para este lote DENTRO DO PERÍODO SELECIONADO
+         const qtdFabricada = prodsDoLoteNoPeriodo.reduce((s, p) => s + (Number(p.quantidade_produzida) || 0), 0);
          
          if (qtdFabricada === 0) return;
 
@@ -233,7 +232,8 @@ const RelatorioProdutosFabricados = () => {
            tempoCorteLote,
            tempoCosturaLote,
            tempoAcabamentoLote,
-           ultimaData
+           ultimaData,
+           lancamentos: prodsDoLoteNoPeriodo
          });
       });
 
@@ -407,12 +407,20 @@ const RelatorioProdutosFabricados = () => {
                                     </div>
                                     
                                     <div className="flex flex-col mt-auto pt-2 border-t border-border/40">
-                                      {lote.ultimaData && lote.ultimaData !== "0000-00-00" && (
-                                        <span className="text-[10px] text-muted-foreground mb-1">
-                                          Fabricado em: {format(parseISO(lote.ultimaData), 'dd/MM/yyyy')}
-                                        </span>
+                                      {lote.lancamentos && lote.lancamentos.length > 0 && (
+                                        <div className="mb-2 max-h-[80px] overflow-y-auto pr-1 custom-scrollbar">
+                                          <span className="text-[10px] font-semibold text-muted-foreground block mb-1">Lançamentos no período:</span>
+                                          <div className="flex flex-col gap-1">
+                                            {lote.lancamentos.map((lanc: any, idx: number) => (
+                                              <div key={idx} className="flex justify-between items-center text-[10px] bg-muted/30 px-1 py-0.5 rounded">
+                                                <span>{lanc.data_fim ? format(parseISO(lanc.data_fim.split('T')[0]), 'dd/MM/yyyy') : 'Sem data'}</span>
+                                                <span className="font-semibold">{lanc.quantidade_produzida} un.</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
                                       )}
-                                      <div className="flex justify-between items-center mt-1">
+                                      <div className="flex justify-between items-center mt-1 pt-1 border-t border-border/20">
                                         <span className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
                                           <span>Cort: {formatarTempoProdutivo(lote.tempoCorteLote)}</span>
                                           <span>Cost: {formatarTempoProdutivo(lote.tempoCosturaLote)}</span>
