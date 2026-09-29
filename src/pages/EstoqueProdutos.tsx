@@ -27,6 +27,37 @@ export default function EstoqueProdutos() {
   const empresaId = useEmpresaId();
   const queryClient = useQueryClient();
   const [inventario, setInventario] = useState<EstoqueCor[]>([]);
+
+  useEffect(() => {
+    const migrateColors = async () => {
+      if (!empresaId) return;
+      const keys = Object.keys(localStorage).filter(k => k.startsWith('produto_cores_') && !k.includes('data'));
+      for (const k of keys) {
+        const prodId = k.replace('produto_cores_', '');
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(prodId)) continue;
+        const stored = localStorage.getItem(k);
+        if (stored) {
+          try {
+            const cores = JSON.parse(stored);
+            if (Array.isArray(cores) && cores.length > 0) {
+              const { data: existing } = await supabase.from('produto_cores').select('id').eq('produto_id', prodId);
+              if (!existing || existing.length === 0) {
+                const toInsert = cores.map((c) => ({
+                  produto_id: prodId,
+                  codigo: c.codigo || '',
+                  descricao: c.descricao,
+                  empresa_id: empresaId
+                }));
+                await supabase.from('produto_cores').insert(toInsert);
+              }
+            }
+          } catch(e){}
+        }
+      }
+    };
+    migrateColors();
+  }, [empresaId]);
+
   const [dataAtualizacao, setDataAtualizacao] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
