@@ -46,7 +46,7 @@ import AdicionarMaterialProdutoDialog from "@/components/produtos/AdicionarMater
 import AdicionarCorDialog from "@/components/produtos/AdicionarCorDialog";
 import FichaTecnicaPrint from "@/components/produtos/FichaTecnicaPrint";
 import { usePrintReport } from "@/hooks/usePrintReport";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface DetalhesProdutoProps {
