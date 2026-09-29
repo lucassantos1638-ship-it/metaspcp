@@ -47,7 +47,36 @@ export default function EstoqueProdutos() {
     }
   }, [empresaId]);
 
-const { data: produtos, isLoading } = useQuery({
+  useEffect(() => {
+      if (manualProdutoId) {
+          try {
+              const stored = localStorage.getItem(`produto_cores_${manualProdutoId}`);
+              let cores = stored ? JSON.parse(stored) : [];
+              if (!Array.isArray(cores)) cores = [];
+              
+              const coresDoInventario = inventario.filter(i => i.produtoId === manualProdutoId);
+              const initial: Record<string, string> = {};
+
+              if (cores.length === 0) {
+                  const inv = coresDoInventario.find(i => i.cor === "Única" || i.cor === "Sem cor definida");
+                  initial["Única"] = inv ? String(inv.quantidade) : "0";
+                  setManualProdutoCores([{ descricao: "Única" }]);
+              } else {
+                  cores.forEach((c: any) => {
+                      const inv = coresDoInventario.find(i => i.cor === c.descricao);
+                      initial[c.descricao] = inv ? String(inv.quantidade) : "0";
+                  });
+                  setManualProdutoCores(cores);
+              }
+              setManualCoresQtd(initial);
+          } catch(e) {}
+      } else {
+          setManualProdutoCores([]);
+          setManualCoresQtd({});
+      }
+  }, [manualProdutoId, inventario]);
+
+  const { data: produtos, isLoading } = useQuery({
     queryKey: ["produtos-estoque", empresaId],
     enabled: !!empresaId,
     queryFn: async () => {
@@ -91,37 +120,6 @@ const { data: produtos, isLoading } = useQuery({
     }
   });
 
-
-  useEffect(() => {
-      if (manualProdutoId) {
-          try {
-              const p = produtos?.find((prod: any) => prod.id === manualProdutoId);
-              let cores = p?.produto_cores || [];
-              if (!Array.isArray(cores)) cores = [];
-              
-              const coresDoInventario = inventario.filter(i => i.produtoId === manualProdutoId);
-              const initial: Record<string, string> = {};
-
-              if (cores.length === 0) {
-                  const inv = coresDoInventario.find(i => i.cor === "Única" || i.cor === "Sem cor definida");
-                  initial["Única"] = inv ? String(inv.quantidade) : "0";
-                  setManualProdutoCores([{ descricao: "Única" }]);
-              } else {
-                  cores.forEach((c: any) => {
-                      const inv = coresDoInventario.find(i => i.cor === c.descricao);
-                      initial[c.descricao] = inv ? String(inv.quantidade) : "0";
-                  });
-                  setManualProdutoCores(cores);
-              }
-              setManualCoresQtd(initial);
-          } catch(e) {}
-      } else {
-          setManualProdutoCores([]);
-          setManualCoresQtd({});
-      }
-  }, [manualProdutoId, inventario, produtos]);
-
-  
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
