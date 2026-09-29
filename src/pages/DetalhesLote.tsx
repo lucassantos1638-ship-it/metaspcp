@@ -19,7 +19,7 @@ import {
 import { useDetalhesLote } from "@/hooks/useDetalhesLote";
 import { formatarTempoProdutivo } from "@/lib/timeUtils";
 import { formatarCusto } from "@/lib/custoUtils";
-import { Package, Clock, Users, CheckCircle2, Loader2, DollarSign, Calculator, ArrowLeft, Droplet, Layers, Printer, ChevronDown, ChevronRight, Pencil, Trash2, Plus } from "lucide-react";
+import { Package, Clock, Users, CheckCircle2, Loader2, DollarSign, Calculator, ArrowLeft, Droplet, Layers, Printer, ChevronDown, ChevronRight, Pencil, Trash2, Plus, Download } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -38,6 +38,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePrintReport } from "@/hooks/usePrintReport";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
+import * as XLSX from "xlsx";
 
 export default function DetalhesLote() {
     const { id } = useParams();
@@ -158,6 +159,75 @@ export default function DetalhesLote() {
     const custoAgregadoTotal = custoMaoDeObraTotal + custoTerceirizadoTotal + custoMaterialTotal;
     const custoAgregadoUnit = custoUnitMaoDeObra + custoUnitTerceirizado + custoUnitMaterial;
 
+    const handleExportExcel = () => {
+        try {
+            // Lote Info
+            const wsInfo = XLSX.utils.json_to_sheet([
+                {
+                    "Número do Lote": lote.numero_lote,
+                    "Nome do Lote": lote.nome_lote,
+                    "Produto": lote.produto?.nome || "N/A",
+                    "SKU": lote.produto?.sku || "-",
+                    "Data Início": lote.data_inicio ? new Date(lote.data_inicio).toLocaleDateString('pt-BR') : (lote.created_at ? new Date(lote.created_at).toLocaleDateString('pt-BR') : '-'),
+                    "Data Fim": lote.data_conclusao ? new Date(lote.data_conclusao).toLocaleDateString('pt-BR') : 'Em andamento',
+                    "Status": lote.finalizado ? 'Finalizado' : 'Em Andamento',
+                    "Custo Total": formatarCusto(custoAgregadoTotal),
+                    "Custo Unitário": formatarCusto(custoAgregadoUnit),
+                    "Tempo Total": formatarTempoProdutivo(tempoTotal),
+                    "Tempo Unitário": formatarTempoProdutivo(tempoUnitarioGeral),
+                    "Custo M.O.": formatarCusto(custoMaoDeObraTotal),
+                    "Custo Terc.": formatarCusto(custoTerceirizadoTotal),
+                    "Custo Material": formatarCusto(custoMaterialTotal),
+                }
+            ]);
+
+            // Detalhamento por Etapa
+            const etapasParaExportar = (progressoPorEtapa || []).map(etapa => ({
+                "Etapa": etapa.etapa_nome || 'avulso',
+                "Subetapa": etapa.subetapa_nome || "Processo Geral",
+                "Terceirizado": etapa.is_terceirizado ? "Sim" : "Não",
+                "Qtd Produzida": etapa.quantidade_produzida,
+                "Qtd Total": etapa.quantidade_total,
+                "Tempo Normal": formatarTempoProdutivo(etapa.tempo_normal),
+                "Tempo Extra": formatarTempoProdutivo(etapa.tempo_extra),
+                "Tempo Total": formatarTempoProdutivo(etapa.tempo_total),
+                "Tempo Unitário": formatarTempoProdutivo(etapa.quantidade_produzida > 0 ? etapa.tempo_total / etapa.quantidade_produzida : 0),
+                "Custo Total": formatarCusto(etapa.custo_total),
+                "Custo Unitário": formatarCusto(etapa.quantidade_produzida > 0 ? etapa.custo_total / etapa.quantidade_produzida : 0),
+                "Qtd Colaboradores": etapa.colaboradores?.length || 0
+            }));
+            const wsEtapas = XLSX.utils.json_to_sheet(etapasParaExportar);
+
+            // Materiais
+            const materiaisParaExportar = (consumos || []).map(consumo => {
+                const custoUnit = consumo.material?.preco_custo || 0;
+                const custoTotal = (consumo.quantidade_real || 0) * custoUnit;
+                return {
+                    "Material": consumo.material?.nome || "Material sem nome",
+                    "Código": consumo.material?.codigo || "-",
+                    "Cor": consumo.cor?.nome || "Única / Padrão",
+                    "Qtd Real": consumo.quantidade_real,
+                    "Unidade": consumo.material?.unidade_medida || "-",
+                    "Custo Unitário": formatarCusto(custoUnit),
+                    "Custo Total": formatarCusto(custoTotal),
+                    "Custo Peca": formatarCusto(quantidadeParaCalculo > 0 ? custoTotal / quantidadeParaCalculo : 0)
+                };
+            });
+            const wsMateriais = XLSX.utils.json_to_sheet(materiaisParaExportar);
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, wsInfo, "Informações Gerais");
+            XLSX.utils.book_append_sheet(wb, wsEtapas, "Progresso por Etapa");
+            XLSX.utils.book_append_sheet(wb, wsMateriais, "Materiais");
+
+            XLSX.writeFile(wb, `Lote_${lote.numero_lote}_${lote.nome_lote}.xlsx`);
+            toast.success("Arquivo Excel gerado com sucesso!");
+        } catch (error) {
+            console.error(error);
+            toast.error("Erro ao gerar o arquivo Excel.");
+        }
+    };
+
 
     return (
         <>
@@ -175,6 +245,10 @@ export default function DetalhesLote() {
                     </div>
                     {lote.finalizado ? (
                         <div className="flex w-full md:w-auto mt-4 md:mt-0 gap-2">
+                            <Button variant="outline" onClick={handleExportExcel} className="border-0 shadow-sm print:hidden" title="Exportar para Excel">
+                                <Download className="mr-2 h-4 w-4" />
+                                Exportar
+                            </Button>
                             <Button variant="outline" onClick={triggerPrint} className="bg-primary text-white hover:bg-primary/90 hover:text-white border-0 shadow-sm print:hidden">
                                 <Printer className="mr-2 h-4 w-4" />
                                 Imprimir Relatório
@@ -204,6 +278,10 @@ export default function DetalhesLote() {
                         </div>
                     ) : (
                         <div className="flex w-full md:w-auto mt-4 md:mt-0 gap-2">
+                            <Button variant="outline" onClick={handleExportExcel} className="border-0 shadow-sm print:hidden" title="Exportar para Excel">
+                                <Download className="mr-2 h-4 w-4" />
+                                Exportar
+                            </Button>
                             <Button variant="outline" onClick={triggerPrint} className="bg-primary text-white hover:bg-primary/90 hover:text-white border-0 shadow-sm print:hidden">
                                 <Printer className="mr-2 h-4 w-4" />
                                 Imprimir Relatório

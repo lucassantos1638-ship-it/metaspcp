@@ -5,8 +5,19 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useMaterial, useAtualizarMaterial, useCriarCores, useExcluirCor } from "@/hooks/useMateriais";
-import { ArrowLeft, Loader2, Plus, Trash2, Save } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import * as XLSX from "xlsx";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { toast } from "@/hooks/use-toast";
+import { useRef } from "react";
 
 interface DetalhesMaterialProps {
     materialId: string;
@@ -23,6 +34,7 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
     const [formData, setFormData] = useState({
         nome: "",
         codigo: "",
+        grupo: "",
         preco_custo: 0,
         unidade_medida: "",
         fator_conversao_pacote: 1,
@@ -32,6 +44,10 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
     });
 
     const [novoNomeCor, setNovoNomeCor] = useState("");
+    const [novoCodigoCor, setNovoCodigoCor] = useState("");
+    
+    const [isUploadOpen, setIsUploadOpen] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Load initial data into form when entering edit mode or when data loads
     const handleEditClick = () => {
@@ -39,6 +55,7 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
             setFormData({
                 nome: material.nome,
                 codigo: material.codigo || "",
+                grupo: material.grupo || "",
                 preco_custo: material.preco_custo || 0,
                 unidade_medida: material.unidade_medida || "",
                 fator_conversao_pacote: material.fator_conversao_pacote || 1,
@@ -66,14 +83,16 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
         e.preventDefault();
         if (!novoNomeCor) return;
 
-        // Split by comma and cleanup whitespace
+        // Adiciona uma única cor por vez quando o código é usado, 
+        // ou continua permitindo vírgula se não usar código
         const nomes = novoNomeCor.split(",").map(n => n.trim()).filter(n => n.length > 0);
 
         if (nomes.length === 0) return;
 
-        const novasCores = nomes.map(nome => ({
+        const novasCores = nomes.map((nome, idx) => ({
             material_id: materialId,
             nome,
+            codigo: idx === 0 && nomes.length === 1 ? novoCodigoCor.trim() || null : null,
             hex: "#000000" // Default dummy hex
         }));
 
@@ -82,9 +101,80 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
             {
                 onSuccess: () => {
                     setNovoNomeCor("");
+                    setNovoCodigoCor("");
                 },
             }
         );
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const arrayBuffer = evt.target?.result as ArrayBuffer;
+                const wb = XLSX.read(arrayBuffer, { type: 'array' });
+                const wsname = wb.SheetNames[0];
+                const ws = wb.Sheets[wsname];
+                
+                // Converte para JSON
+                const data = XLSX.utils.sheet_to_json(ws);
+                
+                if (data.length === 0) {
+                    toast({ title: "Planilha vazia", variant: "destructive" });
+                    return;
+                }
+
+                // Espera as colunas 'Código' e 'Cor' (ignora maiúsculas/minúsculas e acentos)
+                const novasCores = data.map((row: any) => {
+                    let nome = null;
+                    let codigo = null;
+                    
+                    for (const key of Object.keys(row)) {
+                        const normalizedKey = key.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        
+                        if (normalizedKey === 'cor' || normalizedKey === 'nome') {
+                            nome = row[key];
+                        }
+                        if (normalizedKey === 'codigo') {
+                            codigo = row[key];
+                        }
+                    }
+                    
+                    if (!nome) return null;
+
+                    return {
+                        material_id: materialId,
+                        nome: String(nome).trim(),
+                        codigo: codigo ? String(codigo).trim() : null,
+                        hex: "#000000"
+                    };
+                }).filter(Boolean) as { material_id: string; nome: string; codigo: string | null; hex: string }[];
+
+                if (novasCores.length === 0) {
+                    toast({ 
+                        title: "Formato inválido", 
+                        description: "A planilha precisa ter a coluna 'Cor'. Verifique se o nome da coluna está correto.",
+                        variant: "destructive" 
+                    });
+                    return;
+                }
+
+                criarCores(novasCores, {
+                    onSuccess: () => {
+                        setIsUploadOpen(false);
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                    }
+                });
+
+            } catch (error) {
+                console.error("Erro ao ler planilha:", error);
+                toast({ title: "Erro ao ler a planilha", variant: "destructive" });
+            }
+        };
+        reader.readAsArrayBuffer(file);
     };
 
     if (isLoading) {
@@ -139,6 +229,14 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
                                     <Input
                                         value={formData.nome}
                                         onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2 col-span-1">
+                                    <Label>Grupo</Label>
+                                    <Input
+                                        value={formData.grupo}
+                                        onChange={(e) => setFormData({ ...formData, grupo: e.target.value })}
+                                        placeholder="Ex: Malha"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -212,6 +310,10 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
                                     <span className="font-medium">{material.nome}</span>
                                 </div>
                                 <div>
+                                    <span className="text-muted-foreground block">Grupo</span>
+                                    <span className="font-medium">{material.grupo || "-"}</span>
+                                </div>
+                                <div>
                                     <span className="text-muted-foreground block">Preço de Custo</span>
                                     <span className="font-medium">R$ {(material.preco_custo || 0).toFixed(2)}</span>
                                 </div>
@@ -247,14 +349,54 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
             </Card>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                     <CardTitle className="text-base font-semibold">Cores Disponíveis</CardTitle>
+                    
+                    <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <Upload className="h-4 w-4 mr-2" />
+                                Importar Excel
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Importar Cores via Planilha</DialogTitle>
+                                <DialogDescription>
+                                    Para que a importação funcione corretamente, a sua planilha Excel (.xlsx) deve conter a coluna <strong>Cor</strong>. 
+                                    <br /><br />
+                                    Você também pode incluir a coluna <strong>Código</strong>, caso as cores possuam um.
+                                    <br /><br />
+                                    <strong>Exemplo de cabeçalho (primeira linha):</strong>
+                                    <br />
+                                    <span className="font-mono bg-muted p-1 rounded text-xs mt-2 inline-block">Código | Cor</span>
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg mt-4">
+                                <input
+                                    type="file"
+                                    accept=".xlsx, .xls, .csv"
+                                    className="hidden"
+                                    ref={fileInputRef}
+                                    onChange={handleFileUpload}
+                                />
+                                <Button 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isCreatingCores}
+                                >
+                                    {isCreatingCores ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                                    Selecionar Arquivo
+                                </Button>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-[120px]">Código</TableHead>
                                     <TableHead>Cor</TableHead>
                                     <TableHead className="w-[100px] text-right">Ações</TableHead>
                                 </TableRow>
@@ -269,6 +411,7 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
                                 ) : (
                                     material.cores.map((cor) => (
                                         <TableRow key={cor.id}>
+                                            <TableCell className="font-mono text-sm">{cor.codigo || "-"}</TableCell>
                                             <TableCell className="font-medium">{cor.nome}</TableCell>
                                             <TableCell className="text-right">
                                                 <Button
@@ -287,19 +430,28 @@ export default function DetalhesMaterial({ materialId, onVoltar }: DetalhesMater
                             </TableBody>
                         </Table>
 
-                        <form onSubmit={handleAddCor} className="flex gap-4 items-end border-t pt-4">
+                        <form onSubmit={handleAddCor} className="flex gap-4 items-start border-t pt-4">
+                            <div className="grid gap-2 w-[150px]">
+                                <Label htmlFor="codigoCor">Código (Opcional)</Label>
+                                <Input
+                                    id="codigoCor"
+                                    placeholder="Ex: 050010"
+                                    value={novoCodigoCor}
+                                    onChange={(e) => setNovoCodigoCor(e.target.value)}
+                                />
+                            </div>
                             <div className="grid gap-2 flex-1">
-                                <Label htmlFor="nomeCor">Novas Cores</Label>
+                                <Label htmlFor="nomeCor">Nome da Cor</Label>
                                 <Input
                                     id="nomeCor"
-                                    placeholder="Digite as cores separadas por vírgula (Ex: Azu, Vermelho, Verde)"
+                                    placeholder="Digite a cor (Ex: Azul Piscina)"
                                     value={novoNomeCor}
                                     onChange={(e) => setNovoNomeCor(e.target.value)}
                                     required
                                 />
-                                <p className="text-xs text-muted-foreground">Separe por vírgula para adicionar várias de uma vez.</p>
+                                <p className="text-xs text-muted-foreground">Separe por vírgula para adicionar várias cores sem código.</p>
                             </div>
-                            <Button type="submit" disabled={isCreatingCores}>
+                            <Button type="submit" disabled={isCreatingCores} className="mt-6">
                                 {isCreatingCores ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
                                 Adicionar
                             </Button>

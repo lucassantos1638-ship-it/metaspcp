@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Package, AlertTriangle, Trash2, Settings2, Pencil, Plus, Trash, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 import { useProdutoComMetricas, useToggleAtivoProduto, useExcluirProduto, useRemoverMaterialProduto } from "@/hooks/useProdutos";
+import * as XLSX from "xlsx";
+import { toast } from "sonner";
+import { useRef } from "react";
+import { Upload } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +43,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recha
 import EditarEtapasProdutoDialog from "@/components/produtos/EditarEtapasProdutoDialog";
 import EditarProdutoDialog from "@/components/produtos/EditarProdutoDialog";
 import AdicionarMaterialProdutoDialog from "@/components/produtos/AdicionarMaterialProdutoDialog";
+import AdicionarCorDialog from "@/components/produtos/AdicionarCorDialog";
 import FichaTecnicaPrint from "@/components/produtos/FichaTecnicaPrint";
 import { usePrintReport } from "@/hooks/usePrintReport";
 
@@ -53,7 +66,98 @@ export default function DetalhesProduto({
   const [dialogEtapasOpen, setDialogEtapasOpen] = useState(false);
   const [dialogPrecosOpen, setDialogPrecosOpen] = useState(false);
   const [dialogMateriaisOpen, setDialogMateriaisOpen] = useState(false);
+  const [dialogCoresOpen, setDialogCoresOpen] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [cores, setCores] = useState<any[]>([]);
   const { isPrinting, triggerPrint } = usePrintReport();
+
+  const carregarCores = () => {
+    try {
+      const storageKey = `produto_cores_${produtoId}`;
+      const saved = localStorage.getItem(storageKey);
+      if (saved) setCores(JSON.parse(saved));
+      else setCores([]);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    carregarCores();
+  }, [produtoId]);
+
+  const handleRemoverCor = (id: string) => {
+    const novasCores = cores.filter(c => c.id !== id);
+    localStorage.setItem(`produto_cores_${produtoId}`, JSON.stringify(novasCores));
+    setCores(novasCores);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+          try {
+              const arrayBuffer = evt.target?.result as ArrayBuffer;
+              const wb = XLSX.read(arrayBuffer, { type: 'array' });
+              const wsname = wb.SheetNames[0];
+              const ws = wb.Sheets[wsname];
+              
+              const data = XLSX.utils.sheet_to_json(ws);
+              
+              if (data.length === 0) {
+                  toast.error("Planilha vazia");
+                  return;
+              }
+
+              const novasCores = data.map((row: any) => {
+                  let descricao = null;
+                  let codigo = null;
+                  
+                  for (const key of Object.keys(row)) {
+                      const normalizedKey = key.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                      
+                      if (normalizedKey === 'cor' || normalizedKey === 'nome' || normalizedKey === 'descricao') {
+                          descricao = row[key];
+                      }
+                      if (normalizedKey === 'codigo') {
+                          codigo = row[key];
+                      }
+                  }
+                  
+                  if (!descricao) return null;
+
+                  return {
+                      id: crypto.randomUUID(),
+                      descricao: String(descricao).trim(),
+                      codigo: codigo ? String(codigo).trim() : null,
+                  };
+              }).filter(Boolean) as { id: string; descricao: string; codigo: string | null; }[];
+
+              if (novasCores.length === 0) {
+                  toast.error("Formato inválido. A planilha precisa ter a coluna 'Cor'.");
+                  return;
+              }
+
+              const existingCores = [...cores];
+              const updatedCores = [...existingCores, ...novasCores];
+              
+              localStorage.setItem(`produto_cores_${produtoId}`, JSON.stringify(updatedCores));
+              setCores(updatedCores);
+
+              setIsUploadOpen(false);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+              toast.success(`${novasCores.length} cores importadas com sucesso!`);
+
+          } catch (error) {
+              console.error("Erro ao ler planilha:", error);
+              toast.error("Erro ao ler a planilha");
+          }
+      };
+      reader.readAsArrayBuffer(file);
+  };
 
   const handleExcluir = () => {
     excluirProduto.mutate(produtoId, {
@@ -221,7 +325,93 @@ export default function DetalhesProduto({
           </CardHeader>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Composição de Cores */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xl font-bold">Composição de Cores</CardTitle>
+              <div className="flex gap-2">
+                <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                            <Upload className="h-4 w-4 mr-2" />
+                            Importar Excel
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Importar Cores via Planilha</DialogTitle>
+                            <DialogDescription>
+                                A sua planilha Excel deve conter a coluna <strong>Cor</strong>. 
+                                <br /><br />
+                                Você pode incluir a coluna <strong>Código</strong>, caso as cores possuam.
+                                <br /><br />
+                                <strong>Exemplo:</strong>
+                                <br />
+                                <span className="font-mono bg-muted p-1 rounded text-xs mt-2 inline-block">Código | Cor</span>
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg mt-4">
+                            <input
+                                type="file"
+                                accept=".xlsx, .xls, .csv"
+                                className="hidden"
+                                ref={fileInputRef}
+                                onChange={handleFileUpload}
+                            />
+                            <Button onClick={() => fileInputRef.current?.click()}>
+                                <Upload className="h-4 w-4 mr-2" />
+                                Selecionar Arquivo
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+                <Button variant="outline" size="sm" onClick={() => setDialogCoresOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nova Cor
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {cores.length > 0 ? (
+                <div className="max-h-[190px] overflow-y-auto border-t">
+                  <Table>
+                    <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
+                      <TableRow>
+                        <TableHead className="text-[10px] py-1 h-8">Código</TableHead>
+                        <TableHead className="text-[10px] py-1 h-8">Cor</TableHead>
+                        <TableHead className="w-[40px] py-1 h-8"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {cores.map((c) => (
+                        <TableRow key={c.id}>
+                          <TableCell className="font-mono text-[10px] py-1">{c.codigo || "-"}</TableCell>
+                          <TableCell className="font-medium text-[10px] py-1">{c.descricao}</TableCell>
+                          <TableCell className="py-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => handleRemoverCor(c.id)}
+                            >
+                              <Trash className="h-3 w-3" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground border-t">
+                  <div className="mx-auto mb-2 opacity-20 w-10 h-10 border-2 rounded-full" />
+                  <p className="text-[10px]">Nenhuma cor cadastrada</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Composição de Materiais */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -231,59 +421,61 @@ export default function DetalhesProduto({
                 Adicionar Material
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {materiais?.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Material</TableHead>
-                      <TableHead className="text-right">Qtd</TableHead>
-                      <TableHead className="text-right">Custo Un.</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="w-[50px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {materiais.map((item: any) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex flex-col">
-                            <span>{item.material?.nome}</span>
-                            <span className="text-[10px] text-muted-foreground">{item.material?.codigo}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {Number(item.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.material?.unidade_medida}
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          {formatarCusto(item.material?.preco_custo || 0)}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatarCusto((item.material?.preco_custo || 0) * item.quantidade)}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => removerMaterial.mutate({ id: item.id, produtoId })}
-                          >
-                            <Trash className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
+                <div className="max-h-[190px] overflow-y-auto border-t">
+                  <Table>
+                    <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
+                      <TableRow>
+                        <TableHead className="text-[10px] py-1 h-8">Material</TableHead>
+                        <TableHead className="text-[10px] py-1 h-8 text-right">Qtd</TableHead>
+                        <TableHead className="text-[10px] py-1 h-8 text-right">Custo Un.</TableHead>
+                        <TableHead className="text-[10px] py-1 h-8 text-right">Total</TableHead>
+                        <TableHead className="w-[40px] py-1 h-8"></TableHead>
                       </TableRow>
-                    ))}
-                    <TableRow className="bg-muted/50 font-bold">
-                      <TableCell colSpan={3} className="text-right">Total Materiais:</TableCell>
-                      <TableCell className="text-right">{formatarCusto(custoMat)}</TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {materiais.map((item: any) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium text-[10px] py-1">
+                            <div className="flex flex-col">
+                              <span>{item.material?.nome}</span>
+                              <span className="text-[9px] text-muted-foreground">{item.material?.codigo}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-[10px] py-1">
+                            {Number(item.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.material?.unidade_medida}
+                          </TableCell>
+                          <TableCell className="text-right text-[10px] py-1 text-muted-foreground">
+                            {formatarCusto(item.material?.preco_custo || 0)}
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-[10px] py-1">
+                            {formatarCusto((item.material?.preco_custo || 0) * item.quantidade)}
+                          </TableCell>
+                          <TableCell className="py-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => removerMaterial.mutate({ id: item.id, produtoId })}
+                            >
+                              <Trash className="h-3 w-3" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="bg-muted/30 font-bold sticky bottom-0 z-10 shadow-[0_-2px_4px_rgba(0,0,0,0.05)] border-t border-border">
+                        <TableCell colSpan={3} className="text-right text-[10px] py-1">Total Materiais:</TableCell>
+                        <TableCell className="text-right text-[10px] py-1">{formatarCusto(custoMat)}</TableCell>
+                        <TableCell className="py-1"></TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
               ) : (
-                <div className="text-center py-6 text-muted-foreground">
+                <div className="text-center py-6 text-muted-foreground border-t">
                   <Package className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                  <p className="text-sm">Nenhum material vinculado</p>
+                  <p className="text-[10px]">Nenhum material vinculado</p>
                 </div>
               )}
             </CardContent>
@@ -298,38 +490,40 @@ export default function DetalhesProduto({
                 Configurar Etapas
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {etapas.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">Ord</TableHead>
-                      <TableHead>Etapa</TableHead>
-                      <TableHead>Subetapa</TableHead>
-                      <TableHead className="text-center">Obrig.</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {etapas.map((e: any) => (
-                      <TableRow key={e.id}>
-                        <TableCell className="font-medium">{e.ordem}</TableCell>
-                        <TableCell>{e.etapa?.nome}</TableCell>
-                        <TableCell>{e.subetapa?.nome || "-"}</TableCell>
-                        <TableCell className="text-center">
-                          {e.obrigatoria ? (
-                            <Badge variant="default" className="text-[10px] px-1 h-5">Sim</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[10px] px-1 h-5">Não</Badge>
-                          )}
-                        </TableCell>
+                <div className="max-h-[190px] overflow-y-auto border-t">
+                  <Table>
+                    <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
+                      <TableRow>
+                        <TableHead className="text-[10px] py-1 h-8 w-12">Ord</TableHead>
+                        <TableHead className="text-[10px] py-1 h-8">Etapa</TableHead>
+                        <TableHead className="text-[10px] py-1 h-8">Subetapa</TableHead>
+                        <TableHead className="text-[10px] py-1 h-8 text-center">Obrig.</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {etapas.map((e: any) => (
+                        <TableRow key={e.id}>
+                          <TableCell className="font-medium text-[10px] py-1">{e.ordem}</TableCell>
+                          <TableCell className="text-[10px] py-1">{e.etapa?.nome}</TableCell>
+                          <TableCell className="text-[10px] py-1">{e.subetapa?.nome || "-"}</TableCell>
+                          <TableCell className="text-center py-1">
+                            {e.obrigatoria ? (
+                              <Badge variant="default" className="text-[9px] px-1 h-4">Sim</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[9px] px-1 h-4">Não</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               ) : (
-                <div className="text-center py-6 text-muted-foreground">
+                <div className="text-center py-6 text-muted-foreground border-t">
                   <Settings2 className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                  <p className="text-sm">Nenhuma etapa cadastrada</p>
+                  <p className="text-[10px]">Nenhuma etapa cadastrada</p>
                 </div>
               )}
             </CardContent>
@@ -558,6 +752,13 @@ export default function DetalhesProduto({
           open={dialogMateriaisOpen}
           onOpenChange={setDialogMateriaisOpen}
           produtoId={produtoId}
+        />
+
+        <AdicionarCorDialog 
+          open={dialogCoresOpen}
+          onOpenChange={setDialogCoresOpen}
+          produtoId={produtoId}
+          onCorAdicionada={carregarCores}
         />
       </div>
 

@@ -11,8 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Package, Search, Pencil, FileSpreadsheet } from "lucide-react";
-import { useProdutos, useToggleAtivoProduto } from "@/hooks/useProdutos";
+import { Plus, Package, Search, Pencil, FileSpreadsheet, Copy } from "lucide-react";
+import { useProdutos, useToggleAtivoProduto, useDuplicarProduto } from "@/hooks/useProdutos";
 import CadastroProdutoDialog from "@/components/produtos/CadastroProdutoDialog";
 import ImportarProdutosDialog from "@/components/produtos/ImportarProdutosDialog";
 import DetalhesProduto from "@/components/produtos/DetalhesProduto";
@@ -26,6 +26,7 @@ export default function Produtos() {
 
   const { data: produtos, isLoading } = useProdutos();
   const toggleAtivo = useToggleAtivoProduto();
+  const duplicarProduto = useDuplicarProduto();
 
   const produtosFiltrados = produtos?.filter((p) => {
     const matchBusca =
@@ -53,8 +54,15 @@ export default function Produtos() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Produtos</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight flex items-center">
+            Produtos
+            {produtos && (
+              <Badge variant="secondary" className="ml-3 bg-blue-100 text-blue-700 hover:bg-blue-100/80">
+                {produtos.length} {produtos.length === 1 ? 'cadastrado' : 'cadastrados'}
+              </Badge>
+            )}
+          </h1>
+          <p className="text-muted-foreground mt-1">
             Gerencie itens e configurações de produção
           </p>
         </div>
@@ -138,6 +146,21 @@ export default function Produtos() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            duplicarProduto.mutate(produto.id, {
+                              onSuccess: (newId) => setProdutoSelecionado(newId)
+                            });
+                          }}
+                          title="Duplicar Produto"
+                          disabled={duplicarProduto.isPending}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-8 w-8 text-primary hover:text-primary/80"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -178,7 +201,22 @@ export default function Produtos() {
                     </Badge>
                   </div>
 
-                  <div className="flex justify-end pt-2 border-t mt-2">
+                  <div className="flex justify-end gap-2 pt-2 border-t mt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-muted-foreground hover:text-primary text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicarProduto.mutate(produto.id, {
+                            onSuccess: (newId) => setProdutoSelecionado(newId)
+                        });
+                      }}
+                      disabled={duplicarProduto.isPending}
+                    >
+                      <Copy className="h-3 w-3 mr-1.5" />
+                      Duplicar
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"

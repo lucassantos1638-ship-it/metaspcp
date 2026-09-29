@@ -79,6 +79,7 @@ export default function Materiais() {
                             <TableRow>
                                 <TableHead>Código</TableHead>
                                 <TableHead>Nome</TableHead>
+                                <TableHead>Grupo</TableHead>
                                 <TableHead>Unidade</TableHead>
                                 <TableHead>Custo</TableHead>
                                 <TableHead>Status</TableHead>
@@ -94,6 +95,13 @@ export default function Materiais() {
                                 >
                                     <TableCell className="font-mono text-xs text-muted-foreground py-2">{material.codigo || "-"}</TableCell>
                                     <TableCell className="font-medium py-2">{material.nome}</TableCell>
+                                    <TableCell className="py-2">
+                                        {material.grupo ? (
+                                            <Badge variant="outline" className="text-xs bg-slate-50">{material.grupo}</Badge>
+                                        ) : (
+                                            <span className="text-muted-foreground">-</span>
+                                        )}
+                                    </TableCell>
                                     <TableCell className="py-2">{material.unidade_medida}</TableCell>
                                     <TableCell className="py-2">R$ {material.preco_custo.toFixed(2)}</TableCell>
                                     <TableCell className="py-2">

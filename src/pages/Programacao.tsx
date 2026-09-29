@@ -29,6 +29,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProgramacaoMalha } from "@/components/programacao/ProgramacaoMalha";
 
 export default function Programacao() {
     const [open, setOpen] = useState(false);
@@ -97,6 +99,14 @@ export default function Programacao() {
                     </Button>
                 </div>
             </div>
+
+            <Tabs defaultValue="materiais" className="space-y-4">
+                <TabsList>
+                    <TabsTrigger value="materiais">Necessidade de Materiais</TabsTrigger>
+                    <TabsTrigger value="malha">Programação de Malha</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="materiais" className="space-y-6">
 
             <Card>
                 <CardHeader>
@@ -265,6 +275,12 @@ export default function Programacao() {
                     </CardContent>
                 </Card>
             )}
+            </TabsContent>
+
+            <TabsContent value="malha" className="space-y-6">
+                <ProgramacaoMalha />
+            </TabsContent>
+        </Tabs>
 
             {/* Print Styles */}
             <style>{`

@@ -12,6 +12,7 @@ export interface Material {
     estoque_tingimento: number;
     estoque_fabrica: number;
     unidade_medida: string;
+    grupo?: string;
 
     // Conversion fields
     tem_conversao_pacote: boolean;
@@ -27,6 +28,7 @@ export interface MaterialCor {
     id: string;
     material_id: string;
     nome: string;
+    codigo: string | null;
     hex: string | null;
     empresa_id: string;
     created_at: string;
@@ -104,6 +106,7 @@ export function useCriarMaterial() {
             estoque_estamparia?: number;
             estoque_tingimento?: number;
             estoque_fabrica?: number;
+            grupo?: string;
             tem_conversao_pacote?: boolean;
             fator_conversao_pacote?: number;
         }) => {
@@ -196,7 +199,7 @@ export function useCriarCores() {
     const empresaId = useEmpresaId();
 
     return useMutation({
-        mutationFn: async (novasCores: { material_id: string; nome: string; hex?: string }[]) => {
+        mutationFn: async (novasCores: { material_id: string; nome: string; codigo?: string | null; hex?: string }[]) => {
             if (!empresaId) throw new Error("Empresa não identificada");
 
             const coresComEmpresa = novasCores.map(cor => ({

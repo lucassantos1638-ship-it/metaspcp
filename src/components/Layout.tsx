@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { TrialBanner } from "@/components/TrialBanner";
 import logoMetaPCP from '@/assets/logo-metapcp.png';
+import { ChatAssistente } from "./chat/ChatAssistente";
 
 const Layout = () => {
   const location = useLocation();
@@ -56,11 +57,34 @@ const Layout = () => {
       title: "PROGRAMAÇÃO",
       icon: CalendarDays,
       items: [
-        { path: "/pedidos", icon: ClipboardCheck, label: "Pedidos", permission: "pedidos" },
-        { path: "/projecao-vendas", icon: Activity, label: "Projeção de Vendas", permission: "prog_vendas" },
-        { path: "/vendas-perdidas", icon: TrendingDown, label: "Vendas Perdidas", permission: "prog_vendas" },
-        { path: "/programacao", icon: Calendar, label: "Programação", permission: "programacao" },
-        { path: "/previsao-producao", icon: Calculator, label: "Previsão", permission: "previsao_producao" },
+        {
+          label: "Pedidos", 
+          icon: ClipboardCheck, 
+          permission: "pedidos",
+          subItems: [
+            { path: "/pedidos", label: "Lista de Pedidos" },
+            { path: "/pedidos-relatorios", label: "Relatórios" }
+          ]
+        },
+        {
+          label: "Estoque", 
+          icon: Package, 
+          permission: "produtos",
+          subItems: [
+            { path: "/estoque-produtos", label: "Produto" },
+            { path: "/estoque-materiais", label: "Material" },
+            { path: "/estoque-tercerizacao", label: "Terceirização Malha" }
+          ]
+        },
+        {
+          label: "Programação",
+          icon: Calendar,
+          permission: "programacao",
+          subItems: [
+            { path: "/programacao", label: "Programação de Materiais" },
+            { path: "/programacao-semanal", label: "Programação Semanal" }
+          ]
+        },
       ]
     }
   ];
@@ -73,7 +97,10 @@ const Layout = () => {
   })).filter(group => group.items.length > 0);
 
   const defaultOpenAccordions = filteredGroups
-    .filter(g => g.items.some(i => location.pathname === i.path || (i.path !== '/' && location.pathname.startsWith(i.path))))
+    .filter(g => g.items.some(i => 
+      (i.path && (location.pathname === i.path || (i.path !== '/' && location.pathname.startsWith(i.path)))) || 
+      (i.subItems && i.subItems.some(sub => location.pathname === sub.path))
+    ))
     .map(g => g.title);
 
   const renderNavMenu = (isMobile = false) => (
@@ -104,7 +131,10 @@ const Layout = () => {
             );
           }
 
-          const isGroupActive = group.items.some(item => location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path)));
+          const isGroupActive = group.items.some(item => 
+            (item.path && (location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path)))) || 
+            (item.subItems && item.subItems.some(sub => location.pathname === sub.path))
+          );
           const GroupIcon = group.icon;
 
           return (
@@ -124,11 +154,39 @@ const Layout = () => {
                 <div className="flex flex-col space-y-0.5 pl-6 border-l-2 border-border/40 ml-4 mt-1">
                   {group.items.map((item) => {
                     const Icon = item.icon;
-                    const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
+                    if (item.subItems) {
+                      const isSubActive = item.subItems.some((sub: any) => location.pathname === sub.path);
+                      return (
+                        <Accordion type="single" collapsible key={item.label} defaultValue={isSubActive ? item.label : undefined} className="w-full">
+                          <AccordionItem value={item.label} className="border-none">
+                            <AccordionTrigger className={cn("py-2 px-3 rounded hover:no-underline transition-colors hover:bg-muted", isSubActive ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground")}>
+                              <div className="flex items-center gap-2">
+                                <Icon className={cn("h-3.5 w-3.5 transition-opacity", isSubActive ? "opacity-100" : "opacity-70 group-hover:opacity-100")} />
+                                <span className="text-[11px] font-medium">{item.label}</span>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="pb-1 pt-0">
+                               <div className="flex flex-col space-y-0.5 mt-1 border-l-2 border-border/40 ml-4 pl-4">
+                                  {item.subItems.map((sub: any) => {
+                                      const isSubItemActive = location.pathname === sub.path;
+                                      return (
+                                        <Link key={sub.path} to={sub.path} onClick={() => isMobile && setOpen(false)} className={cn("flex items-center px-3 py-1.5 rounded transition-colors text-[11px] font-medium", isSubItemActive ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-muted")}>
+                                            {sub.label}
+                                        </Link>
+                                      )
+                                  })}
+                               </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      )
+                    }
+
+                    const isActive = item.path && (location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path)));
                     return (
                       <Link
                         key={item.path}
-                        to={item.path}
+                        to={item.path as string}
                         onClick={() => isMobile && setOpen(false)}
                         className={cn(
                           "flex items-center justify-between px-3 py-2 rounded transition-colors group",
@@ -277,6 +335,7 @@ const Layout = () => {
           </div>
         </div>
       </main>
+      <ChatAssistente />
     </div>
   );
 };

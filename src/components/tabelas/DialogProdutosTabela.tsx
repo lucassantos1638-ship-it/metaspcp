@@ -19,15 +19,23 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
-import { Plus, Trash2, Search } from "lucide-react";
+import { Plus, Trash2, Search, Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+
 
 interface DialogProdutosTabelaProps {
     open: boolean;
@@ -55,6 +63,7 @@ export default function DialogProdutosTabela({
 
     const [produtoSelecionado, setProdutoSelecionado] = useState<string>("");
     const [preco, setPreco] = useState<string>("");
+    const [openCombobox, setOpenCombobox] = useState(false);
 
     const { data: itens, isLoading } = useQuery({
         queryKey: ["tabelas_preco_itens", tabelaId],
@@ -158,18 +167,58 @@ export default function DialogProdutosTabela({
                 <div className="grid grid-cols-12 gap-4 items-end bg-muted/30 p-4 rounded-lg border border-border">
                     <div className="col-span-12 sm:col-span-7 space-y-2">
                         <Label>Produto</Label>
-                        <Select value={produtoSelecionado} onValueChange={setProdutoSelecionado}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Selecione um produto..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {produtos?.map(p => (
-                                    <SelectItem key={p.id} value={p.id}>
-                                        {p.sku ? `[${p.sku}] ` : ""}{p.nome}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={openCombobox}
+                                    className="w-full justify-between font-normal"
+                                >
+                                    {produtoSelecionado
+                                        ? (() => {
+                                            const p = produtos?.find((prod) => prod.id === produtoSelecionado);
+                                            return p ? `${p.sku ? `[${p.sku}] ` : ""}${p.nome}` : "Produto não encontrado";
+                                        })()
+                                        : "Selecione um produto..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[400px] p-0" align="start">
+                                <Command filter={(value, search) => {
+                                    if (value.toLowerCase().includes(search.toLowerCase())) return 1;
+                                    return 0;
+                                }}>
+                                    <CommandInput placeholder="Buscar por código ou nome..." />
+                                    <CommandList>
+                                        <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                                        <CommandGroup>
+                                            {produtos?.map((p) => {
+                                                const searchText = `${p.sku || ""} ${p.nome}`.toLowerCase();
+                                                return (
+                                                    <CommandItem
+                                                        key={p.id}
+                                                        value={searchText}
+                                                        onSelect={() => {
+                                                            setProdutoSelecionado(p.id === produtoSelecionado ? "" : p.id);
+                                                            setOpenCombobox(false);
+                                                        }}
+                                                    >
+                                                        <Check
+                                                            className={cn(
+                                                                "mr-2 h-4 w-4",
+                                                                produtoSelecionado === p.id ? "opacity-100" : "opacity-0"
+                                                            )}
+                                                        />
+                                                        {p.sku ? `[${p.sku}] ` : ""}{p.nome}
+                                                    </CommandItem>
+                                                );
+                                            })}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
                     </div>
                     <div className="col-span-8 sm:col-span-3 space-y-2">
                         <Label>Preço de Venda</Label>

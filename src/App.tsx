@@ -34,12 +34,17 @@ import ProjecaoVendas from "./pages/ProjecaoVendas";
 import ProjecaoUsuario from "./pages/ProjecaoUsuario";
 import ProjecaoMensal from "./pages/ProjecaoMensal";
 import Programacao from "./pages/Programacao";
+import ProgramacaoSemanal from "./pages/ProgramacaoSemanal";
 import DetalhesLote from "./pages/DetalhesLote";
 import LancamentoMateriais from "./pages/LancamentoMateriais";
 import ListaLancamentoMateriais from "./pages/ListaLancamentoMateriais";
 import TabelasPreco from "./pages/TabelasPreco";
 import Pedidos from "./pages/Pedidos";
 import NovoPedido from "./pages/NovoPedido";
+import RelatoriosPedidosPage from "./pages/RelatoriosPedidosPage";
+import EstoqueProdutos from "./pages/EstoqueProdutos";
+import EstoqueMateriais from "./pages/EstoqueMateriais";
+import EstoqueTercerizacao from "./pages/EstoqueTercerizacao";
 
 import GestaoUsuarios from "./pages/gestor/GestaoUsuarios";
 import DashboardEmpresas from "./pages/super-admin/DashboardEmpresas";
@@ -151,6 +156,15 @@ const App = () => (
               />
 
               <Route
+                path="/programacao-semanal"
+                element={
+                  <ProtectedRoute requiredPermission="programacao">
+                    <ProgramacaoSemanal />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/producao"
                 element={
                   <ProtectedRoute requiredPermission="producao">
@@ -245,6 +259,42 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredPermission="pedidos">
                     <NovoPedido />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/pedidos-relatorios"
+                element={
+                  <ProtectedRoute requiredPermission="pedidos">
+                    <RelatoriosPedidosPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/estoque-produtos"
+                element={
+                  <ProtectedRoute requiredPermission="produtos">
+                    <EstoqueProdutos />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/estoque-materiais"
+                element={
+                  <ProtectedRoute requiredPermission="produtos">
+                    <EstoqueMateriais />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/estoque-tercerizacao"
+                element={
+                  <ProtectedRoute requiredPermission="produtos">
+                    <EstoqueTercerizacao />
                   </ProtectedRoute>
                 }
               />

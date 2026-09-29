@@ -18,6 +18,7 @@ export default function CadastroMaterialDialog({ open, onOpenChange }: CadastroM
     const [codigo, setCodigo] = useState("");
     const [precoCusto, setPrecoCusto] = useState("");
     const [unidadeMedida, setUnidadeMedida] = useState("");
+    const [grupo, setGrupo] = useState("");
     const [estoqueEstamparia, setEstoqueEstamparia] = useState("");
     const [estoqueTingimento, setEstoqueTingimento] = useState("");
     const [estoqueFabrica, setEstoqueFabrica] = useState("");
@@ -41,6 +42,7 @@ export default function CadastroMaterialDialog({ open, onOpenChange }: CadastroM
                 estoque_estamparia: Number(estoqueEstamparia) || 0,
                 estoque_tingimento: Number(estoqueTingimento) || 0,
                 estoque_fabrica: Number(estoqueFabrica) || 0,
+                grupo: grupo.trim() || undefined,
                 tem_conversao_pacote: Number(fatorConversao) > 0,
                 fator_conversao_pacote: Number(fatorConversao) || 1,
             },
@@ -50,6 +52,7 @@ export default function CadastroMaterialDialog({ open, onOpenChange }: CadastroM
                     setCodigo("");
                     setPrecoCusto("");
                     setUnidadeMedida("");
+                    setGrupo("");
                     setEstoqueEstamparia("");
                     setEstoqueTingimento("");
                     setEstoqueFabrica("");
@@ -89,8 +92,17 @@ export default function CadastroMaterialDialog({ open, onOpenChange }: CadastroM
                             />
                         </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
+                    <div className="grid grid-cols-4 gap-4">
+                        <div className="space-y-2 col-span-1">
+                            <Label htmlFor="grupo">Grupo</Label>
+                            <Input
+                                id="grupo"
+                                value={grupo}
+                                onChange={(e) => setGrupo(e.target.value)}
+                                placeholder="Ex: Malha"
+                            />
+                        </div>
+                        <div className="space-y-2 col-span-1">
                             <Label htmlFor="preco">Preço de Custo</Label>
                             <Input
                                 id="preco"

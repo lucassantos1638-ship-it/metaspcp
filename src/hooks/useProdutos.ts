@@ -399,3 +399,93 @@ export function useRemoverMaterialProduto() {
     },
   });
 }
+
+export function useDuplicarProduto() {
+  const queryClient = useQueryClient();
+  const empresaId = useEmpresaId();
+
+  return useMutation({
+    mutationFn: async (originalProdutoId: string) => {
+      if (!empresaId) throw new Error("Empresa não identificada");
+
+      // 1. Fetch original product
+      const { data: produto, error: produtoError } = await supabase
+        .from("produtos")
+        .select("*")
+        .eq("id", originalProdutoId)
+        .single();
+      if (produtoError) throw produtoError;
+
+      // 2. Insert new product
+      const { id, created_at, updated_at, ...produtoData } = produto;
+      const newSku = (produtoData.sku || "SKU") + "-" + Math.floor(Math.random() * 1000);
+
+      const { data: newProduto, error: insertError } = await supabase
+        .from("produtos")
+        .insert({
+          ...produtoData,
+          nome: produtoData.nome + " (Cópia)",
+          sku: newSku,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      const newId = newProduto.id;
+
+      // 3. Duplicate etapas
+      const { data: etapas } = await supabase
+        .from("produto_etapas")
+        .select("*")
+        .eq("produto_id", originalProdutoId);
+
+      if (etapas && etapas.length > 0) {
+        const novasEtapas = etapas.map(({ id: _id, created_at: _ca, updated_at: _ua, produto_id: _pid, ...etapa }) => ({
+          ...etapa,
+          produto_id: newId,
+        }));
+        await supabase.from("produto_etapas").insert(novasEtapas);
+      }
+
+      // 4. Duplicate materiais
+      const { data: materiais } = await supabase
+        .from("produto_materiais")
+        .select("*")
+        .eq("produto_id", originalProdutoId);
+
+      if (materiais && materiais.length > 0) {
+        const novosMateriais = materiais.map(({ id: _id, created_at: _ca, updated_at: _ua, produto_id: _pid, ...material }) => ({
+          ...material,
+          produto_id: newId,
+        }));
+        await supabase.from("produto_materiais").insert(novosMateriais);
+      }
+
+      // 5. Duplicate colors from localStorage
+      const oldColorsKey = "produto_cores_" + originalProdutoId;
+      const savedColors = localStorage.getItem(oldColorsKey);
+      if (savedColors) {
+        try {
+          const colors = JSON.parse(savedColors);
+          const newColors = colors.map((c: any) => ({ ...c, id: crypto.randomUUID() }));
+          localStorage.setItem("produto_cores_" + newId, JSON.stringify(newColors));
+        } catch (e) {
+          console.error("Failed to duplicate colors", e);
+        }
+      }
+
+      return newId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["produtos"] });
+      toast({ title: "Produto duplicado com sucesso!" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao duplicar",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}

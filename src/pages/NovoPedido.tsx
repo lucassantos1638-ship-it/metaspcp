@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,8 @@ interface PedidoItem {
     produto_id: string;
     produto_nome: string;
     produto_sku?: string;
+    cor?: string;
+    codigo_cor?: string;
     quantidade: number;
     preco_unitario: number;
     tipo_desconto: 'percentual' | 'valor';
@@ -68,16 +70,27 @@ export default function NovoPedido() {
     const { id } = useParams();
     const isEditing = !!id;
 
-    const [clienteId, setClienteId] = useState("");
+    const location = useLocation();
+    const pedidoImportado = location.state?.pedidoImportado;
+
+    const [clienteId, setClienteId] = useState(pedidoImportado?.clienteId || "");
     const [tabelaPrecoId, setTabelaPrecoId] = useState("");
     const [tipoVenda, setTipoVenda] = useState("[1] - VENDA");
     const [movimentaEstoque, setMovimentaEstoque] = useState(true);
-    const [observacao, setObservacao] = useState("");
-    const [numero, setNumero] = useState("");
+    const [observacao, setObservacao] = useState(pedidoImportado?.observacoes || "");
+    const [numero, setNumero] = useState(pedidoImportado?.numeroPedido || "");
     const [dataEmissao, setDataEmissao] = useState(() => new Date().toISOString().split('T')[0]);
 
     // Items state
-    const [itens, setItens] = useState<PedidoItem[]>([]);
+    const [itens, setItens] = useState<PedidoItem[]>(pedidoImportado?.itens?.map((i: any) => ({
+        produto_id: i.produto_id,
+        produto_nome: "Item Importado (IA)",
+        quantidade: i.quantidade,
+        preco_unitario: i.preco_unitario,
+        tipo_desconto: 'percentual',
+        desconto: 0,
+        subtotal: i.quantidade * i.preco_unitario
+    })) || []);
 
     // Add Item Form State
     const [produtoSelecionadoId, setProdutoSelecionadoId] = useState("");
@@ -85,6 +98,36 @@ export default function NovoPedido() {
     // Preco is pulled automatically from the table
     const [descontoGlobalTipo, setDescontoGlobalTipo] = useState<'percentual' | 'valor'>('percentual');
     const [descontoGlobal, setDescontoGlobal] = useState<string>("0");
+    const [corSelecionada, setCorSelecionada] = useState<string>("");
+    const [coresProduto, setCoresProduto] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (produtoSelecionadoId) {
+            const saved = localStorage.getItem(`produto_cores_${produtoSelecionadoId}`);
+            let parsed = saved ? JSON.parse(saved) : [];
+
+            if (empresaId) {
+                const invStr = localStorage.getItem(`estoque_cores_${empresaId}`);
+                if (invStr) {
+                    try {
+                        const inv = JSON.parse(invStr);
+                        const prodInv = inv.filter((i: any) => i.produtoId === produtoSelecionadoId);
+                        prodInv.forEach((pi: any) => {
+                            if (pi.cor && pi.cor !== "Única" && pi.cor !== "Sem cor definida") {
+                                if (!parsed.find((c: any) => c.descricao === pi.cor)) {
+                                    parsed.push({ descricao: pi.cor, codigo: null });
+                                }
+                            }
+                        });
+                    } catch (e) {}
+                }
+            }
+            setCoresProduto(parsed);
+        } else {
+            setCoresProduto([]);
+        }
+        setCorSelecionada("");
+    }, [produtoSelecionadoId, empresaId]);
 
     const { data: pedidoData, isLoading: isLoadingPedido } = useQuery({
         queryKey: ["pedido", id],
@@ -121,6 +164,8 @@ export default function NovoPedido() {
                 produto_sku: i.produtos?.sku,
                 quantidade: i.quantidade,
                 preco_unitario: i.preco_unitario,
+                cor: i.cor || "",
+                codigo_cor: i.codigo_cor || "",
                 tipo_desconto: i.tipo_desconto || 'percentual',
                 desconto: i.desconto || 0,
                 subtotal: calcularSubtotal(
@@ -231,6 +276,8 @@ export default function NovoPedido() {
     }, [tabelaPrecoId]);
 
     const parseStatusFromTipoVenda = (tipo: string) => {
+        if (tipo.includes("VENDA PERDIDA")) return "VENDA PERDIDA";
+        if (tipo.includes("PROJEÇÃO")) return "PROJEÇÃO";
         if (tipo.includes("VENDA")) return "VENDA";
         if (tipo.includes("ORÇAMENTO")) return "ORÇAMENTO";
         if (tipo.includes("BONIFICAÇÃO")) return "BONIFICAÇÃO";
@@ -258,12 +305,12 @@ export default function NovoPedido() {
         const parsedDescLocal = parseFloat(descontoGlobal.replace(",", "."));
         const descLocalValido = isNaN(parsedDescLocal) || parsedDescLocal < 0 ? 0 : parsedDescLocal;
 
-        // Verifica se o produto já existe na lista, se sim, soma a quantidade
+        // Verifica se o produto já existe na lista com a mesma cor, se sim, soma a quantidade
         setItens(prev => {
-            const existing = prev.find(i => i.produto_id === produtoSelecionadoId);
+            const existing = prev.find(i => i.produto_id === produtoSelecionadoId && (i.cor || "") === corSelecionada);
             if (existing) {
                 return prev.map(i => {
-                    if (i.produto_id === produtoSelecionadoId) {
+                    if (i.produto_id === produtoSelecionadoId && (i.cor || "") === corSelecionada) {
                         const newQtd = i.quantidade + qtd;
                         return {
                             ...i,
@@ -274,10 +321,13 @@ export default function NovoPedido() {
                     return i;
                 });
             }
+            const colorObj = coresProduto.find(c => c.descricao === corSelecionada);
             return [...prev, {
                 produto_id: produtoTabela.produto_id,
                 produto_nome: produtoTabela.produto_nome,
                 produto_sku: produtoTabela.produto_sku,
+                cor: corSelecionada,
+                codigo_cor: colorObj?.codigo || "",
                 quantidade: qtd,
                 preco_unitario: produtoTabela.preco,
                 tipo_desconto: descontoGlobalTipo,
@@ -289,15 +339,16 @@ export default function NovoPedido() {
         // Limpa formulário de item
         setProdutoSelecionadoId("");
         setQuantidade("1");
+        setCorSelecionada("");
     };
 
-    const handleRemoveItem = (produtoId: string) => {
-        setItens(prev => prev.filter(i => i.produto_id !== produtoId));
+    const handleRemoveItem = (produtoId: string, cor: string = "") => {
+        setItens(prev => prev.filter(i => !(i.produto_id === produtoId && (i.cor || "") === cor)));
     };
 
-    const handleUpdateItemDiscount = (produtoId: string, campo: 'tipo_desconto' | 'desconto', valor: any) => {
+    const handleUpdateItemDiscount = (produtoId: string, cor: string = "", campo: 'tipo_desconto' | 'desconto', valor: any) => {
         setItens(prev => prev.map(item => {
-            if (item.produto_id === produtoId) {
+            if (item.produto_id === produtoId && (item.cor || "") === cor) {
                 const newItem = { ...item, [campo]: valor };
                 const descNum = typeof newItem.desconto === 'string' ? parseFloat(String(newItem.desconto).replace(',', '.')) : newItem.desconto;
                 const descValido = isNaN(descNum) || descNum < 0 ? 0 : descNum;
@@ -366,6 +417,8 @@ export default function NovoPedido() {
                 produto_id: item.produto_id,
                 quantidade: item.quantidade,
                 preco_unitario: item.preco_unitario,
+                cor: item.cor || null,
+                codigo_cor: item.codigo_cor || null,
                 tipo_desconto: item.tipo_desconto,
                 desconto: item.desconto
             }));
@@ -441,6 +494,8 @@ export default function NovoPedido() {
                                         <SelectItem value="[1] - VENDA">[1] - VENDA</SelectItem>
                                         <SelectItem value="[2] - ORÇAMENTO">[2] - ORÇAMENTO</SelectItem>
                                         <SelectItem value="[3] - BONIFICAÇÃO">[3] - BONIFICAÇÃO</SelectItem>
+                                        <SelectItem value="[4] - VENDA PERDIDA">[4] - VENDA PERDIDA</SelectItem>
+                                        <SelectItem value="[5] - PROJEÇÃO">[5] - PROJEÇÃO</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -506,7 +561,7 @@ export default function NovoPedido() {
 
                         {tabelaPrecoId ? (
                             <div className="grid grid-cols-12 gap-4 items-end bg-muted/30 p-4 rounded-lg border">
-                                <div className="col-span-12 sm:col-span-6 space-y-2">
+                                <div className="col-span-12 sm:col-span-4 space-y-2">
                                     <Label>Produto</Label>
                                     <Select value={produtoSelecionadoId} onValueChange={setProdutoSelecionadoId}>
                                         <SelectTrigger>
@@ -521,7 +576,21 @@ export default function NovoPedido() {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="col-span-6 sm:col-span-2 space-y-2">
+                                <div className="col-span-12 sm:col-span-3 space-y-2">
+                                    <Label>Cor</Label>
+                                    <Select value={corSelecionada} onValueChange={setCorSelecionada} disabled={!produtoSelecionadoId || coresProduto.length === 0}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder={coresProduto.length > 0 ? "Selecione a cor..." : "Sem cores"} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Única">Única</SelectItem>
+                                            {coresProduto.map((c: any) => (
+                                                <SelectItem key={c.descricao} value={c.descricao}>{c.codigo ? `[${c.codigo}] ` : ""}{c.descricao}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="col-span-6 sm:col-span-1 space-y-2">
                                     <Label>Qtd</Label>
                                     <Input
                                         type="number"
@@ -571,6 +640,8 @@ export default function NovoPedido() {
                                 <TableHeader className="bg-secondary/50">
                                     <TableRow>
                                         <TableHead>Produto</TableHead>
+                                        <TableHead>Cód. Cor</TableHead>
+                                        <TableHead>Cor</TableHead>
                                         <TableHead className="text-right">Qtd</TableHead>
                                         <TableHead className="text-right">Preço Unit.</TableHead>
                                         <TableHead className="text-center">Tipo Desc.</TableHead>
@@ -582,7 +653,7 @@ export default function NovoPedido() {
                                 <TableBody>
                                     {itens.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                                            <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
                                                 Nenhum item adicionado ao pedido
                                             </TableCell>
                                         </TableRow>
@@ -592,6 +663,12 @@ export default function NovoPedido() {
                                                 <TableCell className="font-medium">
                                                     {item.produto_sku ? `[${item.produto_sku}] ` : ""}{item.produto_nome}
                                                 </TableCell>
+                                                <TableCell className="text-muted-foreground font-mono">
+                                                    {item.codigo_cor || "-"}
+                                                </TableCell>
+                                                <TableCell className="text-muted-foreground">
+                                                    {item.cor || "-"}
+                                                </TableCell>
                                                 <TableCell className="text-right">{item.quantidade}</TableCell>
                                                 <TableCell className="text-right">
                                                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.preco_unitario)}
@@ -599,7 +676,7 @@ export default function NovoPedido() {
                                                 <TableCell className="text-center">
                                                     <Select
                                                         value={item.tipo_desconto}
-                                                        onValueChange={(val: any) => handleUpdateItemDiscount(item.produto_id, 'tipo_desconto', val)}
+                                                        onValueChange={(val: any) => handleUpdateItemDiscount(item.produto_id, item.cor || "", 'tipo_desconto', val)}
                                                     >
                                                         <SelectTrigger className="w-[80px] h-8 text-xs mx-auto">
                                                             <SelectValue />
@@ -617,7 +694,7 @@ export default function NovoPedido() {
                                                         step="0.01"
                                                         className="h-8 w-[80px] text-right ml-auto"
                                                         value={item.desconto === 0 ? '' : item.desconto}
-                                                        onChange={e => handleUpdateItemDiscount(item.produto_id, 'desconto', e.target.value)}
+                                                        onChange={e => handleUpdateItemDiscount(item.produto_id, item.cor || "", 'desconto', e.target.value)}
                                                         placeholder="0"
                                                     />
                                                 </TableCell>
@@ -629,7 +706,7 @@ export default function NovoPedido() {
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                                                        onClick={() => handleRemoveItem(item.produto_id)}
+                                                        onClick={() => handleRemoveItem(item.produto_id, item.cor || "")}
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
