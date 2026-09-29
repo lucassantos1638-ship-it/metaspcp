@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY || "",
+  apiKey: import.meta.env.VITE_OPENAI_API_KEY || "dummy_key",
   dangerouslyAllowBrowser: true, // Necessário pois estamos chamando a partir do frontend
 });
 
