@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AdicionarCorDialogProps {
   open: boolean;
@@ -16,6 +18,8 @@ interface AdicionarCorDialogProps {
 export default function AdicionarCorDialog({ open, onOpenChange, produtoId, onCorAdicionada }: AdicionarCorDialogProps) {
   const [codigo, setCodigo] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     if (open) {
@@ -24,29 +28,38 @@ export default function AdicionarCorDialog({ open, onOpenChange, produtoId, onCo
     }
   }, [open]);
 
-  const handleSalvar = () => {
+  const handleSalvar = async () => {
     if (!codigo.trim() || !descricao.trim()) {
       toast.error("Preencha o código e a descrição da cor.");
       return;
     }
 
+    if (!user?.empresa_id) {
+      toast.error("Usuário não tem empresa vinculada.");
+      return;
+    }
+
+    setLoading(true);
     try {
-      const storageKey = `produto_cores_${produtoId}`;
-      const saved = localStorage.getItem(storageKey);
-      const cores = saved ? JSON.parse(saved) : [];
+      const { error } = await supabase
+        .from('produto_cores')
+        .insert({
+          produto_id: produtoId,
+          codigo: codigo.trim(),
+          descricao: descricao.trim(),
+          empresa_id: user.empresa_id
+        });
+
+      if (error) throw error;
       
-      cores.push({ 
-        id: crypto.randomUUID(), 
-        codigo: codigo.trim(), 
-        descricao: descricao.trim() 
-      });
-      
-      localStorage.setItem(storageKey, JSON.stringify(cores));
       toast.success("Cor adicionada com sucesso!");
       onCorAdicionada();
       onOpenChange(false);
     } catch (err) {
+      console.error(err);
       toast.error("Erro ao salvar a cor.");
+    } finally {
+      setLoading(false);
     }
   };
 

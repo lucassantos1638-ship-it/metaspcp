@@ -46,6 +46,8 @@ import AdicionarMaterialProdutoDialog from "@/components/produtos/AdicionarMater
 import AdicionarCorDialog from "@/components/produtos/AdicionarCorDialog";
 import FichaTecnicaPrint from "@/components/produtos/FichaTecnicaPrint";
 import { usePrintReport } from "@/hooks/usePrintReport";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DetalhesProdutoProps {
   produtoId: string;
@@ -71,15 +73,21 @@ export default function DetalhesProduto({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cores, setCores] = useState<any[]>([]);
   const { isPrinting, triggerPrint } = usePrintReport();
+  const { user } = useAuth();
 
-  const carregarCores = () => {
+  const carregarCores = async () => {
     try {
-      const storageKey = `produto_cores_${produtoId}`;
-      const saved = localStorage.getItem(storageKey);
-      if (saved) setCores(JSON.parse(saved));
-      else setCores([]);
+      const { data, error } = await supabase
+        .from('produto_cores')
+        .select('*')
+        .eq('produto_id', produtoId)
+        .order('descricao');
+        
+      if (error) throw error;
+      setCores(data || []);
     } catch (e) {
       console.error(e);
+      toast.error("Erro ao carregar cores do produto");
     }
   };
 
@@ -87,10 +95,21 @@ export default function DetalhesProduto({
     carregarCores();
   }, [produtoId]);
 
-  const handleRemoverCor = (id: string) => {
-    const novasCores = cores.filter(c => c.id !== id);
-    localStorage.setItem(`produto_cores_${produtoId}`, JSON.stringify(novasCores));
-    setCores(novasCores);
+  const handleRemoverCor = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('produto_cores')
+        .delete()
+        .eq('id', id);
+        
+      if (error) throw error;
+      
+      setCores(cores.filter(c => c.id !== id));
+      toast.success("Cor removida com sucesso");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao remover cor");
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,15 +160,37 @@ export default function DetalhesProduto({
                   return;
               }
 
-              const existingCores = [...cores];
-              const updatedCores = [...existingCores, ...novasCores];
-              
-              localStorage.setItem(`produto_cores_${produtoId}`, JSON.stringify(updatedCores));
-              setCores(updatedCores);
+              if (!user?.empresa_id) {
+                  toast.error("Usuário não tem empresa vinculada");
+                  return;
+              }
 
-              setIsUploadOpen(false);
-              if (fileInputRef.current) fileInputRef.current.value = "";
-              toast.success(`${novasCores.length} cores importadas com sucesso!`);
+              const inserts = novasCores.map(c => ({
+                  produto_id: produtoId,
+                  codigo: c.codigo,
+                  descricao: c.descricao,
+                  empresa_id: user.empresa_id
+              }));
+
+              // Try to perform insertion inside an async context since we are in onload
+              (async () => {
+                  try {
+                      const { error: insertError } = await supabase
+                          .from('produto_cores')
+                          .insert(inserts);
+
+                      if (insertError) throw insertError;
+
+                      await carregarCores();
+                      
+                      setIsUploadOpen(false);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                      toast.success(`${novasCores.length} cores importadas com sucesso!`);
+                  } catch (dbError) {
+                      console.error("Erro ao salvar cores:", dbError);
+                      toast.error("Erro ao salvar cores no banco de dados");
+                  }
+              })();
 
           } catch (error) {
               console.error("Erro ao ler planilha:", error);
