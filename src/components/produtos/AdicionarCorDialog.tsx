@@ -81,7 +81,7 @@ export default function AdicionarCorDialog({ open, onOpenChange, produtoId, onCo
           <div className="pt-2 flex justify-end">
             <Button onClick={handleSalvar}>
               <Check className="w-4 h-4 mr-2" />
-              Salvar
+              Salvar Cor na Tabela
             </Button>
           </div>
         </div>
