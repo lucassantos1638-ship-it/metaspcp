@@ -50,11 +50,10 @@ export default function EstoqueProdutos() {
   useEffect(() => {
       if (manualProdutoId) {
           try {
-              const stored = localStorage.getItem(`produto_cores_${manualProdutoId}`);
-              let cores = stored ? JSON.parse(stored) : [];
+              const p = produtos?.find((prod: any) => prod.id === manualProdutoId);
+              let cores = p?.produto_cores || [];
               if (!Array.isArray(cores)) cores = [];
-              
-              const coresDoInventario = inventario.filter(i => i.produtoId === manualProdutoId);
+                const coresDoInventario = inventario.filter(i => i.produtoId === manualProdutoId);
               const initial: Record<string, string> = {};
 
               if (cores.length === 0) {
@@ -74,7 +73,7 @@ export default function EstoqueProdutos() {
           setManualProdutoCores([]);
           setManualCoresQtd({});
       }
-  }, [manualProdutoId, inventario]);
+  }, [manualProdutoId, inventario, produtos]);
 
   const { data: produtos, isLoading } = useQuery({
     queryKey: ["produtos-estoque", empresaId],

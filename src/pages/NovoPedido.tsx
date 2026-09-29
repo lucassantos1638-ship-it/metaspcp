@@ -103,8 +103,11 @@ export default function NovoPedido() {
 
     useEffect(() => {
         if (produtoSelecionadoId) {
-            const saved = localStorage.getItem(`produto_cores_${produtoSelecionadoId}`);
-            let parsed = saved ? JSON.parse(saved) : [];
+            const p = produtosDaTabela?.find(prod => prod.produto_id === produtoSelecionadoId);
+              let parsed: any[] = [];
+              if (p && p.produto_cores) {
+                  parsed = Array.isArray(p.produto_cores) ? [...p.produto_cores] : [];
+              }
 
             if (empresaId) {
                 const invStr = localStorage.getItem(`estoque_cores_${empresaId}`);
