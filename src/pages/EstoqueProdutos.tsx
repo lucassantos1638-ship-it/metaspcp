@@ -272,7 +272,13 @@ export default function EstoqueProdutos() {
     if (!produtos) return [];
     
     return produtos.map((prod) => {
-      let coresDefinidas: any[] = prod.produto_cores || [];
+      let coresDefinidas: any[] = [];
+      try {
+        const stored = localStorage.getItem(`produto_cores_${prod.id}`);
+        if (stored) {
+          coresDefinidas = JSON.parse(stored);
+        }
+      } catch(e) {}
 
       const coresDoInventario = inventario.filter(i => i.produtoId === prod.id);
       

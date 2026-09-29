@@ -18,7 +18,7 @@ export function useProdutos(apenasAtivos?: boolean) {
       while (hasMore) {
         let query = supabase
           .from("produtos")
-          .select("*, produto_materiais(*, material:materiais(*)), produto_cores(*)")
+          .select("*")
           .eq("empresa_id", empresaId)
           .order("created_at", { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -406,7 +406,7 @@ export function useDuplicarProduto() {
 
   return useMutation({
     mutationFn: async (originalProdutoId: string) => {
-      if (!empresaId) throw new Error("Empresa nï¿½o identificada");
+      if (!empresaId) throw new Error("Empresa não identificada");
 
       // 1. Fetch original product
       const { data: produto, error: produtoError } = await supabase
@@ -424,7 +424,7 @@ export function useDuplicarProduto() {
         .from("produtos")
         .insert({
           ...produtoData,
-          nome: produtoData.nome + " (Cï¿½pia)",
+          nome: produtoData.nome + " (Cópia)",
           sku: newSku,
         })
         .select()
@@ -462,14 +462,16 @@ export function useDuplicarProduto() {
       }
 
       // 5. Duplicate colors from localStorage
-      // 5. Duplicate colors from database
-      const { data: oldColors } = await supabase.from('produto_cores').select('*').eq('produto_id', originalProdutoId);
-      if (oldColors && oldColors.length > 0) {
-          const newColors = oldColors.map(({id, created_at, updated_at, produto_id, ...rest}) => ({
-              ...rest,
-              produto_id: newId
-          }));
-          await supabase.from('produto_cores').insert(newColors);
+      const oldColorsKey = "produto_cores_" + originalProdutoId;
+      const savedColors = localStorage.getItem(oldColorsKey);
+      if (savedColors) {
+        try {
+          const colors = JSON.parse(savedColors);
+          const newColors = colors.map((c: any) => ({ ...c, id: crypto.randomUUID() }));
+          localStorage.setItem("produto_cores_" + newId, JSON.stringify(newColors));
+        } catch (e) {
+          console.error("Failed to duplicate colors", e);
+        }
       }
 
       return newId;
