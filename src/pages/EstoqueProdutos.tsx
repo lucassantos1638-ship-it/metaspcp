@@ -73,7 +73,7 @@ export default function EstoqueProdutos() {
           setManualProdutoCores([]);
           setManualCoresQtd({});
       }
-  }, [manualProdutoId, inventario, produtos]);
+  }, [manualProdutoId, inventario]);
 
   const { data: produtos, isLoading } = useQuery({
     queryKey: ["produtos-estoque", empresaId],
