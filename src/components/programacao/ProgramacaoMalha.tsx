@@ -246,15 +246,17 @@ export function ProgramacaoMalha() {
                 p.produto_materiais?.some((pm: any) => pm.material?.codigo === mat.codigo)
             ) || [];
 
-            const getVendasForMatCor = (matCor: string) => {
+            const getVendasForMatCor = (matCor: string, matCorCodigo?: string) => {
                 let m1 = 0; let m2 = 0; let m3 = 0;
                 const vendas = vendasItens?.filter((v: any) => produtosVinculados.some((pv: any) => pv.id === v.produto_id)) || [];
                 
                 vendas.forEach((v: any) => {
                     const vCor = v.cor ? v.cor.trim().toLowerCase() : "";
+                    const matCorCompleta = (matCorCodigo ? `${matCorCodigo} - ${matCor}` : matCor).trim().toLowerCase();
                     
                     let isMatch = false;
-                    if (vCor === matCor) isMatch = true;
+                    if (vCor === matCor || vCor === matCorCompleta) isMatch = true;
+                    else if (v.codigo_cor && matCorCodigo && String(v.codigo_cor).trim() === String(matCorCodigo).trim()) isMatch = true;
                     else if (matCor === "única" || matCor === "sem cor definida" || matCor === "") isMatch = true;
 
                     if (isMatch) {
@@ -325,8 +327,8 @@ export function ProgramacaoMalha() {
                  }
 
                  const totalTerceiros = entidades?.reduce((acc: any, ent: any) => acc + (terceirosSaldos[ent.id] || 0), 0) || 0;
-                 const mediaVendas = (m1 + m2 + m3) / 3;
-                 const saldo = mediaVendas - estoqueAtualCalculado - estoqueMaterialAtual - totalTerceiros;
+                 const somaVendas = (m1 + m2 + m3);
+                 const saldo = somaVendas - estoqueAtualCalculado - estoqueMaterialAtual - totalTerceiros;
 
                  result.push({
                     isSummary: true,
@@ -338,7 +340,7 @@ export function ProgramacaoMalha() {
                     necMes1: m1,
                     necMes2: m2,
                     necMes3: m3,
-                    mediaVendas,
+                    somaVendas,
                     estoqueAtual: estoqueAtualCalculado,
                     estoqueMaterial: estoqueMaterialAtual,
                     terceirosSaldos,
@@ -352,7 +354,7 @@ export function ProgramacaoMalha() {
                     let estoqueAtualCalculado = 0;
                     
                     const matCorNormal = cor.nome ? cor.nome.trim().toLowerCase() : "";
-                    const { m1, m2, m3 } = getVendasForMatCor(matCorNormal);
+                    const { m1, m2, m3 } = getVendasForMatCor(matCorNormal, cor.codigo);
 
                     produtosVinculados.forEach((prod: any) => {
                         const relacao = prod.produto_materiais.find((pm: any) => pm.material?.codigo === mat.codigo);
@@ -417,8 +419,8 @@ export function ProgramacaoMalha() {
                     }
 
                     const totalTerceiros = entidades?.reduce((acc: any, ent: any) => acc + (terceirosSaldos[ent.id] || 0), 0) || 0;
-                    const mediaVendas = (m1 + m2 + m3) / 3;
-                    const saldo = mediaVendas - estoqueAtualCalculado - estoqueMaterialAtual - totalTerceiros;
+                    const somaVendas = (m1 + m2 + m3);
+                    const saldo = somaVendas - estoqueAtualCalculado - estoqueMaterialAtual - totalTerceiros;
 
                     colorRows.push({
                         isSummary: false,
@@ -430,7 +432,7 @@ export function ProgramacaoMalha() {
                         necMes1: m1,
                         necMes2: m2,
                         necMes3: m3,
-                        mediaVendas,
+                        somaVendas,
                         estoqueAtual: estoqueAtualCalculado,
                         estoqueMaterial: estoqueMaterialAtual,
                         terceirosSaldos,
@@ -446,8 +448,8 @@ export function ProgramacaoMalha() {
                 });
 
                 const totalTerceirosSummary = entidades?.reduce((acc: any, ent: any) => acc + (sumTerceiros[ent.id] || 0), 0) || 0;
-                const mediaVendasSummary = (sumM1 + sumM2 + sumM3) / 3;
-                const saldoSummary = mediaVendasSummary - sumEstProduto - sumEstMaterial - totalTerceirosSummary;
+                const somaVendasSummary = (sumM1 + sumM2 + sumM3);
+                const saldoSummary = somaVendasSummary - sumEstProduto - sumEstMaterial - totalTerceirosSummary;
 
                 result.push({
                     isSummary: true,
@@ -459,7 +461,7 @@ export function ProgramacaoMalha() {
                     necMes1: sumM1,
                     necMes2: sumM2,
                     necMes3: sumM3,
-                    mediaVendas: mediaVendasSummary,
+                    somaVendas: somaVendasSummary,
                     estoqueAtual: sumEstProduto,
                     estoqueMaterial: sumEstMaterial,
                     terceirosSaldos: sumTerceiros,
@@ -515,7 +517,7 @@ export function ProgramacaoMalha() {
                                 title="Clique para expandir/ocultar os meses"
                             >
                                 <div className="flex items-center justify-center gap-1">
-                                    MÉDIA VENDAS<br/>(3 MESES)
+                                    SOMA VENDAS<br/>(3 MESES)
                                     <span className="text-blue-600 font-black text-sm ml-1">{showMonths ? "-" : "+"}</span>
                                 </div>
                             </TableHead>
@@ -602,7 +604,7 @@ export function ProgramacaoMalha() {
                                     <TableCell className="border-r border-slate-300 font-bold text-slate-700">{row.materiaPrima}</TableCell>
                                     <TableCell className="border-r border-slate-300"></TableCell>
                                     <TableCell className="border-r border-slate-300"></TableCell>
-                                    <TableCell className="border-r border-slate-300 text-right font-bold text-blue-900 bg-blue-50/50">{formatKg(row.mediaVendas)}</TableCell>
+                                    <TableCell className="border-r border-slate-300 text-right font-bold text-blue-900 bg-blue-50/50">{formatKg(row.somaVendas)}</TableCell>
                                     {showMonths && (
                                         <>
                                             <TableCell className="border-r border-slate-300 text-right text-slate-500 font-normal bg-slate-100/50">{formatKg(row.necMes1)}</TableCell>
@@ -631,7 +633,7 @@ export function ProgramacaoMalha() {
                                     <TableCell className="border-r border-slate-100"></TableCell>
                                     <TableCell className="border-r border-slate-200 text-emerald-700 font-mono font-medium">{row.codCor}</TableCell>
                                     <TableCell className="border-r border-slate-200 text-slate-700">{row.cor}</TableCell>
-                                    <TableCell className="border-r border-slate-200 text-right font-bold text-blue-800 bg-blue-50/30">{formatKg(row.mediaVendas)}</TableCell>
+                                    <TableCell className="border-r border-slate-200 text-right font-bold text-blue-800 bg-blue-50/30">{formatKg(row.somaVendas)}</TableCell>
                                     {showMonths && (
                                         <>
                                             <TableCell className="border-r border-slate-200 text-right font-medium text-slate-500 bg-slate-50/50">{formatKg(row.necMes1)}</TableCell>

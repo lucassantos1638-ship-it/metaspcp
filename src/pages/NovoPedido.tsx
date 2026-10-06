@@ -80,6 +80,7 @@ export default function NovoPedido() {
     const [observacao, setObservacao] = useState(pedidoImportado?.observacoes || "");
     const [numero, setNumero] = useState(pedidoImportado?.numeroPedido || "");
     const [dataEmissao, setDataEmissao] = useState(() => new Date().toISOString().split('T')[0]);
+    const [dataEntrega, setDataEntrega] = useState("");
 
     // Items state
     const [itens, setItens] = useState<PedidoItem[]>(pedidoImportado?.itens?.map((i: any) => ({
@@ -161,6 +162,7 @@ export default function NovoPedido() {
             setMovimentaEstoque(pedidoData.pedido.movimenta_estoque);
             setObservacao(pedidoData.pedido.observacao || "");
             setNumero(pedidoData.pedido.numero || "");
+            setDataEntrega(pedidoData.pedido.data_entrega || "");
             setItens(pedidoData.itensData.map((i: any) => ({
                 produto_id: i.produto_id,
                 produto_nome: i.produtos?.nome,
@@ -385,6 +387,7 @@ export default function NovoPedido() {
                         tipo_venda: tipoVenda,
                         movimenta_estoque: movimentaEstoque,
                         observacao: observacao,
+                        data_entrega: dataEntrega || null,
                         status: statusEnum
                     })
                     .eq("id", id);
@@ -406,6 +409,7 @@ export default function NovoPedido() {
                         tipo_venda: tipoVenda,
                         movimenta_estoque: movimentaEstoque,
                         observacao: observacao,
+                        data_entrega: dataEntrega || null,
                         status: statusEnum
                     }])
                     .select("id")
@@ -475,6 +479,15 @@ export default function NovoPedido() {
                                     type="date"
                                     value={dataEmissao}
                                     onChange={e => setDataEmissao(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Data de Entrega</Label>
+                                <Input
+                                    type="date"
+                                    value={dataEntrega}
+                                    onChange={e => setDataEntrega(e.target.value)}
                                 />
                             </div>
 

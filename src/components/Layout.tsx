@@ -72,6 +72,7 @@ const Layout = () => {
           permission: "produtos",
           subItems: [
             { path: "/estoque-produtos", label: "Produto" },
+            { path: "/estoque-cortes", label: "Cortes" },
             { path: "/estoque-materiais", label: "Material" },
             { path: "/estoque-tercerizacao", label: "Terceirização Malha" }
           ]

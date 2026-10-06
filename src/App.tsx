@@ -43,6 +43,7 @@ import Pedidos from "./pages/Pedidos";
 import NovoPedido from "./pages/NovoPedido";
 import RelatoriosPedidosPage from "./pages/RelatoriosPedidosPage";
 import EstoqueProdutos from "./pages/EstoqueProdutos";
+import EstoqueCortes from "./pages/EstoqueCortes";
 import EstoqueMateriais from "./pages/EstoqueMateriais";
 import EstoqueTercerizacao from "./pages/EstoqueTercerizacao";
 
@@ -277,6 +278,15 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredPermission="produtos">
                     <EstoqueProdutos />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/estoque-cortes"
+                element={
+                  <ProtectedRoute requiredPermission="produtos">
+                    <EstoqueCortes />
                   </ProtectedRoute>
                 }
               />

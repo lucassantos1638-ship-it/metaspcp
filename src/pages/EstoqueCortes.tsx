@@ -23,7 +23,7 @@ interface EstoqueCor {
   quantidade: number;
 }
 
-export default function EstoqueProdutos() {
+export default function EstoqueCortes() {
   const empresaId = useEmpresaId();
   const queryClient = useQueryClient();
   const [inventario, setInventario] = useState<EstoqueCor[]>([]);
@@ -71,8 +71,8 @@ export default function EstoqueProdutos() {
   // Load from local storage on mount
   useEffect(() => {
     if (empresaId) {
-      const stored = localStorage.getItem(`estoque_cores_${empresaId}`);
-      const storedDate = localStorage.getItem(`estoque_cores_data_${empresaId}`);
+      const stored = localStorage.getItem(`estoque_cortes_${empresaId}`);
+      const storedDate = localStorage.getItem(`estoque_cortes_data_${empresaId}`);
       if (stored) setInventario(JSON.parse(stored));
       if (storedDate) setDataAtualizacao(storedDate);
     }
@@ -230,8 +230,8 @@ export default function EstoqueProdutos() {
       }
 
       const now = new Date().toISOString();
-      localStorage.setItem(`estoque_cores_${empresaId}`, JSON.stringify(novosEstoquesCores));
-      localStorage.setItem(`estoque_cores_data_${empresaId}`, now);
+      localStorage.setItem(`estoque_cortes_${empresaId}`, JSON.stringify(novosEstoquesCores));
+      localStorage.setItem(`estoque_cortes_data_${empresaId}`, now);
       
       setInventario(novosEstoquesCores);
       setDataAtualizacao(now);
@@ -280,9 +280,9 @@ export default function EstoqueProdutos() {
 
         await supabase.from("produtos").update({ estoque: totalEstoque }).eq("id", prod.id);
 
-        localStorage.setItem(`estoque_cores_${empresaId}`, JSON.stringify(current));
+        localStorage.setItem(`estoque_cortes_${empresaId}`, JSON.stringify(current));
         const now = new Date().toISOString();
-        localStorage.setItem(`estoque_cores_data_${empresaId}`, now);
+        localStorage.setItem(`estoque_cortes_data_${empresaId}`, now);
         
         setInventario(current);
         setDataAtualizacao(now);
@@ -410,14 +410,14 @@ export default function EstoqueProdutos() {
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Estoque");
-    XLSX.writeFile(wb, `Estoque_Produtos_${format(new Date(), "dd-MM-yyyy")}.xlsx`);
+    XLSX.writeFile(wb, `Estoque_Cortes_${format(new Date(), "dd-MM-yyyy")}.xlsx`);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-2">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Estoque de Produtos</h1>
+          <h1 className="text-3xl font-bold text-foreground">Estoque de Cortes</h1>
           <p className="text-muted-foreground mt-1">
             Inventário e gerenciamento do estoque detalhado por cor
           </p>
