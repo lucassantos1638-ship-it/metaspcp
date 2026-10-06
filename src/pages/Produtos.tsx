@@ -15,6 +15,7 @@ import { Plus, Package, Search, Pencil, FileSpreadsheet, Copy } from "lucide-rea
 import { useProdutos, useToggleAtivoProduto, useDuplicarProduto } from "@/hooks/useProdutos";
 import CadastroProdutoDialog from "@/components/produtos/CadastroProdutoDialog";
 import ImportarProdutosDialog from "@/components/produtos/ImportarProdutosDialog";
+import ImportarCoresDialog from "@/components/produtos/ImportarCoresDialog";
 import DetalhesProduto from "@/components/produtos/DetalhesProduto";
 
 export default function Produtos() {
@@ -22,6 +23,7 @@ export default function Produtos() {
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [dialogCadastroOpen, setDialogCadastroOpen] = useState(false);
   const [dialogImportarOpen, setDialogImportarOpen] = useState(false);
+  const [dialogImportarCoresOpen, setDialogImportarCoresOpen] = useState(false);
   const [produtoSelecionado, setProdutoSelecionado] = useState<string | null>(null);
 
   const { data: produtos, isLoading } = useProdutos();
@@ -67,6 +69,10 @@ export default function Produtos() {
           </p>
         </div>
         <div className="flex w-full sm:w-auto gap-2">
+          <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setDialogImportarCoresOpen(true)}>
+            <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" />
+            Atualizar Cores
+          </Button>
           <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setDialogImportarOpen(true)}>
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             Importar
@@ -254,6 +260,10 @@ export default function Produtos() {
       <ImportarProdutosDialog
         open={dialogImportarOpen}
         onOpenChange={setDialogImportarOpen}
+      />
+      <ImportarCoresDialog
+        open={dialogImportarCoresOpen}
+        onOpenChange={setDialogImportarCoresOpen}
       />
     </div >
   );
