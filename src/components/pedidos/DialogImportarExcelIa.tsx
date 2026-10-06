@@ -3,46 +3,27 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info, FileSpreadsheet, Loader2, Check } from "lucide-react";
-import { extractTextFromExcel } from "@/lib/excelUtils";
-import { analisarTextoPedidoComIA, PedidoExtraidoIA } from "@/lib/iaPedidoUtils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import * as XLSX from "xlsx";
 
 export const DialogImportarExcelIa = () => {
   const [open, setOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [pedidoIa, setPedidoIa] = useState<PedidoExtraidoIA | null>(null);
-  
-  // Mapeamentos
-  const [clienteId, setClienteId] = useState<string>("");
-  const [itensMapeados, setItensMapeados] = useState<{ original: any; produtoId: string }[]>([]);
   
   const empresaId = useEmpresaId();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-
-  // Buscar clientes
-  const { data: clientes } = useQuery({
-    queryKey: ["clientes", empresaId],
-    enabled: !!empresaId && !!pedidoIa,
-    queryFn: async () => {
-      const { data } = await supabase.from("entidade").select("*").eq("empresa_id", empresaId);
-      return data || [];
-    }
-  });
 
   // Buscar produtos
   const { data: produtos } = useQuery({
     queryKey: ["produtos", empresaId],
-    enabled: !!empresaId && !!pedidoIa,
+    enabled: !!empresaId && open,
     queryFn: async () => {
-      const { data } = await supabase.from("produtos").select("*").eq("empresa_id", empresaId);
+      const { data } = await supabase.from("produtos").select("*, produto_cores(codigo, descricao)").eq("empresa_id", empresaId);
       return data || [];
     }
   });
@@ -56,119 +37,152 @@ export const DialogImportarExcelIa = () => {
       return;
     }
 
-    setIsProcessing(true);
-    setPedidoIa(null);
-
-    try {
-      // 1. Extrai texto do Excel
-      const texto = await extractTextFromExcel(file);
-      // 2. Manda pra IA
-      const dados = await analisarTextoPedidoComIA(texto);
-      
-      setPedidoIa(dados);
-      
-      // Inicializar mapeamentos de itens com vazio
-      setItensMapeados(dados.itens.map(i => ({ original: i, produtoId: "" })));
-      
-    } catch (error: any) {
-      console.error(error);
-      toast.error(`Erro: ${error.message || "Falha ao processar Excel"}`);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Tenta auto-selecionar cliente e produtos quando os dados carregam
-  React.useEffect(() => {
-    if (pedidoIa && clientes && produtos) {
-      // Auto-match cliente
-      if (!clienteId) {
-        const clienteEncontrado = clientes.find(c => {
-          const nomeIgual = c.nome.toLowerCase().trim() === pedidoIa.clienteNome.toLowerCase().trim();
-          const docDB = c.cpf_cnpj?.replace(/\D/g, '') || "";
-          const docPDF = pedidoIa.clienteCnpj?.replace(/\D/g, '') || "";
-          
-          if (docPDF) {
-            return nomeIgual && docDB === docPDF;
-          }
-          return nomeIgual;
-        });
-        
-        if (clienteEncontrado) setClienteId(clienteEncontrado.id);
-      }
-
-      // Auto-match produtos
-      setItensMapeados(prev => {
-        let changed = false;
-        const novos = prev.map(item => {
-          if (!item.produtoId) {
-            const desc = item.original.descricao.toLowerCase().trim();
-            const prod = produtos.find(p => p.nome.toLowerCase().trim() === desc);
-            if (prod) {
-              changed = true;
-              return { ...item, produtoId: prod.id };
-            }
-          }
-          return item;
-        });
-        return changed ? novos : prev;
-      });
-    }
-  }, [pedidoIa, clientes, produtos]);
-
-  const handleItemProdutoChange = (index: number, val: string) => {
-    const novos = [...itensMapeados];
-    novos[index].produtoId = val;
-    setItensMapeados(novos);
-  };
-
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleProsseguir = async () => {
-    let finalClienteId = clienteId;
-
-    if (!finalClienteId && pedidoIa?.clienteNome) {
-      setIsSaving(true);
-      try {
-        const { data: novoCliente, error } = await supabase.from("entidade").insert({
-          empresa_id: empresaId,
-          tipo: "cliente",
-          nome: pedidoIa.clienteNome.toUpperCase(),
-          cpf_cnpj: pedidoIa.clienteCnpj || null
-        }).select("id").single();
-        
-        if (error) throw error;
-        finalClienteId = novoCliente.id;
-        queryClient.invalidateQueries({ queryKey: ["clientes"] });
-      } catch (err: any) {
-        toast.error("Erro ao cadastrar novo cliente: " + err.message);
-        setIsSaving(false);
-        return;
-      }
-      setIsSaving(false);
-    } else if (!finalClienteId) {
-      toast.error("A planilha não tem nome de cliente e nenhum foi selecionado.");
+    if (!produtos || produtos.length === 0) {
+      toast.error("Nenhum produto cadastrado no sistema para vincular.");
       return;
     }
 
-    // Passar os dados para a tela de Novo Pedido
-    navigate("/pedidos/novo", {
-      state: {
-        pedidoImportado: {
-          clienteId: finalClienteId,
-          observacoes: pedidoIa?.observacoes || "",
-          numeroPedido: pedidoIa?.numeroPedido || "",
-          itens: itensMapeados.filter(i => i.produtoId).map(i => ({
-            produto_id: i.produtoId,
-            quantidade: i.original.quantidade,
-            preco_unitario: i.original.precoUnitario,
-          }))
+    setIsProcessing(true);
+
+    try {
+      const dataBuf = await file.arrayBuffer();
+      const workbook = XLSX.read(dataBuf);
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(firstSheet);
+
+      if (data.length === 0) {
+        toast.error("Planilha vazia.");
+        setIsProcessing(false);
+        return;
+      }
+
+      const itensMapeados = [];
+      let produtosEncontrados = 0;
+
+      for (const row of data as any[]) {
+        let sku = '';
+        let nomeProduto = '';
+        let hintCor = "";
+        let hintNome = "";
+        let hintCodCor = "";
+        let hintNomeCor = "";
+        let quantidade = 0;
+
+        for (const key of Object.keys(row)) {
+            const val = String(row[key]).trim();
+            if (!val) continue;
+
+            const normalizedKey = key.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const originalKeyStr = key.trim();
+            
+            if (normalizedKey === 'codigo' || normalizedKey.includes('artigo') || normalizedKey.includes('sku') || normalizedKey.includes('codigo do produto')) {
+              sku = val;
+            }
+            if (normalizedKey === 'produto' || normalizedKey.includes('desc') || normalizedKey.includes('nome do produto') || normalizedKey === 'descricao') {
+              nomeProduto = val;
+            }
+            
+            if (normalizedKey === 'nome' || normalizedKey === 'nome da cor') {
+                hintNome = val;
+            }
+            if (originalKeyStr === 'cor' || originalKeyStr === 'Cor' || originalKeyStr === 'COR') {
+                hintCor = val;
+            }
+            if (normalizedKey.includes('cod cor') || normalizedKey.includes('cód cor') || normalizedKey.includes('codigo da cor')) {
+                hintCodCor = val;
+            }
+            if (normalizedKey === 'nome da cor') {
+                hintNomeCor = val;
+            }
+            
+            if (normalizedKey.includes('quantidade') || normalizedKey.includes('qtd') || normalizedKey.includes('saldo') || normalizedKey.includes('estoque')) {
+              quantidade = Number(row[key]) || 0;
+            }
+        }
+
+        if ((!sku && !nomeProduto) || quantidade <= 0) continue;
+
+        // TENTA PUXAR PELO CÓDIGO (SKU). Só usa o nome se a planilha não tiver enviado código nenhum.
+        const produtoDb = produtos.find((p: any) => {
+            if (sku) {
+                return p.sku && String(p.sku).toLowerCase() === sku.toLowerCase();
+            }
+            return p.nome && String(p.nome).toLowerCase() === nomeProduto.toLowerCase();
+        });
+
+        if (produtoDb) {
+          // Tenta extrair da planilha
+          let corFinal = hintNome || hintNomeCor || "";
+          let codCorFinal = hintCodCor || "";
+          
+          if (!corFinal && hintCor && isNaN(Number(hintCor))) corFinal = String(hintCor);
+          if (!codCorFinal && hintCor && !isNaN(Number(hintCor))) codCorFinal = String(hintCor);
+          if (!codCorFinal && hintCor && !corFinal) codCorFinal = String(hintCor);
+
+          // Limpa espaços em branco extras
+          corFinal = corFinal.trim();
+          codCorFinal = String(codCorFinal).trim();
+
+          // Preenche lacunas com o cadastro de produtos APENAS se algo estiver faltando
+          if (produtoDb.produto_cores && produtoDb.produto_cores.length > 0) {
+              if (codCorFinal && !corFinal) {
+                  // Tem código, mas não tem nome. Busca o nome pelo código.
+                  const corDb = produtoDb.produto_cores.find((c: any) => String(c.codigo).trim() === codCorFinal);
+                  if (corDb) corFinal = corDb.descricao;
+              } else if (!codCorFinal && corFinal) {
+                  // Tem nome, mas não tem código. Busca o código pelo nome.
+                  const corDb = produtoDb.produto_cores.find((c: any) => String(c.descricao).trim().toLowerCase() === corFinal.toLowerCase());
+                  if (corDb) codCorFinal = corDb.codigo || "";
+              } else if (!codCorFinal && !corFinal && produtoDb.produto_cores.length === 1) {
+                  // Não tem nenhum dos dois e o produto só tem 1 cor cadastrada.
+                  corFinal = produtoDb.produto_cores[0].descricao;
+                  codCorFinal = produtoDb.produto_cores[0].codigo || "";
+              }
+          }
+
+          itensMapeados.push({
+            produto_id: produtoDb.id,
+            produto_nome: produtoDb.nome,
+            produto_sku: produtoDb.sku || "",
+            cor: corFinal,
+            codigo_cor: codCorFinal,
+            quantidade,
+            preco_unitario: 0 // Valor base, deverá ser atualizado com a tabela de preços
+          });
+          produtosEncontrados++;
         }
       }
-    });
-    
-    setOpen(false);
-    setPedidoIa(null);
+
+      if (produtosEncontrados === 0) {
+        toast.error("Nenhum produto da planilha foi encontrado no sistema. Verifique a coluna de código/SKU.");
+        setIsProcessing(false);
+        return;
+      }
+
+      toast.success(`${produtosEncontrados} itens encontrados e mapeados!`);
+      
+      setOpen(false);
+      
+      // setTimeout to allow Radix Dialog to cleanup pointer-events before navigating
+      setTimeout(() => {
+          navigate("/pedidos/novo", {
+            state: {
+              pedidoImportado: {
+                clienteId: "",
+                observacoes: "Pedido importado via Excel.",
+                numeroPedido: "",
+                itens: itensMapeados
+              }
+            }
+          });
+      }, 100);
+
+    } catch (err: any) {
+      toast.error("Erro ao processar planilha: " + err.message);
+    } finally {
+      setIsProcessing(false);
+      event.target.value = ''; 
+    }
   };
 
   return (
@@ -176,34 +190,35 @@ export const DialogImportarExcelIa = () => {
       <DialogTrigger asChild>
         <Button variant="secondary" className="gap-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200">
           <FileSpreadsheet className="w-4 h-4" />
-          Importar Excel (IA)
+          Importar Excel
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Importar Pedido de Planilha Excel (IA)</DialogTitle>
+          <DialogTitle>Importar Pedido de Planilha Excel</DialogTitle>
         </DialogHeader>
 
-        {!pedidoIa && !isProcessing && (
+        {!isProcessing && (
           <div className="space-y-4">
             <Alert className="bg-blue-50/50 text-blue-800 border-blue-200/50">
               <Info className="h-4 w-4 text-blue-600" />
-              <AlertTitle className="text-blue-800 font-semibold">Como montar sua planilha?</AlertTitle>
+              <AlertTitle className="text-blue-800 font-semibold">Estrutura da Planilha</AlertTitle>
               <AlertDescription className="text-blue-700/90 text-sm mt-2 space-y-2">
-                <p>A Inteligência Artificial é flexível e não exige um formato rígido, mas é ideal que a planilha contenha:</p>
+                <p>O sistema irá ler os itens da sua planilha e adicioná-los automaticamente a um novo pedido. A planilha deve conter as colunas:</p>
                 <ul className="list-disc list-inside ml-2 space-y-1">
-                  <li><strong>Cliente:</strong> Nome do cliente (e CNPJ se possível).</li>
-                  <li><strong>Produtos:</strong> Descrição, Quantidade e Preço Unitário.</li>
-                  <li><strong>Opcionais:</strong> Número do pedido, forma de pagamento, cor e observações.</li>
+                  <li><strong>Código</strong> ou <strong>Produto</strong></li>
+                  <li><strong>Quantidade</strong></li>
+                  <li><strong>Código da Cor</strong> e/ou <strong>Nome da Cor</strong> (opcional)</li>
                 </ul>
+                <p className="text-xs italic mt-2 text-blue-600/80">O cliente e os preços serão definidos manualmente na próxima tela.</p>
               </AlertDescription>
             </Alert>
 
             <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed rounded-lg border-muted-foreground/25 bg-muted/10 transition-colors hover:bg-muted/20">
               <FileSpreadsheet className="w-10 h-10 text-muted-foreground mb-4" />
               <p className="text-sm text-muted-foreground mb-4">Selecione o arquivo Excel do pedido (.xlsx, .xls)</p>
-              <Input type="file" accept=".xlsx, .xls, .csv" className="max-w-xs cursor-pointer" onChange={handleFileUpload} />
+              <Input type="file" accept=".xlsx, .xls, .csv" className="max-w-xs cursor-pointer" onChange={handleFileUpload} disabled={isProcessing} />
             </div>
           </div>
         )}
@@ -211,75 +226,7 @@ export const DialogImportarExcelIa = () => {
         {isProcessing && (
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
-            <p className="text-sm font-medium">Lendo planilha e processando com IA...</p>
-          </div>
-        )}
-
-        {pedidoIa && (
-          <div className="space-y-6">
-            <div className="p-4 bg-muted/30 rounded-md border space-y-4">
-              <h3 className="font-semibold text-sm flex items-center gap-2">
-                <Check className="w-4 h-4 text-green-600" /> Leitura Concluída
-              </h3>
-              
-              <div className="space-y-2">
-                <Label>Cliente Identificado: <span className="font-normal text-muted-foreground">{pedidoIa.clienteNome}</span></Label>
-                <Select value={clienteId} onValueChange={setClienteId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cliente correspondente..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes?.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.nome} {c.cpf_cnpj ? `(${c.cpf_cnpj})` : ''}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {pedidoIa.observacoes && (
-                <div className="text-xs text-muted-foreground bg-white p-2 rounded border">
-                  <strong>Obs do Excel:</strong> {pedidoIa.observacoes}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold">Mapeamento de Produtos</h4>
-              <p className="text-xs text-muted-foreground">Associe os itens lidos do Excel com os produtos cadastrados no sistema.</p>
-              
-              <div className="space-y-4 border rounded-md p-4 bg-muted/10">
-                {itensMapeados.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b last:border-0 last:pb-0">
-                    <div>
-                      <p className="text-sm font-medium truncate">{item.original.descricao}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Qtd: {item.original.quantidade} | R$ {item.original.precoUnitario}
-                        {item.original.cor ? ` | Cor: ${item.original.cor}` : ''}
-                      </p>
-                    </div>
-                    <div>
-                      <Select value={item.produtoId} onValueChange={(val) => handleItemProdutoChange(idx, val)}>
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Buscar produto no sistema..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {produtos?.map(p => (
-                            <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4">
-              <Button variant="outline" onClick={() => { setPedidoIa(null); setClienteId(""); }} disabled={isSaving}>Cancelar</Button>
-              <Button onClick={handleProsseguir} disabled={isSaving}>
-                {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</> : "Prosseguir e Revisar Valores"}
-              </Button>
-            </div>
+            <p className="text-sm font-medium">Lendo planilha e localizando produtos no cadastro...</p>
           </div>
         )}
       </DialogContent>

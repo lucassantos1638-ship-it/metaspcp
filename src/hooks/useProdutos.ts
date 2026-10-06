@@ -225,20 +225,23 @@ export function useToggleAtivoProduto() {
     mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
       const { error } = await supabase
         .from("produtos")
-        .update({ ativo, updated_at: new Date().toISOString() })
+        .update({ ativo })
         .eq("id", id);
 
       if (error) throw error;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["produtos"] });
+      queryClient.invalidateQueries({ queryKey: ["produto", variables.id] });
+      queryClient.invalidateQueries({ queryKey: ["produto", variables.id, "metricas"] });
       toast({
         title: variables.ativo ? "Produto ativado" : "Produto desativado",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Erro ao atualizar produto",
+        description: error.message,
         variant: "destructive",
       });
     },

@@ -5,6 +5,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,21 +26,24 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useGerarSku } from "@/hooks/useProdutos";
 
 interface ImportarProdutosDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
 
+interface CorImportada {
+    codigo: string;
+    descricao: string;
+}
+
 interface ProdutoImportado {
+    sku: string;
     nome: string;
-    sku?: string;
-    descricao?: string;
-    preco_cpf?: number;
-    preco_cnpj?: number;
+    cores: CorImportada[];
     status: 'pendente' | 'sucesso' | 'erro';
     erro?: string;
+    isNovoProduto?: boolean;
 }
 
 export default function ImportarProdutosDialog({
@@ -84,20 +88,48 @@ export default function ImportarProdutosDialog({
                     return;
                 }
 
-                // Mapear dados
-                const produtosMapeados: ProdutoImportado[] = data.map((row: any) => ({
-                    nome: row['Nome'] || row['nome'] || row['NOME'] || '',
-                    sku: row['SKU'] || row['sku'] || undefined,
-                    descricao: row['Descrição'] || row['descricao'] || row['Descricao'] || undefined,
-                    preco_cpf: Number(row['Preço CPF'] || row['Preco CPF'] || row['preco_cpf'] || 0),
-                    preco_cnpj: Number(row['Preço CNPJ'] || row['Preco CNPJ'] || row['preco_cnpj'] || 0),
-                    status: 'pendente' as 'pendente' | 'sucesso' | 'erro'
-                })).filter(p => p.nome.trim() !== ''); // Ignorar linhas sem nome
+                const produtosMap = new Map<string, ProdutoImportado>();
+
+                data.forEach((row: any) => {
+                    let sku = '';
+                    let nome = '';
+                    let codigoCor = '';
+                    let nomeCor = '';
+
+                    for (const key of Object.keys(row)) {
+                        const normalizedKey = key.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        
+                        if (normalizedKey === 'artigo' || normalizedKey === 'sku') sku = String(row[key]).trim();
+                        if (normalizedKey === 'descricao' || normalizedKey === 'nome') nome = String(row[key]).trim();
+                        if (normalizedKey === 'cor' || normalizedKey === 'cod cor' || normalizedKey === 'codigo cor' || normalizedKey === 'codigo') codigoCor = String(row[key]).trim();
+                        if (normalizedKey === 'desc cor' || normalizedKey === 'descricao cor' || normalizedKey === 'nome cor') nomeCor = String(row[key]).trim();
+                    }
+
+                    if (!sku) return;
+
+                    if (!produtosMap.has(sku)) {
+                        produtosMap.set(sku, {
+                            sku,
+                            nome: nome || 'Produto sem nome',
+                            cores: [],
+                            status: 'pendente'
+                        });
+                    }
+
+                    if (nomeCor) {
+                        produtosMap.get(sku)!.cores.push({
+                            codigo: codigoCor !== 'undefined' ? codigoCor : '',
+                            descricao: nomeCor
+                        });
+                    }
+                });
+
+                const produtosMapeados = Array.from(produtosMap.values());
 
                 if (produtosMapeados.length === 0) {
                     toast({
                         title: "Nenhum produto válido",
-                        description: "Certifique-se que a planilha tem uma coluna chamada 'Nome'.",
+                        description: "Certifique-se que a planilha tem a coluna 'Artigo' ou 'SKU'.",
                         variant: "destructive",
                     });
                 }
@@ -117,44 +149,73 @@ export default function ImportarProdutosDialog({
         reader.readAsBinaryString(selectedFile);
     };
 
-    const gerarSkuAuto = () => {
-        // Função auxiliar simples para caso não venha SKU
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let result = '';
-        for (let i = 0; i < 8; i++) {
-            result += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return result;
-    }
-
     const handleImportar = async () => {
         if (produtosParaImportar.length === 0) return;
 
         setLoading(true);
         let sucessos = 0;
         let erros = 0;
+        let coresAdicionadas = 0;
         const novosProdutos = [...produtosParaImportar];
 
         for (let i = 0; i < novosProdutos.length; i++) {
             const prod = novosProdutos[i];
 
             try {
-                // Gerar SKU se não existir
-                const skuParaSalvar = prod.sku || gerarSkuAuto();
-
-                const { error } = await supabase
+                let produtoId;
+                const { data: prodExistente, error: checkError } = await supabase
                     .from("produtos")
-                    .insert({
-                        nome: prod.nome,
-                        sku: skuParaSalvar,
-                        descricao: prod.descricao,
-                        preco_cpf: prod.preco_cpf || 0,
-                        preco_cnpj: prod.preco_cnpj || 0,
-                        empresa_id: empresaId,
-                        ativo: true,
-                    });
+                    .select("id")
+                    .eq("sku", prod.sku)
+                    .eq("empresa_id", empresaId!)
+                    .maybeSingle();
 
-                if (error) throw error;
+                if (checkError) throw checkError;
+
+                if (!prodExistente) {
+                    const { data: newProd, error: insertError } = await supabase
+                        .from("produtos")
+                        .insert({
+                            nome: prod.nome,
+                            sku: prod.sku,
+                            empresa_id: empresaId!,
+                            ativo: true,
+                        })
+                        .select("id")
+                        .single();
+
+                    if (insertError) throw insertError;
+                    produtoId = newProd.id;
+                    prod.isNovoProduto = true;
+                } else {
+                    produtoId = prodExistente.id;
+                    prod.isNovoProduto = false;
+                }
+
+                if (prod.cores.length > 0) {
+                    const { data: coresExistentes } = await supabase
+                        .from('produto_cores')
+                        .select('descricao, codigo')
+                        .eq('produto_id', produtoId);
+                    
+                    const coresParaInserir = prod.cores.filter(c => 
+                        !coresExistentes?.some(ce => ce.descricao.toLowerCase().trim() === c.descricao.toLowerCase().trim())
+                    ).map(c => ({
+                        produto_id: produtoId,
+                        empresa_id: empresaId!,
+                        codigo: c.codigo || null,
+                        descricao: c.descricao
+                    }));
+
+                    if (coresParaInserir.length > 0) {
+                        const { error: insertCoresError } = await supabase
+                            .from('produto_cores')
+                            .insert(coresParaInserir);
+                        
+                        if (insertCoresError) throw insertCoresError;
+                        coresAdicionadas += coresParaInserir.length;
+                    }
+                }
 
                 novosProdutos[i].status = 'sucesso';
                 sucessos++;
@@ -172,12 +233,11 @@ export default function ImportarProdutosDialog({
         if (sucessos > 0) {
             toast({
                 title: "Importação concluída",
-                description: `${sucessos} produtos importados com sucesso. ${erros > 0 ? `${erros} erros.` : ''}`,
-                variant: erros > 0 ? "default" : "default", // Ajustar variante se necessário
+                description: `${sucessos} produtos processados. ${coresAdicionadas} novas cores inseridas. ${erros > 0 ? `${erros} erros.` : ''}`,
+                variant: erros > 0 ? "default" : "default",
             });
             queryClient.invalidateQueries({ queryKey: ["produtos"] });
 
-            // Se tudo deu certo, fechar
             if (erros === 0) {
                 onOpenChange(false);
                 resetForm();
@@ -185,7 +245,7 @@ export default function ImportarProdutosDialog({
         } else {
             toast({
                 title: "Erro na importação",
-                description: "Nenhum produto foi importado. Verifique os erros na lista.",
+                description: "Nenhum produto foi processado. Verifique os erros na lista.",
                 variant: "destructive",
             });
         }
@@ -193,14 +253,17 @@ export default function ImportarProdutosDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[90vh]">
+            <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>Importar Produtos via Excel</DialogTitle>
+                    <DialogDescription>
+                        Envie uma planilha para cadastrar novos produtos ou adicionar cores aos existentes.
+                    </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-6">
+                <div className="flex-1 overflow-hidden flex flex-col space-y-4 min-h-0">
                     {!file ? (
-                        <div className="border-2 border-dashed rounded-lg p-10 flex flex-col items-center justify-center text-center space-y-4 hover:bg-muted/50 transition-colors">
+                        <div className="border-2 border-dashed rounded-lg p-10 flex flex-col items-center justify-center text-center space-y-4 hover:bg-muted/50 transition-colors h-full">
                             <div className="bg-primary/10 p-4 rounded-full">
                                 <FileSpreadsheet className="h-8 w-8 text-primary" />
                             </div>
@@ -209,9 +272,15 @@ export default function ImportarProdutosDialog({
                                 <p className="text-sm text-muted-foreground">
                                     Formatos suportados: .xlsx, .xls, .csv
                                 </p>
-                                <p className="text-xs text-muted-foreground mt-2">
-                                    Colunas esperadas: <strong>Nome</strong>, SKU (opcional), Descrição (opcional), <strong>Preço CPF</strong> (opcional), <strong>Preço CNPJ</strong> (opcional)
-                                </p>
+                                <div className="mt-4 text-sm text-muted-foreground bg-muted p-4 rounded-md inline-block text-left">
+                                    <p><strong>Colunas suportadas:</strong></p>
+                                    <ul className="list-disc list-inside mt-2 space-y-1">
+                                        <li><strong>Artigo</strong> ou <strong>SKU</strong> (Obrigatório)</li>
+                                        <li><strong>Descrição</strong> ou <strong>Nome</strong></li>
+                                        <li><strong>Cor</strong> (Código da cor)</li>
+                                        <li><strong>Desc. Cor</strong> (Nome da cor)</li>
+                                    </ul>
+                                </div>
                             </div>
                             <Input
                                 type="file"
@@ -228,8 +297,8 @@ export default function ImportarProdutosDialog({
                             </Button>
                         </div>
                     ) : (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
+                        <div className="flex-1 flex flex-col space-y-4 min-h-0 h-full">
+                            <div className="flex items-center justify-between shrink-0">
                                 <div className="flex items-center gap-2">
                                     <FileSpreadsheet className="h-5 w-5 text-green-600" />
                                     <span className="font-medium">{file.name}</span>
@@ -240,16 +309,14 @@ export default function ImportarProdutosDialog({
                                 </Button>
                             </div>
 
-                            <ScrollArea className="h-[400px] border rounded-md">
+                            <ScrollArea className="flex-1 border rounded-md">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Status</TableHead>
-                                            <TableHead>Nome</TableHead>
-                                            <TableHead>SKU</TableHead>
-                                            <TableHead>Desc.</TableHead>
-                                            <TableHead>R$ CPF</TableHead>
-                                            <TableHead>R$ CNPJ</TableHead>
+                                            <TableHead>Artigo (SKU)</TableHead>
+                                            <TableHead>Descrição (Nome)</TableHead>
+                                            <TableHead>Qtd. Cores</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -265,18 +332,14 @@ export default function ImportarProdutosDialog({
                                                         </div>
                                                     )}
                                                 </TableCell>
-                                                <TableCell>{prod.nome}</TableCell>
-                                                <TableCell className="font-mono text-xs text-muted-foreground">
-                                                    {prod.sku || <em>Auto-gerar</em>}
-                                                </TableCell>
-                                                <TableCell className="text-xs text-muted-foreground truncate max-w-[150px]">
-                                                    {prod.descricao || '-'}
+                                                <TableCell className="font-mono text-xs">{prod.sku}</TableCell>
+                                                <TableCell className="text-xs truncate max-w-[200px]">
+                                                    {prod.nome}
                                                 </TableCell>
                                                 <TableCell className="text-xs">
-                                                    {prod.preco_cpf ? `R$ ${prod.preco_cpf.toFixed(2)}` : '-'}
-                                                </TableCell>
-                                                <TableCell className="text-xs">
-                                                    {prod.preco_cnpj ? `R$ ${prod.preco_cnpj.toFixed(2)}` : '-'}
+                                                    {prod.cores.length > 0 ? (
+                                                        <Badge variant="secondary">{prod.cores.length}</Badge>
+                                                    ) : '-'}
                                                 </TableCell>
                                             </TableRow>
                                         ))}

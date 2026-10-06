@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Box, Loader2, Maximize, Minimize, ChevronDown, ChevronRight, PackageOpen, Download } from "lucide-react";
+import { Box, Loader2, Maximize, Minimize, ChevronDown, ChevronRight, PackageOpen, Download, Search } from "lucide-react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -44,6 +44,7 @@ export default function ProgramacaoSemanal() {
     };
 
     const [modalSemanaIndex, setModalSemanaIndex] = useState<number | null>(null);
+    const [filtroPedidoModal, setFiltroPedidoModal] = useState<string>("");
 
     useEffect(() => {
         if (empresaId) {
@@ -353,7 +354,20 @@ export default function ProgramacaoSemanal() {
         
         data.forEach(row => {
             if (row.isSummary) {
-                const totalQtd = row.entregasPorSemana[modalSemanaIndex];
+                // Wait, if it's summary, we need to gather all orders across colors for this product!
+                const pedidosDaSemana = row.pedidosPorSemana[modalSemanaIndex] || [];
+                let filteredPedidos = [...pedidosDaSemana];
+                
+                if (filtroPedidoModal) {
+                    const term = filtroPedidoModal.toLowerCase();
+                    filteredPedidos = filteredPedidos.filter((p: any) => 
+                        (p.numero && String(p.numero).toLowerCase().includes(term)) || 
+                        (p.cliente && String(p.cliente).toLowerCase().includes(term))
+                    );
+                }
+                
+                const totalQtd = filteredPedidos.reduce((acc: number, p: any) => acc + (p.quantidade || 0), 0);
+                
                 if (totalQtd > 0) {
                     result.push({
                         isSummary: true,
@@ -362,6 +376,7 @@ export default function ProgramacaoSemanal() {
                         codCor: "",
                         cor: "",
                         estoque: row.estoque,
+                        estoqueCortes: row.estoqueCortes,
                         pedido: "",
                         cliente: "",
                         data_entrega: "",
@@ -370,9 +385,24 @@ export default function ProgramacaoSemanal() {
                     });
                 }
             } else {
-                const pedidos = row.pedidosPorSemana[modalSemanaIndex];
-                if (pedidos && pedidos.length > 0) {
-                    pedidos.forEach((p: any) => {
+                const pedidos = row.pedidosPorSemana[modalSemanaIndex] || [];
+                let filteredPedidos = [...pedidos];
+                
+                if (filtroPedidoModal) {
+                    const term = filtroPedidoModal.toLowerCase();
+                    filteredPedidos = filteredPedidos.filter((p: any) => 
+                        (p.numero && String(p.numero).toLowerCase().includes(term)) || 
+                        (p.cliente && String(p.cliente).toLowerCase().includes(term))
+                    );
+                }
+                
+                if (filteredPedidos.length > 0) {
+                    // Sort by client
+                    filteredPedidos.sort((a: any, b: any) => (a.cliente || "").localeCompare(b.cliente || ""));
+                    
+                    const corTotalQtd = filteredPedidos.reduce((acc: number, p: any) => acc + (p.quantidade || 0), 0);
+                    
+                    filteredPedidos.forEach((p: any) => {
                         result.push({
                             isSummary: false,
                             codigo: "",
@@ -380,11 +410,12 @@ export default function ProgramacaoSemanal() {
                             codCor: row.codCor,
                             cor: row.cor,
                             estoque: row.estoque,
+                            estoqueCortes: row.estoqueCortes,
                             pedido: p.numero || "-",
                             cliente: p.cliente || "Sem nome",
                             data_entrega: p.data_entrega,
                             qtd: p.quantidade,
-                            saldo: (row.estoque !== null ? row.estoque : 0) - row.entregasPorSemana[modalSemanaIndex]
+                            saldo: (row.estoque !== null ? row.estoque : 0) - corTotalQtd
                         });
                     });
                 }
@@ -392,7 +423,7 @@ export default function ProgramacaoSemanal() {
         });
         
         return result;
-    }, [data, modalSemanaIndex]);
+    }, [data, modalSemanaIndex, filtroPedidoModal]);
 
     const formatVal = (val: number) => {
         if (!val) return "0";
@@ -459,32 +490,65 @@ export default function ProgramacaoSemanal() {
         XLSX.writeFile(workbook, `programacao-semanal-${tipo}-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
     };
 
-    const handleExportModalPDF = () => {
+    const handleExportModalPDF = (tipo: 'resumo' | 'total' = 'total') => {
         if (!modalRows || modalRows.length === 0 || modalSemanaIndex === null) return;
 
         const doc = new jsPDF('landscape');
         
         doc.setFontSize(14);
         const periodo = `${format(semanasDoMes[modalSemanaIndex].start, "dd/MM")} a ${format(semanasDoMes[modalSemanaIndex].end, "dd/MM")}`;
-        doc.text(`Entregas da Semana: ${periodo}`, 14, 15);
         
-        const head = [[
-            "CÓDIGO", "PRODUTO", "CÓD. COR", "COR", "ESTOQUE", "Nº PEDIDO", "CLIENTE", "ENTREGA", "QTD", "SALDO"
-        ]];
+        let titulo = `Entregas da Semana (${tipo === 'resumo' ? 'Resumido' : 'Total'}): ${periodo}`;
+        if (filtroPedidoModal) {
+            titulo += ` - Filtro: ${filtroPedidoModal}`;
+        }
         
-        const body = modalRows.map(r => {
-            return [
-                r.codigo || r.codCor || "",
-                r.isSummary ? r.produto : "",
-                r.codCor || "",
-                r.cor || "",
-                r.estoque !== null ? formatVal(r.estoque) : '',
-                r.pedido || "",
-                r.cliente || "",
-                r.data_entrega ? format(parseISO(r.data_entrega), "dd/MM/yyyy") : "",
-                formatVal(r.qtd),
-                r.estoque !== null ? formatVal(r.saldo) : ''
-            ];
+        const clients = new Set<string>();
+        modalRows.forEach(r => {
+            if (!r.isSummary && r.cliente && r.cliente !== "Sem nome") {
+                clients.add(r.cliente);
+            }
+        });
+        const clientList = Array.from(clients);
+        if (clientList.length > 0 && clientList.length <= 4) {
+            titulo += ` - Clientes: ${clientList.join(', ')}`;
+        } else if (clientList.length > 4) {
+            titulo += ` - ${clientList.length} Clientes`;
+        }
+        
+        doc.text(titulo, 14, 15);
+        
+        const head = tipo === 'resumo' 
+            ? [["CÓDIGO", "PRODUTO", "ESTOQUE", "CORTES", "QTD TOTAL", "SALDO"]]
+            : [["CÓDIGO", "PRODUTO", "CÓD. COR", "COR", "ESTOQUE", "CORTES", "Nº PEDIDO", "CLIENTE", "ENTREGA", "QTD", "SALDO"]];
+        
+        const filteredRows = tipo === 'resumo' ? modalRows.filter(r => r.isSummary) : modalRows;
+        
+        const body = filteredRows.map(r => {
+            if (tipo === 'resumo') {
+                return [
+                    r.codigo || "",
+                    r.produto || "",
+                    r.estoque !== null ? formatVal(r.estoque) : '',
+                    r.estoqueCortes !== null && r.estoqueCortes !== undefined ? formatVal(r.estoqueCortes) : '',
+                    formatVal(r.qtd),
+                    r.estoque !== null ? formatVal(r.saldo) : ''
+                ];
+            } else {
+                return [
+                    r.codigo || r.codCor || "",
+                    r.isSummary ? r.produto : "",
+                    r.codCor || "",
+                    r.cor || "",
+                    r.estoque !== null ? formatVal(r.estoque) : '',
+                    r.estoqueCortes !== null && r.estoqueCortes !== undefined ? formatVal(r.estoqueCortes) : '',
+                    r.pedido || "",
+                    r.cliente || "",
+                    r.data_entrega ? format(parseISO(r.data_entrega + "T00:00:00"), "dd/MM/yyyy") : "",
+                    formatVal(r.qtd),
+                    r.estoque !== null ? formatVal(r.saldo) : ''
+                ];
+            }
         });
 
         autoTable(doc, {
@@ -501,10 +565,11 @@ export default function ProgramacaoSemanal() {
             headStyles: { fillColor: [79, 70, 229], fontSize: 7, halign: 'center', textColor: [255, 255, 255] },
             columnStyles: {
                 0: { cellWidth: 15 },
-                1: { cellWidth: 50 },
-                4: { halign: 'right' },
-                8: { halign: 'right' },
-                9: { halign: 'right' }
+                1: { cellWidth: tipo === 'resumo' ? 80 : 50 },
+                [tipo === 'resumo' ? 2 : 4]: { halign: 'right' },
+                [tipo === 'resumo' ? 3 : 5]: { halign: 'right' },
+                [tipo === 'resumo' ? 4 : 9]: { halign: 'right' },
+                [tipo === 'resumo' ? 5 : 10]: { halign: 'right' }
             },
             didParseCell: function(d: any) {
                 if (d.section === 'body') {
@@ -517,7 +582,7 @@ export default function ProgramacaoSemanal() {
             }
         });
 
-        doc.save(`entregas-semana-${periodo.replace(/\//g, '-')}.pdf`);
+        doc.save(`entregas-semana-${tipo}-${periodo.replace(/\//g, '-')}.pdf`);
     };
 
     const handleExportPDF = (tipo: 'resumo' | 'total') => {
@@ -852,7 +917,7 @@ export default function ProgramacaoSemanal() {
                 </Card>
             </div>
 
-            <Dialog open={modalSemanaIndex !== null} onOpenChange={(open) => !open && setModalSemanaIndex(null)}>
+            <Dialog open={modalSemanaIndex !== null} onOpenChange={(open) => { if (!open) { setModalSemanaIndex(null); setFiltroPedidoModal(""); } }}>
                 <DialogContent className="max-w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden">
                     <DialogHeader className="p-6 pb-2 relative">
                         <DialogTitle className="text-xl flex items-center gap-2">
@@ -866,20 +931,42 @@ export default function ProgramacaoSemanal() {
                             Visualização geral de todos os produtos com pedidos agendados para esta semana.
                         </DialogDescription>
                         
-                        <div className="absolute right-12 top-6">
-                            <button
-                                onClick={handleExportModalPDF}
-                                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-md transition-colors border border-red-200"
-                            >
-                                <Download className="w-4 h-4" />
-                                PDF
-                            </button>
+                        <div className="absolute right-12 top-6 flex items-center gap-4">
+                            <div className="flex items-center gap-2 border border-slate-300 rounded-md px-2 py-1.5 bg-white shadow-sm">
+                                <Search className="w-4 h-4 text-slate-400" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Cliente ou Pedido..." 
+                                    value={filtroPedidoModal}
+                                    onChange={e => setFiltroPedidoModal(e.target.value)}
+                                    className="text-sm border-none outline-none w-36 bg-transparent text-slate-700 font-medium"
+                                />
+                            </div>
+                            
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button
+                                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-md transition-colors border border-red-200"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                        PDF
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem onClick={() => handleExportModalPDF('resumo')} className="cursor-pointer text-sm">
+                                        Resumido (Só Produtos)
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleExportModalPDF('total')} className="cursor-pointer text-sm">
+                                        Completo (Com Cores)
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     </DialogHeader>
 
                     <div className="flex-1 overflow-auto p-6 pt-0">
                         <div className="border rounded-md">
-                            <Table className="text-sm">
+                            <Table className="text-xs">
                                 <TableHeader className="bg-slate-100 sticky top-0 z-10">
                                     <TableRow>
                                         <TableHead className="font-bold text-slate-700 w-[80px]">CÓDIGO</TableHead>

@@ -85,12 +85,15 @@ export default function NovoPedido() {
     // Items state
     const [itens, setItens] = useState<PedidoItem[]>(pedidoImportado?.itens?.map((i: any) => ({
         produto_id: i.produto_id,
-        produto_nome: "Item Importado (IA)",
+        produto_nome: i.produto_nome || "Item Importado",
+        produto_sku: i.produto_sku || "",
+        cor: i.cor || "",
+        codigo_cor: i.codigo_cor || "",
         quantidade: i.quantidade,
-        preco_unitario: i.preco_unitario,
+        preco_unitario: i.preco_unitario || 0,
         tipo_desconto: 'percentual',
         desconto: 0,
-        subtotal: i.quantidade * i.preco_unitario
+        subtotal: i.quantidade * (i.preco_unitario || 0)
     })) || []);
 
     // Add Item Form State
@@ -369,7 +372,6 @@ export default function NovoPedido() {
 
     const saveMutation = useMutation({
         mutationFn: async () => {
-            if (!clienteId || !tabelaPrecoId) throw new Error("Cliente e Tabela de Preço são obrigatórios");
             if (itens.length === 0) throw new Error("Adicione pelo menos um item ao pedido");
 
             const statusEnum = parseStatusFromTipoVenda(tipoVenda);
@@ -382,8 +384,8 @@ export default function NovoPedido() {
                     .update({
                         data_emissao: dataEmissao,
                         numero: numero || null,
-                        cliente_id: clienteId,
-                        tabela_preco_id: tabelaPrecoId,
+                        cliente_id: clienteId || null,
+                        tabela_preco_id: tabelaPrecoId || null,
                         tipo_venda: tipoVenda,
                         movimenta_estoque: movimentaEstoque,
                         observacao: observacao,
@@ -404,8 +406,8 @@ export default function NovoPedido() {
                         empresa_id: empresaId,
                         data_emissao: dataEmissao,
                         numero: numero || null,
-                        cliente_id: clienteId,
-                        tabela_preco_id: tabelaPrecoId,
+                        cliente_id: clienteId || null,
+                        tabela_preco_id: tabelaPrecoId || null,
                         tipo_venda: tipoVenda,
                         movimenta_estoque: movimentaEstoque,
                         observacao: observacao,
@@ -518,7 +520,7 @@ export default function NovoPedido() {
 
                             {/* Linha 2 */}
                             <div className="space-y-2">
-                                <Label>Cliente *</Label>
+                                <Label>Cliente</Label>
                                 <Select value={clienteId} onValueChange={setClienteId}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Selecione um cliente..." />
@@ -534,7 +536,7 @@ export default function NovoPedido() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Tabela de Preço *</Label>
+                                <Label>Tabela de Preço</Label>
                                 <Select value={tabelaPrecoId} onValueChange={setTabelaPrecoId}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Selecione a tabela..." />

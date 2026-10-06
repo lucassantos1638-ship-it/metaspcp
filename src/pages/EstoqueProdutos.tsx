@@ -162,24 +162,13 @@ export default function EstoqueProdutos() {
 
     setIsProcessing(true);
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const dataBuf = await file.arrayBuffer();
+      const workbook = XLSX.read(dataBuf);
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
+      const data = XLSX.utils.sheet_to_json(firstSheet);
 
-      if (rows.length < 2) {
-        toast.error("Planilha vazia ou sem cabeçalhos.");
-        setIsProcessing(false);
-        return;
-      }
-
-      const headers = rows[0].map(h => String(h || "").toLowerCase());
-      const idxProduto = headers.findIndex(h => h.includes("produto") || h.includes("sku") || h.includes("nome") || h.includes("referencia"));
-      const idxCor = headers.findIndex(h => h.includes("cor"));
-      const idxQtd = headers.findIndex(h => h.includes("quantidade") || h.includes("qtd") || h.includes("saldo") || h.includes("estoque"));
-
-      if (idxProduto === -1 || idxQtd === -1) {
-        toast.error("A planilha deve conter pelo menos as colunas: Produto (ou SKU) e Quantidade.");
+      if (data.length === 0) {
+        toast.error("Planilha vazia.");
         setIsProcessing(false);
         return;
       }
@@ -187,28 +176,73 @@ export default function EstoqueProdutos() {
       const novosEstoquesCores: EstoqueCor[] = [];
       const mapaTotalPorProduto: Record<string, number> = {};
       
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row || !row[idxProduto]) continue;
+      let produtosEncontrados = 0;
 
-        const identificador = String(row[idxProduto]).trim();
-        const cor = idxCor !== -1 && row[idxCor] ? String(row[idxCor]).trim() : "Única";
-        const quantidade = Number(row[idxQtd]) || 0;
+      for (const row of data as any[]) {
+        let sku = '';
+        let nomeProduto = '';
+        let corCodigo = '';
+        let corNome = '';
+        let quantidade = 0;
+
+        for (const key of Object.keys(row)) {
+            const normalizedKey = key.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            
+            if (normalizedKey.includes('artigo') || normalizedKey.includes('sku') || normalizedKey.includes('codigo do produto') || normalizedKey === 'codigo') sku = String(row[key]).trim();
+            if (normalizedKey.includes('desc') || normalizedKey.includes('nome do produto')) nomeProduto = String(row[key]).trim();
+            if (normalizedKey === 'cor' || normalizedKey.includes('nome da cor') || normalizedKey.includes('desc cor') || normalizedKey.includes('descricao cor')) corNome = String(row[key]).trim();
+            if (normalizedKey.includes('cod cor') || normalizedKey.includes('codigo cor') || normalizedKey.includes('codigo da cor')) corCodigo = String(row[key]).trim();
+            if (normalizedKey.includes('quantidade') || normalizedKey.includes('qtd') || normalizedKey.includes('saldo') || normalizedKey.includes('estoque')) quantidade = Number(row[key]) || 0;
+        }
+
+        const identificador = sku || nomeProduto;
+        if (!identificador) continue;
+
+        const corFinal = corNome || "Única";
 
         const produtoDb = produtos.find(
-          p => p.nome.toLowerCase() === identificador.toLowerCase() || p.sku?.toLowerCase() === identificador.toLowerCase()
+          p => p.sku?.toLowerCase() === identificador.toLowerCase() || p.nome.toLowerCase() === identificador.toLowerCase()
         );
 
         if (produtoDb) {
+          let corFinal = corNome || "Única";
+
+          if (produtoDb.produto_cores && produtoDb.produto_cores.length > 0) {
+            const coresCadastradas = produtoDb.produto_cores;
+            
+            let matchedCor = null;
+            
+            if (corCodigo) {
+              matchedCor = coresCadastradas.find((c: any) => c.codigo && String(c.codigo).trim() === corCodigo);
+            }
+            if (!matchedCor && corNome) {
+              matchedCor = coresCadastradas.find((c: any) => c.descricao && String(c.descricao).toLowerCase().trim() === corNome.toLowerCase());
+            }
+            if (!matchedCor && corNome) {
+              matchedCor = coresCadastradas.find((c: any) => c.codigo && String(c.codigo).trim() === corNome);
+            }
+
+            if (matchedCor) {
+              corFinal = matchedCor.descricao;
+            }
+          }
+
           novosEstoquesCores.push({
             produtoId: produtoDb.id,
             produtoNome: produtoDb.nome,
             produtoSku: produtoDb.sku || "",
-            cor,
+            cor: corFinal,
             quantidade
           });
           mapaTotalPorProduto[produtoDb.id] = (mapaTotalPorProduto[produtoDb.id] || 0) + quantidade;
+          produtosEncontrados++;
         }
+      }
+
+      if (produtosEncontrados === 0) {
+        toast.error("Nenhum produto da planilha foi encontrado no sistema. Verifique a coluna de código/SKU.");
+        setIsProcessing(false);
+        return;
       }
 
       let totalAtualizados = 0;
@@ -526,19 +560,25 @@ export default function EstoqueProdutos() {
                 <table className="w-full text-xs text-left">
                   <thead>
                     <tr className="border-b border-border/50">
-                      <th className="pb-2 font-semibold">SKU <span className="font-normal italic text-muted-foreground">(ou Produto)</span></th>
-                      <th className="pb-2 font-semibold">Cor</th>
+                      <th className="pb-2 font-semibold">Código do Produto</th>
+                      <th className="pb-2 font-semibold">Descrição</th>
+                      <th className="pb-2 font-semibold">Código da Cor</th>
+                      <th className="pb-2 font-semibold">Nome da Cor</th>
                       <th className="pb-2 font-semibold text-right">Quantidade</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
                       <td className="py-2 text-muted-foreground">CAM-001</td>
+                      <td className="py-2 text-muted-foreground">Camiseta</td>
+                      <td className="py-2 text-muted-foreground">123</td>
                       <td className="py-2 text-muted-foreground">Azul</td>
                       <td className="py-2 text-right font-mono font-medium">50</td>
                     </tr>
                     <tr>
                       <td className="py-2 text-muted-foreground">CAM-001</td>
+                      <td className="py-2 text-muted-foreground">Camiseta</td>
+                      <td className="py-2 text-muted-foreground">124</td>
                       <td className="py-2 text-muted-foreground">Verde</td>
                       <td className="py-2 text-right font-mono font-medium">35</td>
                     </tr>
