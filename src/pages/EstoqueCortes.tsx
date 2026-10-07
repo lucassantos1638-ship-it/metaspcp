@@ -174,8 +174,8 @@ export default function EstoqueCortes() {
       }
 
       const headers = rows[0].map(h => String(h || "").toLowerCase());
-      const idxProduto = headers.findIndex(h => h.includes("produto") || h.includes("sku") || h.includes("nome") || h.includes("referencia"));
-      const idxCor = headers.findIndex(h => h.includes("cor"));
+      const idxProduto = headers.findIndex(h => h.includes("código do produto") || h.includes("codigo") || h.includes("código") || h.includes("produto") || h.includes("sku") || h.includes("nome") || h.includes("referencia"));
+      const idxCor = headers.findIndex(h => h.includes("descor") || h.includes("nome da cor") || h.includes("cor"));
       const idxQtd = headers.findIndex(h => h.includes("quantidade") || h.includes("qtd") || h.includes("saldo") || h.includes("estoque"));
 
       if (idxProduto === -1 || idxQtd === -1) {
