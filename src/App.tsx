@@ -44,6 +44,7 @@ import NovoPedido from "./pages/NovoPedido";
 import RelatoriosPedidosPage from "./pages/RelatoriosPedidosPage";
 import EstoqueProdutos from "./pages/EstoqueProdutos";
 import EstoqueCortes from "./pages/EstoqueCortes";
+import EstoqueMinimo from "./pages/EstoqueMinimo";
 import EstoqueMateriais from "./pages/EstoqueMateriais";
 import EstoqueTercerizacao from "./pages/EstoqueTercerizacao";
 
@@ -287,6 +288,15 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredPermission="produtos">
                     <EstoqueCortes />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/estoque-minimo"
+                element={
+                  <ProtectedRoute requiredPermission="produtos">
+                    <EstoqueMinimo />
                   </ProtectedRoute>
                 }
               />

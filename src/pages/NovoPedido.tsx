@@ -21,8 +21,23 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
-import { Plus, Trash2, ArrowLeft, Search } from "lucide-react";
+import { useProdutos } from "@/hooks/useProdutos";
+import { Plus, Trash2, ArrowLeft, Search, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface ProdutoTabela {
@@ -98,6 +113,7 @@ export default function NovoPedido() {
 
     // Add Item Form State
     const [produtoSelecionadoId, setProdutoSelecionadoId] = useState("");
+    const [produtoPopoverOpen, setProdutoPopoverOpen] = useState(false);
     const [quantidade, setQuantidade] = useState<string>("1");
     // Preco is pulled automatically from the table
     const [descontoGlobalTipo, setDescontoGlobalTipo] = useState<'percentual' | 'valor'>('percentual');
@@ -249,6 +265,8 @@ export default function NovoPedido() {
         },
     });
 
+    const { data: todosProdutos } = useProdutos(true);
+
     const { data: produtosDaTabela } = useQuery({
         queryKey: ["produtos_tabela", tabelaPrecoId],
         enabled: !!tabelaPrecoId,
@@ -304,10 +322,25 @@ export default function NovoPedido() {
             return;
         }
 
+        let preco = 0;
+        let produto_nome = "";
+        let produto_sku = "";
+
         const produtoTabela = produtosDaTabela?.find(p => p.produto_id === produtoSelecionadoId);
-        if (!produtoTabela) {
-            toast.error("Produto não encontrado na tabela de preços.");
-            return;
+        if (produtoTabela) {
+            preco = produtoTabela.preco;
+            produto_nome = produtoTabela.produto_nome;
+            produto_sku = produtoTabela.produto_sku;
+        } else {
+            const prod = todosProdutos?.find(p => p.id === produtoSelecionadoId);
+            if (prod) {
+                preco = 0;
+                produto_nome = prod.nome;
+                produto_sku = prod.sku || "";
+            } else {
+                toast.error("Produto não encontrado.");
+                return;
+            }
         }
 
         const parsedDescLocal = parseFloat(descontoGlobal.replace(",", "."));
@@ -331,16 +364,16 @@ export default function NovoPedido() {
             }
             const colorObj = coresProduto.find(c => c.descricao === corSelecionada);
             return [...prev, {
-                produto_id: produtoTabela.produto_id,
-                produto_nome: produtoTabela.produto_nome,
-                produto_sku: produtoTabela.produto_sku,
+                produto_id: produtoSelecionadoId,
+                produto_nome: produto_nome,
+                produto_sku: produto_sku,
                 cor: corSelecionada,
                 codigo_cor: colorObj?.codigo || "",
                 quantidade: qtd,
-                preco_unitario: produtoTabela.preco,
+                preco_unitario: preco,
                 tipo_desconto: descontoGlobalTipo,
                 desconto: descLocalValido,
-                subtotal: calcularSubtotal(qtd, produtoTabela.preco, descontoGlobalTipo, descLocalValido)
+                subtotal: calcularSubtotal(qtd, preco, descontoGlobalTipo, descLocalValido)
             }];
         });
 
@@ -581,18 +614,56 @@ export default function NovoPedido() {
                             <div className="grid grid-cols-12 gap-4 items-end bg-muted/30 p-4 rounded-lg border">
                                 <div className="col-span-12 sm:col-span-4 space-y-2">
                                     <Label>Produto</Label>
-                                    <Select value={produtoSelecionadoId} onValueChange={setProdutoSelecionadoId}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Selecione um produto cadastrado na tabela..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {produtosDaTabela?.map(p => (
-                                                <SelectItem key={p.produto_id} value={p.produto_id}>
-                                                    {p.produto_sku ? `[${p.produto_sku}] ` : ""}{p.produto_nome} - {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(p.preco)}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <Popover open={produtoPopoverOpen} onOpenChange={setProdutoPopoverOpen}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                role="combobox"
+                                                aria-expanded={produtoPopoverOpen}
+                                                className="w-full justify-between font-normal text-left truncate"
+                                            >
+                                                {produtoSelecionadoId
+                                                    ? (() => {
+                                                        const p = todosProdutos?.find((prod) => prod.id === produtoSelecionadoId);
+                                                        return p ? `${p.sku ? `[${p.sku}] ` : ""}${p.nome}` : "Selecione um produto...";
+                                                    })()
+                                                    : "Selecione um produto..."}
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                            <Command>
+                                                <CommandInput placeholder="Pesquisar por código ou nome..." />
+                                                <CommandList>
+                                                    <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        {todosProdutos?.map((p) => {
+                                                            const pt = produtosDaTabela?.find(t => t.produto_id === p.id);
+                                                            const precoDisplay = pt ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pt.preco) : "(Sem preço na tabela)";
+                                                            return (
+                                                                <CommandItem
+                                                                    key={p.id}
+                                                                    value={`${p.sku || ""} ${p.nome}`}
+                                                                    onSelect={() => {
+                                                                        setProdutoSelecionadoId(p.id === produtoSelecionadoId ? "" : p.id);
+                                                                        setProdutoPopoverOpen(false);
+                                                                    }}
+                                                                >
+                                                                    <Check
+                                                                        className={cn(
+                                                                            "mr-2 h-4 w-4 flex-shrink-0",
+                                                                            produtoSelecionadoId === p.id ? "opacity-100" : "opacity-0"
+                                                                        )}
+                                                                    />
+                                                                    <span className="truncate">{p.sku ? `[${p.sku}] ` : ""}{p.nome} - {precoDisplay}</span>
+                                                                </CommandItem>
+                                                            );
+                                                        })}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
                                 <div className="col-span-12 sm:col-span-3 space-y-2">
                                     <Label>Cor</Label>

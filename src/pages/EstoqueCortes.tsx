@@ -214,15 +214,17 @@ export default function EstoqueCortes() {
       let totalAtualizados = 0;
       let totalZerados = 0;
 
-      const promises = produtos.map(prod => {
-        const novoEstoque = mapaTotalPorProduto[prod.id] || 0;
-        if (novoEstoque > 0) totalAtualizados++;
-        else totalZerados++;
+      const promises = produtos
+        .filter(prod => mapaTotalPorProduto[prod.id] !== undefined)
+        .map(prod => {
+          const novoEstoque = mapaTotalPorProduto[prod.id];
+          if (novoEstoque > 0) totalAtualizados++;
+          else totalZerados++;
 
-        return supabase
-          .from("produtos")
-          .update({ estoque: novoEstoque })
-          .eq("id", prod.id);
+          return supabase
+            .from("produtos")
+            .update({ estoque: novoEstoque })
+            .eq("id", prod.id);
       });
 
       for (let i = 0; i < promises.length; i += 50) {
