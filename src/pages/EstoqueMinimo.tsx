@@ -20,6 +20,7 @@ interface EstoqueCor {
   produtoNome: string;
   produtoSku: string;
   cor: string;
+  codigoCor?: string;
   quantidade: number;
 }
 
@@ -68,14 +69,28 @@ export default function EstoqueMinimo() {
   const [manualProdutoCores, setManualProdutoCores] = useState<any[]>([]);
   const [manualCoresQtd, setManualCoresQtd] = useState<Record<string, string>>({});
 
-  // Load from local storage on mount
+  // Load from local storage on mount and sync on storage/focus
   useEffect(() => {
-    if (empresaId) {
-      const stored = localStorage.getItem(`estoque_minimo_${empresaId}`);
-      const storedDate = localStorage.getItem(`estoque_minimo_data_${empresaId}`);
-      if (stored) setInventario(JSON.parse(stored));
-      if (storedDate) setDataAtualizacao(storedDate);
-    }
+    const carregar = () => {
+      if (empresaId) {
+        const stored = localStorage.getItem(`estoque_minimo_${empresaId}`);
+        const storedDate = localStorage.getItem(`estoque_minimo_data_${empresaId}`);
+        if (stored) {
+          try {
+            setInventario(JSON.parse(stored));
+          } catch(e) {}
+        }
+        if (storedDate) setDataAtualizacao(storedDate);
+      }
+    };
+
+    carregar();
+    window.addEventListener("storage", carregar);
+    window.addEventListener("focus", carregar);
+    return () => {
+      window.removeEventListener("storage", carregar);
+      window.removeEventListener("focus", carregar);
+    };
   }, [empresaId]);
 
   useEffect(() => {
@@ -93,7 +108,10 @@ export default function EstoqueMinimo() {
                   setManualProdutoCores([{ descricao: "Única" }]);
               } else {
                   cores.forEach((c: any) => {
-                      const inv = coresDoInventario.find(i => i.cor === c.descricao);
+                      const inv = coresDoInventario.find(i => 
+                        (c.codigo && (i.codigoCor === c.codigo || i.cor === c.codigo)) ||
+                        i.cor === c.descricao
+                      );
                       initial[c.descricao] = inv ? String(inv.quantidade) : "0";
                   });
                   setManualProdutoCores(cores);
@@ -151,6 +169,74 @@ export default function EstoqueMinimo() {
     }
   });
 
+  // Sanitiza inventario antigo caso haja itens com cor gravada como código numérico ou duplicados
+  useEffect(() => {
+    if (!produtos || produtos.length === 0 || !empresaId) return;
+    const stored = localStorage.getItem(`estoque_minimo_${empresaId}`);
+    if (!stored) return;
+
+    try {
+      const items: EstoqueCor[] = JSON.parse(stored);
+      if (!Array.isArray(items) || items.length === 0) return;
+
+      let changed = false;
+      const mapaUnico = new Map<string, EstoqueCor>();
+
+      items.forEach((item) => {
+        const prod = produtos.find((p: any) => p.id === item.produtoId || (item.produtoSku && p.sku === item.produtoSku));
+        let corFinal = item.cor ? String(item.cor).trim() : "Única";
+        let codCorFinal = item.codigoCor ? String(item.codigoCor).trim() : "-";
+
+        if (prod && Array.isArray(prod.produto_cores) && prod.produto_cores.length > 0) {
+          // Se corFinal for numérica ou igual ao código de alguma cor cadastrada
+          const matchCod = prod.produto_cores.find((c: any) =>
+            c.codigo && (c.codigo === codCorFinal || c.codigo === corFinal)
+          );
+          if (matchCod) {
+            if (corFinal !== matchCod.descricao || codCorFinal !== matchCod.codigo) {
+              corFinal = matchCod.descricao;
+              codCorFinal = matchCod.codigo || "-";
+              changed = true;
+            }
+          } else {
+            const matchDesc = prod.produto_cores.find((c: any) =>
+              c.descricao && c.descricao.trim().toLowerCase() === corFinal.toLowerCase()
+            );
+            if (matchDesc && matchDesc.codigo && codCorFinal !== matchDesc.codigo) {
+              codCorFinal = matchDesc.codigo;
+              changed = true;
+            }
+          }
+        }
+
+        const key = `${item.produtoId}__${codCorFinal}__${corFinal.toUpperCase()}`;
+        if (mapaUnico.has(key)) {
+          const existing = mapaUnico.get(key)!;
+          if (Number(item.quantidade) > Number(existing.quantidade)) {
+            existing.quantidade = item.quantidade;
+          }
+          changed = true;
+        } else {
+          mapaUnico.set(key, {
+            ...item,
+            cor: corFinal,
+            codigoCor: codCorFinal,
+            quantidade: Number(item.quantidade) || 0
+          });
+        }
+      });
+
+      if (changed) {
+        const sanitizado = Array.from(mapaUnico.values());
+        setInventario(sanitizado);
+        localStorage.setItem(`estoque_minimo_${empresaId}`, JSON.stringify(sanitizado));
+        window.dispatchEvent(new Event("estoque_minimo_updated"));
+      }
+    } catch (e) {
+      console.error("Erro na sanitização de estoque mínimo:", e);
+    }
+  }, [produtos, empresaId]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -174,14 +260,36 @@ export default function EstoqueMinimo() {
       }
 
       const headers = rows[0].map(h => String(h || "").toLowerCase());
-      const idxProduto = headers.findIndex(h => h.includes("código do produto") || h.includes("codigo") || h.includes("código") || h.includes("produto") || h.includes("sku") || h.includes("referencia"));
-      const idxCor = headers.findIndex(h => h.includes("descor") || h.includes("nome da cor") || h.includes("cor"));
-      const idxQtd = headers.findIndex(h => h.includes("quantidade") || h.includes("qtd") || h.includes("saldo") || h.includes("estoque"));
+      
+      let idxProduto = -1;
+      let idxCodCor = -1;
+      let idxNomeCor = -1;
+      let idxQtd = -1;
+
+      headers.forEach((h, idx) => {
+        const norm = h.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (norm === "descor" || norm.includes("desc cor") || norm.includes("descricao cor") || norm.includes("nome da cor") || norm.includes("nome cor")) {
+          idxNomeCor = idx;
+        } else if (norm === "cor" || norm.includes("cod cor") || norm.includes("codigo cor") || norm.includes("codigo da cor") || norm.includes("codcor")) {
+          idxCodCor = idx;
+        } else if (norm === "codigo" || norm.includes("sku") || norm.includes("codigo do produto") || norm.includes("referencia") || norm.includes("artigo")) {
+          idxProduto = idx;
+        } else if (idxProduto === -1 && (norm.includes("descricao") || norm.includes("produto") || norm.includes("nome"))) {
+          idxProduto = idx;
+        } else if (norm.includes("quantidade") || norm.includes("qtd") || norm.includes("qtde") || norm.includes("saldo") || norm.includes("estoque")) {
+          idxQtd = idx;
+        }
+      });
 
       if (idxProduto === -1 || idxQtd === -1) {
         toast.error("A planilha deve conter pelo menos as colunas: Código do Produto e Quantidade.");
         setIsProcessing(false);
         return;
+      }
+
+      // Se só achou idxNomeCor e não idxCodCor:
+      if (idxCodCor === -1 && idxNomeCor !== -1) {
+        idxCodCor = idxNomeCor;
       }
 
       const novosEstoquesCores: EstoqueCor[] = [];
@@ -192,19 +300,66 @@ export default function EstoqueMinimo() {
         if (!row || !row[idxProduto]) continue;
 
         const identificador = String(row[idxProduto]).trim();
-        const cor = idxCor !== -1 && row[idxCor] ? String(row[idxCor]).trim() : "Única";
+        const codCorPlanilha = idxCodCor !== -1 && row[idxCodCor] !== undefined && row[idxCodCor] !== null ? String(row[idxCodCor]).trim() : "";
+        const nomeCorPlanilha = idxNomeCor !== -1 && row[idxNomeCor] !== undefined && row[idxNomeCor] !== null ? String(row[idxNomeCor]).trim() : "";
         const quantidade = Number(row[idxQtd]) || 0;
 
         const produtoDb = produtos.find(
-          p => p.nome.toLowerCase() === identificador.toLowerCase() || p.sku?.toLowerCase() === identificador.toLowerCase()
+          p => p.sku?.toLowerCase().trim() === identificador.toLowerCase() || p.nome.toLowerCase().trim() === identificador.toLowerCase()
         );
 
         if (produtoDb) {
+          const coresCadastradas = produtoDb.produto_cores || [];
+          let matchedCor: any = null;
+
+          // 1. PRIORIDADE MÁXIMA: Buscar pelo CÓDIGO DA COR nas cores cadastradas
+          if (codCorPlanilha) {
+            matchedCor = coresCadastradas.find((c: any) => 
+              c.codigo && String(c.codigo).trim().toLowerCase() === codCorPlanilha.toLowerCase()
+            );
+          }
+
+          // 2. Se não achou, tentar se nomeCorPlanilha na verdade é o código
+          if (!matchedCor && nomeCorPlanilha) {
+            matchedCor = coresCadastradas.find((c: any) => 
+              c.codigo && String(c.codigo).trim().toLowerCase() === nomeCorPlanilha.toLowerCase()
+            );
+          }
+
+          // 3. Buscar pela descrição da cor cadastrada
+          if (!matchedCor && nomeCorPlanilha) {
+            matchedCor = coresCadastradas.find((c: any) => 
+              c.descricao && String(c.descricao).trim().toLowerCase() === nomeCorPlanilha.toLowerCase()
+            );
+          }
+
+          // 4. Se codCorPlanilha for na verdade a descrição da cor
+          if (!matchedCor && codCorPlanilha) {
+            matchedCor = coresCadastradas.find((c: any) => 
+              c.descricao && String(c.descricao).trim().toLowerCase() === codCorPlanilha.toLowerCase()
+            );
+          }
+
+          let corFinal = "Única";
+          let codCorFinal = "-";
+
+          if (matchedCor) {
+            corFinal = matchedCor.descricao;
+            codCorFinal = matchedCor.codigo || "-";
+          } else if (nomeCorPlanilha) {
+            corFinal = nomeCorPlanilha;
+            codCorFinal = codCorPlanilha || "-";
+          } else if (codCorPlanilha) {
+            corFinal = codCorPlanilha;
+            codCorFinal = codCorPlanilha;
+          }
+
           novosEstoquesCores.push({
             produtoId: produtoDb.id,
             produtoNome: produtoDb.nome,
             produtoSku: produtoDb.sku || "",
-            cor,
+            cor: corFinal,
+            codigoCor: codCorFinal,
             quantidade
           });
           mapaTotalPorProduto[produtoDb.id] = (mapaTotalPorProduto[produtoDb.id] || 0) + quantidade;
@@ -230,6 +385,7 @@ export default function EstoqueMinimo() {
       const now = new Date().toISOString();
       localStorage.setItem(`estoque_minimo_${empresaId}`, JSON.stringify(novosEstoquesCores));
       localStorage.setItem(`estoque_minimo_data_${empresaId}`, now);
+      window.dispatchEvent(new Event("estoque_minimo_updated"));
       
       setInventario(novosEstoquesCores);
       setDataAtualizacao(now);
@@ -260,15 +416,20 @@ export default function EstoqueMinimo() {
         
         Object.entries(manualCoresQtd).forEach(([corNome, qtdStr]) => {
             const qtd = Number(qtdStr);
-            const index = current.findIndex(c => c.produtoId === manualProdutoId && c.cor === corNome);
+            const corObj = manualProdutoCores.find(c => c.descricao === corNome);
+            const codCor = corObj?.codigo || "";
+            const index = current.findIndex(c => c.produtoId === manualProdutoId && (c.cor === corNome || (codCor && (c.codigoCor === codCor || c.cor === codCor))));
             if (index >= 0) {
                 current[index].quantidade = qtd;
+                current[index].cor = corNome;
+                if (codCor) current[index].codigoCor = codCor;
             } else {
                 current.push({
                     produtoId: prod.id,
                     produtoNome: prod.nome,
                     produtoSku: prod.sku || "",
                     cor: corNome,
+                    codigoCor: codCor,
                     quantidade: qtd
                 });
             }
@@ -281,6 +442,7 @@ export default function EstoqueMinimo() {
         localStorage.setItem(`estoque_minimo_${empresaId}`, JSON.stringify(current));
         const now = new Date().toISOString();
         localStorage.setItem(`estoque_minimo_data_${empresaId}`, now);
+        window.dispatchEvent(new Event("estoque_minimo_updated"));
         
         setInventario(current);
         setDataAtualizacao(now);
@@ -335,24 +497,44 @@ export default function EstoqueMinimo() {
       const mapCores = new Map<string, any>();
 
       coresDefinidas.forEach(c => {
-        const nomeCor = c.descricao.toUpperCase();
-        mapCores.set(nomeCor, {
-          cor: c.descricao, // keep original case if preferred, or uppercase
-          codigo: c.codigo || '-',
+        const cod = c.codigo ? String(c.codigo).trim() : '-';
+        const desc = c.descricao ? String(c.descricao).trim() : 'Sem cor definida';
+        const key = `${cod}__${desc.toUpperCase()}`;
+        mapCores.set(key, {
+          cor: desc,
+          codigo: cod,
           estoque: 0
         });
       });
 
       coresDoInventario.forEach(item => {
-        const nomeCor = item.cor.toUpperCase();
-        if (mapCores.has(nomeCor)) {
-            mapCores.get(nomeCor).estoque = item.quantidade;
+        const itemCod = item.codigoCor ? String(item.codigoCor).trim() : '';
+        const itemCor = item.cor ? String(item.cor).trim() : '';
+
+        // 1. Prioridade absoluta: buscar pelo código da cor
+        let target: any = null;
+        if (itemCod && itemCod !== '-') {
+          target = Array.from(mapCores.values()).find(c => c.codigo && c.codigo.toLowerCase() === itemCod.toLowerCase());
+        }
+        // 2. Se item.cor foi gravado como o código (ex: "140003")
+        if (!target && itemCor) {
+          target = Array.from(mapCores.values()).find(c => c.codigo && c.codigo.toLowerCase() === itemCor.toLowerCase());
+        }
+        // 3. Buscar pela descrição da cor
+        if (!target && itemCor) {
+          target = Array.from(mapCores.values()).find(c => c.cor && c.cor.toLowerCase() === itemCor.toLowerCase());
+        }
+
+        if (target) {
+          target.estoque = item.quantidade;
         } else {
-            mapCores.set(nomeCor, {
-              cor: item.cor,
-              codigo: '-',
-              estoque: item.quantidade
-            });
+          // Se for uma cor realmente avulsa
+          const key = `${itemCod || '-'}__${itemCor.toUpperCase()}`;
+          mapCores.set(key, {
+            cor: itemCor || 'Sem cor definida',
+            codigo: itemCod || '-',
+            estoque: item.quantidade
+          });
         }
       });
 

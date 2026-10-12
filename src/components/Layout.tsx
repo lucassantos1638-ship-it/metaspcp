@@ -74,6 +74,7 @@ const Layout = () => {
             { path: "/estoque-produtos", label: "Produto" },
             { path: "/estoque-cortes", label: "Cortes" },
             { path: "/estoque-minimo", label: "Estoque Mínimo" },
+            { path: "/media-3-meses", label: "Média (3 meses)" },
             { path: "/estoque-materiais", label: "Material" },
             { path: "/estoque-tercerizacao", label: "Terceirização Malha" }
           ]

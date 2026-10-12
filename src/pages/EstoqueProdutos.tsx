@@ -266,6 +266,7 @@ export default function EstoqueProdutos() {
       const now = new Date().toISOString();
       localStorage.setItem(`estoque_cores_${empresaId}`, JSON.stringify(novosEstoquesCores));
       localStorage.setItem(`estoque_cores_data_${empresaId}`, now);
+      window.dispatchEvent(new Event("estoque_cores_updated"));
       
       setInventario(novosEstoquesCores);
       setDataAtualizacao(now);
@@ -317,6 +318,7 @@ export default function EstoqueProdutos() {
         localStorage.setItem(`estoque_cores_${empresaId}`, JSON.stringify(current));
         const now = new Date().toISOString();
         localStorage.setItem(`estoque_cores_data_${empresaId}`, now);
+        window.dispatchEvent(new Event("estoque_cores_updated"));
         
         setInventario(current);
         setDataAtualizacao(now);

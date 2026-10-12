@@ -36,7 +36,8 @@ import {
 } from "@/components/ui/popover";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
 import { useProdutos } from "@/hooks/useProdutos";
-import { Plus, Trash2, ArrowLeft, Search, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Search, Check, ChevronsUpDown, CheckCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -55,6 +56,7 @@ interface PedidoItem {
     cor?: string;
     codigo_cor?: string;
     quantidade: number;
+    quantidade_falta?: number;
     preco_unitario: number;
     tipo_desconto: 'percentual' | 'valor';
     desconto: number;
@@ -96,6 +98,7 @@ export default function NovoPedido() {
     const [numero, setNumero] = useState(pedidoImportado?.numeroPedido || "");
     const [dataEmissao, setDataEmissao] = useState(() => new Date().toISOString().split('T')[0]);
     const [dataEntrega, setDataEntrega] = useState("");
+    const [statusPedido, setStatusPedido] = useState<string>("VENDA");
 
     // Items state
     const [itens, setItens] = useState<PedidoItem[]>(pedidoImportado?.itens?.map((i: any) => ({
@@ -182,25 +185,41 @@ export default function NovoPedido() {
             setObservacao(pedidoData.pedido.observacao || "");
             setNumero(pedidoData.pedido.numero || "");
             setDataEntrega(pedidoData.pedido.data_entrega || "");
-            setItens(pedidoData.itensData.map((i: any) => ({
-                produto_id: i.produto_id,
-                produto_nome: i.produtos?.nome,
-                produto_sku: i.produtos?.sku,
-                quantidade: i.quantidade,
-                preco_unitario: i.preco_unitario,
-                cor: i.cor || "",
-                codigo_cor: i.codigo_cor || "",
-                tipo_desconto: i.tipo_desconto || 'percentual',
-                desconto: i.desconto || 0,
-                subtotal: calcularSubtotal(
-                    i.quantidade,
-                    i.preco_unitario,
-                    i.tipo_desconto || 'percentual',
-                    i.desconto || 0
-                )
-            })));
+            setStatusPedido(pedidoData.pedido.status || "VENDA");
+
+            // Carrega quantidades faltantes salvas localmente para este pedido se houver
+            let faltasSalvas: Record<string, number> = {};
+            if (id) {
+                try {
+                    const str = localStorage.getItem(`pedido_faltas_${id}`);
+                    if (str) faltasSalvas = JSON.parse(str);
+                } catch (e) {}
+            }
+
+            setItens(pedidoData.itensData.map((i: any) => {
+                const key = `${i.produto_id}_${i.cor || ""}`;
+                const faltaVal = faltasSalvas[key] !== undefined ? faltasSalvas[key] : (i.quantidade || 0);
+                return {
+                    produto_id: i.produto_id,
+                    produto_nome: i.produtos?.nome,
+                    produto_sku: i.produtos?.sku,
+                    quantidade: i.quantidade,
+                    quantidade_falta: faltaVal,
+                    preco_unitario: i.preco_unitario,
+                    cor: i.cor || "",
+                    codigo_cor: i.codigo_cor || "",
+                    tipo_desconto: i.tipo_desconto || 'percentual',
+                    desconto: i.desconto || 0,
+                    subtotal: calcularSubtotal(
+                        i.quantidade,
+                        i.preco_unitario,
+                        i.tipo_desconto || 'percentual',
+                        i.desconto || 0
+                    )
+                };
+            }));
         }
-    }, [pedidoData]);
+    }, [pedidoData, id]);
 
     const { data: proximoNumero } = useQuery({
         queryKey: ["proximo_numero_pedido", empresaId],
@@ -387,6 +406,31 @@ export default function NovoPedido() {
         setItens(prev => prev.filter(i => !(i.produto_id === produtoId && (i.cor || "") === cor)));
     };
 
+    const handleUpdateItemFalta = (produtoId: string, cor: string = "", valorStr: string) => {
+        const val = valorStr === "" ? 0 : parseFloat(valorStr.replace(',', '.'));
+        const valFinal = isNaN(val) || val < 0 ? 0 : val;
+        setItens(prev => {
+            const updated = prev.map(item => {
+                if (item.produto_id === produtoId && (item.cor || "") === cor) {
+                    return { ...item, quantidade_falta: valFinal };
+                }
+                return item;
+            });
+            if (id) {
+                try {
+                    const faltasMap: Record<string, number> = {};
+                    updated.forEach(it => {
+                        const key = `${it.produto_id}_${it.cor || ""}`;
+                        faltasMap[key] = it.quantidade_falta !== undefined ? Number(it.quantidade_falta) : (it.quantidade || 0);
+                    });
+                    localStorage.setItem(`pedido_faltas_${id}`, JSON.stringify(faltasMap));
+                    window.dispatchEvent(new Event("storage"));
+                } catch (e) {}
+            }
+            return updated;
+        });
+    };
+
     const handleUpdateItemDiscount = (produtoId: string, cor: string = "", campo: 'tipo_desconto' | 'desconto', valor: any) => {
         setItens(prev => prev.map(item => {
             if (item.produto_id === produtoId && (item.cor || "") === cor) {
@@ -403,11 +447,24 @@ export default function NovoPedido() {
 
     const totalPedido = itens.reduce((acc, item) => acc + item.subtotal, 0);
 
+    const persistFaltas = (pedidoId: string) => {
+        if (!pedidoId) return;
+        try {
+            const faltasMap: Record<string, number> = {};
+            itens.forEach(it => {
+                const key = `${it.produto_id}_${it.cor || ""}`;
+                faltasMap[key] = it.quantidade_falta !== undefined ? Number(it.quantidade_falta) : (it.quantidade || 0);
+            });
+            localStorage.setItem(`pedido_faltas_${pedidoId}`, JSON.stringify(faltasMap));
+            window.dispatchEvent(new Event("storage"));
+        } catch (e) {}
+    };
+
     const saveMutation = useMutation({
-        mutationFn: async () => {
+        mutationFn: async (novoStatusOverride?: string) => {
             if (itens.length === 0) throw new Error("Adicione pelo menos um item ao pedido");
 
-            const statusEnum = parseStatusFromTipoVenda(tipoVenda);
+            const statusEnum = novoStatusOverride || statusPedido || parseStatusFromTipoVenda(tipoVenda);
 
             let pedidoId = id;
 
@@ -470,10 +527,15 @@ export default function NovoPedido() {
                 .insert(itensParaInserir);
 
             if (itensError) throw itensError;
+
+            if (pedidoId) {
+                persistFaltas(pedidoId);
+            }
         },
         onSuccess: () => {
             toast.success("Pedido salvo com sucesso!");
             queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+            queryClient.invalidateQueries({ queryKey: ["todas-vendas-programacao"] });
             navigate("/pedidos");
         },
         onError: (error: Error) => {
@@ -481,23 +543,94 @@ export default function NovoPedido() {
         },
     });
 
+    const handleFinalizarPedido = async () => {
+        const isFinalizado = statusPedido === "FINALIZADO";
+        const novoStatus = isFinalizado ? "VENDA" : "FINALIZADO";
+        
+        // Se estiver finalizando, preenche falta = 0 automaticamente se o usuário desejar
+        if (!isFinalizado) {
+            setItens(prev => prev.map(item => ({
+                ...item,
+                quantidade_falta: 0
+            })));
+        }
+        
+        setStatusPedido(novoStatus);
+        
+        if (id) {
+            try {
+                const faltasMap: Record<string, number> = {};
+                itens.forEach(it => {
+                    const key = `${it.produto_id}_${it.cor || ""}`;
+                    faltasMap[key] = !isFinalizado ? 0 : (it.quantidade_falta !== undefined ? it.quantidade_falta : it.quantidade);
+                });
+                localStorage.setItem(`pedido_faltas_${id}`, JSON.stringify(faltasMap));
+                window.dispatchEvent(new Event("storage"));
+
+                const { error } = await supabase
+                    .from("pedidos")
+                    .update({ status: novoStatus })
+                    .eq("id", id);
+                if (error) throw error;
+                queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+                queryClient.invalidateQueries({ queryKey: ["todas-vendas-programacao"] });
+                toast.success(!isFinalizado ? "Pedido marcado como FINALIZADO com sucesso!" : "Pedido reaberto com sucesso!");
+            } catch (err: any) {
+                toast.error("Erro ao alterar status: " + err.message);
+            }
+        } else {
+            toast.info(!isFinalizado ? "Status alterado para FINALIZADO. Salve o pedido para confirmar." : "Status alterado para VENDA.");
+        }
+    };
+
     const handleSave = () => {
         saveMutation.mutate();
     };
 
     return (
         <div className="space-y-6 max-w-5xl mx-auto">
-            <div className="flex items-center space-x-4 mb-2">
-                <Button variant="ghost" size="icon" onClick={() => navigate("/pedidos")}>
-                    <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <div>
-                    <h1 className="text-3xl font-bold text-foreground">
-                        {isEditing ? "Editar Pedido" : "Novo Pedido"}
-                    </h1>
-                    <p className="text-muted-foreground mt-1">
-                        {isEditing ? "Atualize as informações do pedido" : "Crie um novo orçamento ou venda"}
-                    </p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-2">
+                <div className="flex items-center space-x-4">
+                    <Button variant="ghost" size="icon" onClick={() => navigate("/pedidos")}>
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                    <div>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-3xl font-bold text-foreground">
+                                {isEditing ? "Editar Pedido" : "Novo Pedido"}
+                            </h1>
+                            {statusPedido === "FINALIZADO" ? (
+                                <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 text-xs px-2.5 py-0.5">
+                                    <CheckCircle className="w-3.5 h-3.5" /> FINALIZADO
+                                </Badge>
+                            ) : (
+                                <Badge variant="outline" className="text-slate-600 border-slate-300 text-xs px-2.5 py-0.5">
+                                    {statusPedido}
+                                </Badge>
+                            )}
+                        </div>
+                        <p className="text-muted-foreground mt-1">
+                            {isEditing ? "Atualize as informações do pedido" : "Crie um novo orçamento ou venda"}
+                        </p>
+                    </div>
+                </div>
+
+                {/* BOTÃO PEDIDO FINALIZADO NO TOPO */}
+                <div className="flex items-center gap-2">
+                    <Button
+                        type="button"
+                        variant={statusPedido === "FINALIZADO" ? "outline" : "default"}
+                        className={cn(
+                            "font-semibold transition-all shadow-sm",
+                            statusPedido === "FINALIZADO"
+                                ? "border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                                : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                        )}
+                        onClick={handleFinalizarPedido}
+                    >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        {statusPedido === "FINALIZADO" ? "Reabrir Pedido" : "Finalizar Pedido"}
+                    </Button>
                 </div>
             </div>
 
@@ -732,6 +865,7 @@ export default function NovoPedido() {
                                         <TableHead>Cód. Cor</TableHead>
                                         <TableHead>Cor</TableHead>
                                         <TableHead className="text-right">Qtd</TableHead>
+                                        <TableHead className="text-center font-bold text-amber-700 bg-amber-50/60 w-[110px]">Falta</TableHead>
                                         <TableHead className="text-right">Preço Unit.</TableHead>
                                         <TableHead className="text-center">Tipo Desc.</TableHead>
                                         <TableHead className="text-right">Desconto</TableHead>
@@ -742,66 +876,88 @@ export default function NovoPedido() {
                                 <TableBody>
                                     {itens.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
+                                            <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
                                                 Nenhum item adicionado ao pedido
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        itens.map((item, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell className="font-medium">
-                                                    {item.produto_sku ? `[${item.produto_sku}] ` : ""}{item.produto_nome}
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground font-mono">
-                                                    {item.codigo_cor || "-"}
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground">
-                                                    {item.cor || "-"}
-                                                </TableCell>
-                                                <TableCell className="text-right">{item.quantidade}</TableCell>
-                                                <TableCell className="text-right">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.preco_unitario)}
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    <Select
-                                                        value={item.tipo_desconto}
-                                                        onValueChange={(val: any) => handleUpdateItemDiscount(item.produto_id, item.cor || "", 'tipo_desconto', val)}
-                                                    >
-                                                        <SelectTrigger className="w-[80px] h-8 text-xs mx-auto">
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="percentual" className="text-xs">%</SelectItem>
-                                                            <SelectItem value="valor" className="text-xs">$</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <Input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.01"
-                                                        className="h-8 w-[80px] text-right ml-auto"
-                                                        value={item.desconto === 0 ? '' : item.desconto}
-                                                        onChange={e => handleUpdateItemDiscount(item.produto_id, item.cor || "", 'desconto', e.target.value)}
-                                                        placeholder="0"
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="text-right font-semibold">
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.subtotal)}
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                                                        onClick={() => handleRemoveItem(item.produto_id, item.cor || "")}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
+                                        itens.map((item, index) => {
+                                            const faltaVal = item.quantidade_falta !== undefined ? item.quantidade_falta : item.quantidade;
+                                            return (
+                                                <TableRow key={index} className={statusPedido === "FINALIZADO" ? "bg-muted/20" : ""}>
+                                                    <TableCell className="font-medium">
+                                                        {item.produto_sku ? `[${item.produto_sku}] ` : ""}{item.produto_nome}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground font-mono">
+                                                        {item.codigo_cor || "-"}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {item.cor || "-"}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-medium">{item.quantidade}</TableCell>
+                                                    
+                                                    {/* COLUNA FALTA */}
+                                                    <TableCell className="text-center bg-amber-50/30">
+                                                        <Input
+                                                            type="number"
+                                                            min="0"
+                                                            step="1"
+                                                            className={cn(
+                                                                "h-8 w-[85px] text-center mx-auto font-bold",
+                                                                faltaVal === 0 
+                                                                    ? "text-emerald-700 bg-emerald-50/50 border-emerald-300" 
+                                                                    : "text-amber-800 bg-amber-50 border-amber-300"
+                                                            )}
+                                                            value={item.quantidade_falta !== undefined ? item.quantidade_falta : item.quantidade}
+                                                            onChange={e => handleUpdateItemFalta(item.produto_id, item.cor || "", e.target.value)}
+                                                            placeholder="0"
+                                                        />
+                                                    </TableCell>
+
+                                                    <TableCell className="text-right">
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.preco_unitario)}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Select
+                                                            value={item.tipo_desconto}
+                                                            onValueChange={(val: any) => handleUpdateItemDiscount(item.produto_id, item.cor || "", 'tipo_desconto', val)}
+                                                        >
+                                                            <SelectTrigger className="w-[80px] h-8 text-xs mx-auto">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="percentual" className="text-xs">%</SelectItem>
+                                                                <SelectItem value="valor" className="text-xs">$</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            className="h-8 w-[80px] text-right ml-auto"
+                                                            value={item.desconto === 0 ? '' : item.desconto}
+                                                            onChange={e => handleUpdateItemDiscount(item.produto_id, item.cor || "", 'desconto', e.target.value)}
+                                                            placeholder="0"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-semibold">
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.subtotal)}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                                            onClick={() => handleRemoveItem(item.produto_id, item.cor || "")}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
                                     )}
                                 </TableBody>
                             </Table>

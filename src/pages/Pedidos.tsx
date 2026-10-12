@@ -12,7 +12,8 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
-import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, CheckCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -173,8 +174,16 @@ export default function Pedidos() {
                                         <TableCell className="text-right py-2 font-semibold">
                                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pedido.total)}
                                         </TableCell>
-                                        <TableCell className="py-2 uppercase text-xs">
-                                            {pedido.status}
+                                        <TableCell className="py-2 text-xs">
+                                            {pedido.status === "FINALIZADO" ? (
+                                                <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 w-fit text-[11px] font-semibold">
+                                                    <CheckCircle className="w-3 h-3" /> FINALIZADO
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="uppercase text-[11px] font-semibold text-slate-600">
+                                                    {pedido.status}
+                                                </Badge>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right space-x-2 py-2">
                                             <Button

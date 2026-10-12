@@ -20,6 +20,7 @@ interface EstoqueCor {
   produtoNome: string;
   produtoSku: string;
   cor: string;
+  codigoCor?: string;
   quantidade: number;
 }
 
@@ -174,14 +175,35 @@ export default function EstoqueCortes() {
       }
 
       const headers = rows[0].map(h => String(h || "").toLowerCase());
-      const idxProduto = headers.findIndex(h => h.includes("código do produto") || h.includes("codigo") || h.includes("código") || h.includes("produto") || h.includes("sku") || h.includes("nome") || h.includes("referencia"));
-      const idxCor = headers.findIndex(h => h.includes("descor") || h.includes("nome da cor") || h.includes("cor"));
-      const idxQtd = headers.findIndex(h => h.includes("quantidade") || h.includes("qtd") || h.includes("saldo") || h.includes("estoque"));
+      
+      let idxProduto = -1;
+      let idxCodCor = -1;
+      let idxNomeCor = -1;
+      let idxQtd = -1;
+
+      headers.forEach((h, idx) => {
+        const norm = h.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (norm === "descor" || norm.includes("desc cor") || norm.includes("descricao cor") || norm.includes("nome da cor") || norm.includes("nome cor")) {
+          idxNomeCor = idx;
+        } else if (norm === "cor" || norm.includes("cod cor") || norm.includes("codigo cor") || norm.includes("codigo da cor") || norm.includes("codcor")) {
+          idxCodCor = idx;
+        } else if (norm === "codigo" || norm.includes("sku") || norm.includes("codigo do produto") || norm.includes("referencia") || norm.includes("artigo")) {
+          idxProduto = idx;
+        } else if (idxProduto === -1 && (norm.includes("descricao") || norm.includes("produto") || norm.includes("nome"))) {
+          idxProduto = idx;
+        } else if (norm.includes("quantidade") || norm.includes("qtd") || norm.includes("qtde") || norm.includes("saldo") || norm.includes("estoque")) {
+          idxQtd = idx;
+        }
+      });
 
       if (idxProduto === -1 || idxQtd === -1) {
         toast.error("A planilha deve conter pelo menos as colunas: Produto (ou SKU) e Quantidade.");
         setIsProcessing(false);
         return;
+      }
+
+      if (idxCodCor === -1 && idxNomeCor !== -1) {
+        idxCodCor = idxNomeCor;
       }
 
       const novosEstoquesCores: EstoqueCor[] = [];
@@ -192,19 +214,66 @@ export default function EstoqueCortes() {
         if (!row || !row[idxProduto]) continue;
 
         const identificador = String(row[idxProduto]).trim();
-        const cor = idxCor !== -1 && row[idxCor] ? String(row[idxCor]).trim() : "Única";
+        const codCorPlanilha = idxCodCor !== -1 && row[idxCodCor] !== undefined && row[idxCodCor] !== null ? String(row[idxCodCor]).trim() : "";
+        const nomeCorPlanilha = idxNomeCor !== -1 && row[idxNomeCor] !== undefined && row[idxNomeCor] !== null ? String(row[idxNomeCor]).trim() : "";
         const quantidade = Number(row[idxQtd]) || 0;
 
         const produtoDb = produtos.find(
-          p => p.nome.toLowerCase() === identificador.toLowerCase() || p.sku?.toLowerCase() === identificador.toLowerCase()
+          p => p.sku?.toLowerCase().trim() === identificador.toLowerCase() || p.nome.toLowerCase().trim() === identificador.toLowerCase()
         );
 
         if (produtoDb) {
+          const coresCadastradas = produtoDb.produto_cores || [];
+          let matchedCor: any = null;
+
+          // 1. PRIORIDADE MÁXIMA: Buscar pelo CÓDIGO DA COR nas cores cadastradas
+          if (codCorPlanilha) {
+            matchedCor = coresCadastradas.find((c: any) => 
+              c.codigo && String(c.codigo).trim().toLowerCase() === codCorPlanilha.toLowerCase()
+            );
+          }
+
+          // 2. Tentar se nomeCorPlanilha na verdade é o código
+          if (!matchedCor && nomeCorPlanilha) {
+            matchedCor = coresCadastradas.find((c: any) => 
+              c.codigo && String(c.codigo).trim().toLowerCase() === nomeCorPlanilha.toLowerCase()
+            );
+          }
+
+          // 3. Buscar pela descrição da cor cadastrada
+          if (!matchedCor && nomeCorPlanilha) {
+            matchedCor = coresCadastradas.find((c: any) => 
+              c.descricao && String(c.descricao).trim().toLowerCase() === nomeCorPlanilha.toLowerCase()
+            );
+          }
+
+          // 4. Se codCorPlanilha for na verdade a descrição da cor
+          if (!matchedCor && codCorPlanilha) {
+            matchedCor = coresCadastradas.find((c: any) => 
+              c.descricao && String(c.descricao).trim().toLowerCase() === codCorPlanilha.toLowerCase()
+            );
+          }
+
+          let corFinal = "Única";
+          let codCorFinal = "-";
+
+          if (matchedCor) {
+            corFinal = matchedCor.descricao;
+            codCorFinal = matchedCor.codigo || "-";
+          } else if (nomeCorPlanilha) {
+            corFinal = nomeCorPlanilha;
+            codCorFinal = codCorPlanilha || "-";
+          } else if (codCorPlanilha) {
+            corFinal = codCorPlanilha;
+            codCorFinal = codCorPlanilha;
+          }
+
           novosEstoquesCores.push({
             produtoId: produtoDb.id,
             produtoNome: produtoDb.nome,
             produtoSku: produtoDb.sku || "",
-            cor,
+            cor: corFinal,
+            codigoCor: codCorFinal,
             quantidade
           });
           mapaTotalPorProduto[produtoDb.id] = (mapaTotalPorProduto[produtoDb.id] || 0) + quantidade;
@@ -232,6 +301,7 @@ export default function EstoqueCortes() {
       const now = new Date().toISOString();
       localStorage.setItem(`estoque_cortes_${empresaId}`, JSON.stringify(novosEstoquesCores));
       localStorage.setItem(`estoque_cortes_data_${empresaId}`, now);
+      window.dispatchEvent(new Event("estoque_cortes_updated"));
       
       setInventario(novosEstoquesCores);
       setDataAtualizacao(now);
@@ -283,6 +353,7 @@ export default function EstoqueCortes() {
         localStorage.setItem(`estoque_cortes_${empresaId}`, JSON.stringify(current));
         const now = new Date().toISOString();
         localStorage.setItem(`estoque_cortes_data_${empresaId}`, now);
+        window.dispatchEvent(new Event("estoque_cortes_updated"));
         
         setInventario(current);
         setDataAtualizacao(now);
@@ -337,24 +408,43 @@ export default function EstoqueCortes() {
       const mapCores = new Map<string, any>();
 
       coresDefinidas.forEach(c => {
-        const nomeCor = c.descricao.toUpperCase();
-        mapCores.set(nomeCor, {
-          cor: c.descricao, // keep original case if preferred, or uppercase
-          codigo: c.codigo || '-',
+        const cod = c.codigo ? String(c.codigo).trim() : '-';
+        const desc = c.descricao ? String(c.descricao).trim() : 'Sem cor definida';
+        const key = `${cod}__${desc.toUpperCase()}`;
+        mapCores.set(key, {
+          cor: desc,
+          codigo: cod,
           estoque: 0
         });
       });
 
       coresDoInventario.forEach(item => {
-        const nomeCor = item.cor.toUpperCase();
-        if (mapCores.has(nomeCor)) {
-            mapCores.get(nomeCor).estoque = item.quantidade;
+        const itemCod = item.codigoCor ? String(item.codigoCor).trim() : '';
+        const itemCor = item.cor ? String(item.cor).trim() : '';
+
+        // 1. Prioridade absoluta: buscar pelo código da cor
+        let target: any = null;
+        if (itemCod && itemCod !== '-') {
+          target = Array.from(mapCores.values()).find(c => c.codigo && c.codigo.toLowerCase() === itemCod.toLowerCase());
+        }
+        // 2. Se item.cor foi gravado como o código (ex: "140003")
+        if (!target && itemCor) {
+          target = Array.from(mapCores.values()).find(c => c.codigo && c.codigo.toLowerCase() === itemCor.toLowerCase());
+        }
+        // 3. Buscar pela descrição da cor
+        if (!target && itemCor) {
+          target = Array.from(mapCores.values()).find(c => c.cor && c.cor.toLowerCase() === itemCor.toLowerCase());
+        }
+
+        if (target) {
+          target.estoque = item.quantidade;
         } else {
-            mapCores.set(nomeCor, {
-              cor: item.cor,
-              codigo: '-',
-              estoque: item.quantidade
-            });
+          const key = `${itemCod || '-'}__${itemCor.toUpperCase()}`;
+          mapCores.set(key, {
+            cor: itemCor || 'Sem cor definida',
+            codigo: itemCod || '-',
+            estoque: item.quantidade
+          });
         }
       });
 

@@ -45,6 +45,7 @@ import RelatoriosPedidosPage from "./pages/RelatoriosPedidosPage";
 import EstoqueProdutos from "./pages/EstoqueProdutos";
 import EstoqueCortes from "./pages/EstoqueCortes";
 import EstoqueMinimo from "./pages/EstoqueMinimo";
+import Media3Meses from "./pages/Media3Meses";
 import EstoqueMateriais from "./pages/EstoqueMateriais";
 import EstoqueTercerizacao from "./pages/EstoqueTercerizacao";
 
@@ -297,6 +298,15 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredPermission="produtos">
                     <EstoqueMinimo />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/media-3-meses"
+                element={
+                  <ProtectedRoute requiredPermission="produtos">
+                    <Media3Meses />
                   </ProtectedRoute>
                 }
               />
