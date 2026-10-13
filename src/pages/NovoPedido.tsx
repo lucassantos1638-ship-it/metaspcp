@@ -88,6 +88,8 @@ export default function NovoPedido() {
     const { id } = useParams();
     const isEditing = !!id;
 
+    const { data: todosProdutos } = useProdutos(true);
+
     const location = useLocation();
     const pedidoImportado = location.state?.pedidoImportado;
 
@@ -285,8 +287,6 @@ export default function NovoPedido() {
             return data;
         },
     });
-
-    const { data: todosProdutos } = useProdutos(true);
 
     const { data: produtosDaTabela } = useQuery({
         queryKey: ["produtos_tabela", tabelaPrecoId],
