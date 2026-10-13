@@ -843,7 +843,9 @@ export default function NovoPedido() {
                                                                     onSelect={() => {
                                                                         setProdutoSelecionadoId(p.id);
                                                                         setProdutoPopoverOpen(false);
-                                                                        setModalCoresOpen(true);
+                                                                        setTimeout(() => {
+                                                                            setModalCoresOpen(true);
+                                                                        }, 80);
                                                                     }}
                                                                 >
                                                                     <Check
@@ -864,15 +866,23 @@ export default function NovoPedido() {
                                 </div>
                                 <div className="col-span-12 sm:col-span-3 space-y-2">
                                     <Label>Cor</Label>
-                                    <Select value={corSelecionada} onValueChange={setCorSelecionada} disabled={!produtoSelecionadoId || coresProduto.length === 0}>
+                                    <Select 
+                                        value={corSelecionada || undefined} 
+                                        onValueChange={(val) => setCorSelecionada(val || "")} 
+                                        disabled={!produtoSelecionadoId}
+                                    >
                                         <SelectTrigger>
                                             <SelectValue placeholder={coresProduto.length > 0 ? "Selecione a cor..." : "Sem cores"} />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="Única">Única</SelectItem>
-                                            {coresProduto.map((c: any) => (
-                                                <SelectItem key={c.descricao} value={c.descricao}>{c.codigo ? `[${c.codigo}] ` : ""}{c.descricao}</SelectItem>
-                                            ))}
+                                            {coresProduto
+                                                .filter((c: any) => c && c.descricao && String(c.descricao).trim() !== "" && String(c.descricao).trim().toLowerCase() !== "única" && String(c.descricao).trim().toLowerCase() !== "unica")
+                                                .map((c: any, index: number) => (
+                                                    <SelectItem key={`${c.descricao}_${index}`} value={String(c.descricao).trim()}>
+                                                        {c.codigo ? `[${c.codigo}] ` : ""}{c.descricao}
+                                                    </SelectItem>
+                                                ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -935,8 +945,8 @@ export default function NovoPedido() {
                                 onOpenChange={setModalCoresOpen}
                                 produtoId={produtoSelecionadoId}
                                 produtoNome={todosProdutos?.find(p => p.id === produtoSelecionadoId)?.nome || ""}
-                                produtoSku={todosProdutos?.find(p => p.id === produtoSelecionadoId)?.sku}
-                                precoUnitario={produtosDaTabela?.find(t => t.produto_id === produtoSelecionadoId)?.preco || 0}
+                                produtoSku={todosProdutos?.find(p => p.id === produtoSelecionadoId)?.sku || ""}
+                                precoUnitario={Number(produtosDaTabela?.find(t => t.produto_id === produtoSelecionadoId)?.preco) || 0}
                                 empresaId={empresaId || ""}
                                 descontoPadraoTipo={descontoGlobalTipo}
                                 descontoPadraoValor={parseFloat(descontoGlobal) || 0}

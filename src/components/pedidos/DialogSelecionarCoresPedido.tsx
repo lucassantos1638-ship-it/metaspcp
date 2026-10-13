@@ -68,7 +68,7 @@ export function DialogSelecionarCoresPedido({
     produtoId,
     produtoNome,
     produtoSku,
-    precoUnitario,
+    precoUnitario = 0,
     empresaId,
     descontoPadraoTipo = 'percentual',
     descontoPadraoValor = 0,
@@ -79,8 +79,8 @@ export function DialogSelecionarCoresPedido({
     const [loadingCores, setLoadingCores] = useState(false);
     const [quantidades, setQuantidades] = useState<Record<string, number>>({});
     const [termoPesquisa, setTermoPesquisa] = useState("");
-    const [tipoDesconto, setTipoDesconto] = useState<'percentual' | 'valor'>(descontoPadraoTipo);
-    const [valorDesconto, setValorDesconto] = useState<number>(descontoPadraoValor);
+    const [tipoDesconto, setTipoDesconto] = useState<'percentual' | 'valor'>('percentual');
+    const [valorDesconto, setValorDesconto] = useState<number>(0);
 
     // Carrega cores quando o diálogo for aberto ou o produtoId mudar
     useEffect(() => {
@@ -91,8 +91,8 @@ export function DialogSelecionarCoresPedido({
             return;
         }
 
-        setTipoDesconto(descontoPadraoTipo);
-        setValorDesconto(descontoPadraoValor || 0);
+        setTipoDesconto(descontoPadraoTipo || 'percentual');
+        setValorDesconto(Number(descontoPadraoValor) || 0);
 
         let isCancelled = false;
 
@@ -102,22 +102,26 @@ export function DialogSelecionarCoresPedido({
                 const map = new Map<string, CorItem>();
 
                 // 1. Busca no Supabase produto_cores
-                const { data: dbCores, error } = await supabase
-                    .from("produto_cores")
-                    .select("codigo, descricao")
-                    .eq("produto_id", produtoId)
-                    .order("codigo");
+                try {
+                    const { data: dbCores, error } = await supabase
+                        .from("produto_cores")
+                        .select("codigo, descricao")
+                        .eq("produto_id", produtoId)
+                        .order("codigo");
 
-                if (!error && dbCores) {
-                    dbCores.forEach((c: any) => {
-                        const desc = (c.descricao || "").trim();
-                        if (desc) {
-                            map.set(desc.toUpperCase(), {
-                                codigo: c.codigo || "",
-                                descricao: desc
-                            });
-                        }
-                    });
+                    if (!error && Array.isArray(dbCores)) {
+                        dbCores.forEach((c: any) => {
+                            const desc = String(c?.descricao || "").trim();
+                            if (desc) {
+                                map.set(desc.toUpperCase(), {
+                                    codigo: String(c?.codigo || "").trim(),
+                                    descricao: desc
+                                });
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.error("Erro ao buscar cores no Supabase:", e);
                 }
 
                 // 2. Busca do localStorage produto_cores_${produtoId}
@@ -127,10 +131,10 @@ export function DialogSelecionarCoresPedido({
                         const parsed = JSON.parse(localCoresStr);
                         if (Array.isArray(parsed)) {
                             parsed.forEach((c: any) => {
-                                const desc = (c.descricao || c.cor || "").trim();
+                                const desc = String(c?.descricao || c?.cor || "").trim();
                                 if (desc && !map.has(desc.toUpperCase())) {
                                     map.set(desc.toUpperCase(), {
-                                        codigo: c.codigo || "",
+                                        codigo: String(c?.codigo || "").trim(),
                                         descricao: desc
                                     });
                                 }
@@ -145,16 +149,18 @@ export function DialogSelecionarCoresPedido({
                         const invStr = localStorage.getItem(`estoque_cores_${empresaId}`);
                         if (invStr) {
                             const inv = JSON.parse(invStr);
-                            const prodInv = inv.filter((i: any) => i.produtoId === produtoId);
-                            prodInv.forEach((pi: any) => {
-                                const desc = (pi.cor || "").trim();
-                                if (desc && desc !== "Sem cor definida" && !map.has(desc.toUpperCase())) {
-                                    map.set(desc.toUpperCase(), {
-                                        codigo: pi.codigoCor || pi.codigo || "",
-                                        descricao: desc
-                                    });
-                                }
-                            });
+                            if (Array.isArray(inv)) {
+                                const prodInv = inv.filter((i: any) => i.produtoId === produtoId);
+                                prodInv.forEach((pi: any) => {
+                                    const desc = String(pi?.cor || "").trim();
+                                    if (desc && desc !== "Sem cor definida" && !map.has(desc.toUpperCase())) {
+                                        map.set(desc.toUpperCase(), {
+                                            codigo: String(pi?.codigoCor || pi?.codigo || "").trim(),
+                                            descricao: desc
+                                        });
+                                    }
+                                });
+                            }
                         }
                     } catch (e) {}
                 }
@@ -170,6 +176,9 @@ export function DialogSelecionarCoresPedido({
                 }
             } catch (err) {
                 console.error("Erro ao carregar cores do produto:", err);
+                if (!isCancelled) {
+                    setCores([{ codigo: "-", descricao: "Única" }]);
+                }
             } finally {
                 if (!isCancelled) {
                     setLoadingCores(false);
@@ -187,25 +196,36 @@ export function DialogSelecionarCoresPedido({
     // Filtra as cores com base na pesquisa
     const coresFiltradas = useMemo(() => {
         if (!termoPesquisa.trim()) return cores;
-        const termoNorm = termoPesquisa
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .toLowerCase();
+        try {
+            const termoNorm = termoPesquisa
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase();
 
-        return cores.filter(c => {
-            const descNorm = c.descricao.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-            const codNorm = (c.codigo || "").toLowerCase();
-            return descNorm.includes(termoNorm) || codNorm.includes(termoNorm);
-        });
+            return cores.filter(c => {
+                const descNorm = String(c.descricao || "")
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toLowerCase();
+                const codNorm = String(c.codigo || "").toLowerCase();
+                return descNorm.includes(termoNorm) || codNorm.includes(termoNorm);
+            });
+        } catch (e) {
+            return cores;
+        }
     }, [cores, termoPesquisa]);
 
     // Map de quantidades já existentes no pedido para cada cor
     const mapJaNoPedido = useMemo(() => {
         const map: Record<string, number> = {};
-        itensJaNoPedido.forEach(it => {
-            const corKey = (it.cor || "").trim().toUpperCase();
-            map[corKey] = (map[corKey] || 0) + (it.quantidade || 0);
-        });
+        if (Array.isArray(itensJaNoPedido)) {
+            itensJaNoPedido.forEach(it => {
+                const corKey = String(it?.cor || "").trim().toUpperCase();
+                if (corKey) {
+                    map[corKey] = (map[corKey] || 0) + (Number(it?.quantidade) || 0);
+                }
+            });
+        }
         return map;
     }, [itensJaNoPedido]);
 
@@ -220,7 +240,7 @@ export function DialogSelecionarCoresPedido({
 
     const handleIncrementar = (descricao: string, delta: number) => {
         setQuantidades(prev => {
-            const atual = prev[descricao] || 0;
+            const atual = Number(prev[descricao]) || 0;
             const novo = Math.max(0, atual + delta);
             return {
                 ...prev,
@@ -233,24 +253,27 @@ export function DialogSelecionarCoresPedido({
         setQuantidades({});
     };
 
-    // Cálculos de totais
+    // Cálculos de totais com validação defensiva
     const totalPecas = useMemo(() => {
-        return Object.values(quantidades).reduce((acc, q) => acc + (q || 0), 0);
+        return Object.values(quantidades).reduce((acc, q) => acc + (Number(q) || 0), 0);
     }, [quantidades]);
 
     const totalCoresComQtd = useMemo(() => {
-        return Object.values(quantidades).filter(q => (q || 0) > 0).length;
+        return Object.values(quantidades).filter(q => (Number(q) || 0) > 0).length;
     }, [quantidades]);
 
+    const precoBase = Number(precoUnitario) || 0;
+
     const precoComDesconto = useMemo(() => {
-        let preco = precoUnitario;
+        let preco = precoBase;
+        const descNum = Number(valorDesconto) || 0;
         if (tipoDesconto === 'percentual') {
-            preco -= preco * ((valorDesconto || 0) / 100);
+            preco -= preco * (descNum / 100);
         } else {
-            preco -= (valorDesconto || 0);
+            preco -= descNum;
         }
         return Math.max(0, preco);
-    }, [precoUnitario, tipoDesconto, valorDesconto]);
+    }, [precoBase, tipoDesconto, valorDesconto]);
 
     const valorTotalPrevisto = totalPecas * precoComDesconto;
 
@@ -260,18 +283,19 @@ export function DialogSelecionarCoresPedido({
         const itensParaAdicionar: ItemConfirmado[] = [];
 
         cores.forEach(c => {
-            const qtd = quantidades[c.descricao] || 0;
+            const desc = c.descricao || "Única";
+            const qtd = Number(quantidades[desc]) || 0;
             if (qtd > 0) {
                 itensParaAdicionar.push({
                     produto_id: produtoId,
-                    produto_nome: produtoNome,
-                    produto_sku: produtoSku,
-                    cor: c.descricao,
+                    produto_nome: produtoNome || "Produto",
+                    produto_sku: produtoSku || "",
+                    cor: desc,
                     codigo_cor: c.codigo && c.codigo !== "-" ? c.codigo : "",
                     quantidade: qtd,
-                    preco_unitario: precoUnitario,
+                    preco_unitario: precoBase,
                     tipo_desconto: tipoDesconto,
-                    desconto: valorDesconto || 0
+                    desconto: Number(valorDesconto) || 0
                 });
             }
         });
@@ -279,6 +303,16 @@ export function DialogSelecionarCoresPedido({
         onConfirmar(itensParaAdicionar);
         onOpenChange(false);
     };
+
+    const formatCurrency = (val: number) => {
+        try {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val) || 0);
+        } catch (e) {
+            return `R$ ${(Number(val) || 0).toFixed(2)}`;
+        }
+    };
+
+    if (!open) return null;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -303,7 +337,7 @@ export function DialogSelecionarCoresPedido({
                                 {produtoSku ? `[${produtoSku}] ` : ""}{produtoNome}
                             </Badge>
                             <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-bold text-xs px-2.5 py-1">
-                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(precoUnitario)} / un.
+                                {formatCurrency(precoBase)} / un.
                             </Badge>
                         </div>
                     </div>
@@ -330,7 +364,7 @@ export function DialogSelecionarCoresPedido({
 
                         <div className="col-span-6 sm:col-span-3 flex items-center gap-1.5">
                             <Label className="text-[11px] font-semibold text-slate-600 whitespace-nowrap">Desconto:</Label>
-                            <Select value={tipoDesconto} onValueChange={(val: any) => setTipoDesconto(val)}>
+                            <Select value={tipoDesconto} onValueChange={(val: any) => setTipoDesconto(val || 'percentual')}>
                                 <SelectTrigger className="h-9 text-xs w-[70px] bg-white border-slate-300">
                                     <SelectValue />
                                 </SelectTrigger>
@@ -346,7 +380,7 @@ export function DialogSelecionarCoresPedido({
                                 type="number"
                                 min="0"
                                 step="0.01"
-                                value={valorDesconto || ""}
+                                value={valorDesconto > 0 ? valorDesconto : ""}
                                 onChange={e => setValorDesconto(Math.max(0, parseFloat(e.target.value) || 0))}
                                 placeholder="0"
                                 className="h-9 text-xs bg-white border-slate-300"
@@ -379,15 +413,16 @@ export function DialogSelecionarCoresPedido({
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {coresFiltradas.map((c) => {
-                                        const qtd = quantidades[c.descricao] || 0;
-                                        const jaTem = mapJaNoPedido[c.descricao.toUpperCase()] || 0;
+                                    {coresFiltradas.map((c, idx) => {
+                                        const desc = c.descricao || `Cor ${idx + 1}`;
+                                        const qtd = Number(quantidades[desc]) || 0;
+                                        const jaTem = mapJaNoPedido[desc.toUpperCase()] || 0;
                                         const subtotalLinha = qtd * precoComDesconto;
                                         const temQtd = qtd > 0;
 
                                         return (
                                             <TableRow
-                                                key={c.descricao}
+                                                key={`${desc}_${idx}`}
                                                 className={cn(
                                                     "transition-colors hover:bg-slate-50/80",
                                                     temQtd && "bg-emerald-50/50 hover:bg-emerald-50/70 border-emerald-200"
@@ -399,7 +434,7 @@ export function DialogSelecionarCoresPedido({
                                                 <TableCell className="font-medium text-slate-800">
                                                     <div className="flex items-center gap-2">
                                                         <span className="w-2.5 h-2.5 rounded-full bg-slate-300 border border-slate-400 shrink-0" />
-                                                        <span>{c.descricao}</span>
+                                                        <span>{desc}</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-center">
@@ -418,7 +453,7 @@ export function DialogSelecionarCoresPedido({
                                                             variant="outline"
                                                             size="icon"
                                                             className="h-7 w-7 rounded border-slate-300 hover:bg-slate-100 text-slate-600"
-                                                            onClick={() => handleIncrementar(c.descricao, -1)}
+                                                            onClick={() => handleIncrementar(desc, -1)}
                                                             disabled={qtd <= 0}
                                                         >
                                                             <Minus className="h-3 w-3" />
@@ -429,7 +464,7 @@ export function DialogSelecionarCoresPedido({
                                                             min="0"
                                                             step="1"
                                                             value={qtd > 0 ? qtd : ""}
-                                                            onChange={e => handleQtdChange(c.descricao, e.target.value)}
+                                                            onChange={e => handleQtdChange(desc, e.target.value)}
                                                             placeholder="0"
                                                             className={cn(
                                                                 "h-8 w-20 text-center font-bold text-xs bg-white border-slate-300 transition-all",
@@ -442,7 +477,7 @@ export function DialogSelecionarCoresPedido({
                                                             variant="outline"
                                                             size="icon"
                                                             className="h-7 w-7 rounded border-slate-300 hover:bg-slate-100 text-slate-600"
-                                                            onClick={() => handleIncrementar(c.descricao, 1)}
+                                                            onClick={() => handleIncrementar(desc, 1)}
                                                         >
                                                             <Plus className="h-3 w-3" />
                                                         </Button>
@@ -452,7 +487,7 @@ export function DialogSelecionarCoresPedido({
                                                             variant="ghost"
                                                             size="sm"
                                                             className="h-7 px-1.5 text-[10px] text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-semibold"
-                                                            onClick={() => handleIncrementar(c.descricao, 10)}
+                                                            onClick={() => handleIncrementar(desc, 10)}
                                                             title="Adicionar +10"
                                                         >
                                                             +10
@@ -462,7 +497,7 @@ export function DialogSelecionarCoresPedido({
                                                 <TableCell className="text-right font-bold text-slate-700">
                                                     {subtotalLinha > 0 ? (
                                                         <span className="text-emerald-700">
-                                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotalLinha)}
+                                                            {formatCurrency(subtotalLinha)}
                                                         </span>
                                                     ) : (
                                                         <span className="text-slate-400 font-normal">R$ 0,00</span>
@@ -489,7 +524,7 @@ export function DialogSelecionarCoresPedido({
 
                         {totalPecas > 0 && (
                             <div className="border-l pl-4 border-slate-300 font-bold text-slate-800 text-sm">
-                                Total: <span className="text-indigo-700">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorTotalPrevisto)}</span>
+                                Total: <span className="text-indigo-700">{formatCurrency(valorTotalPrevisto)}</span>
                             </div>
                         )}
                     </div>
