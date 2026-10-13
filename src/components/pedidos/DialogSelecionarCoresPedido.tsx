@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
     Table,
     TableBody,
@@ -339,6 +338,9 @@ export function DialogSelecionarCoresPedido({
                             <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-bold text-xs px-2.5 py-1">
                                 {formatCurrency(precoBase)} / un.
                             </Badge>
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-700 font-semibold text-xs px-2.5 py-1 border border-slate-300">
+                                {cores.length} {cores.length === 1 ? 'cor' : 'cores'}
+                            </Badge>
                         </div>
                     </div>
 
@@ -389,128 +391,136 @@ export function DialogSelecionarCoresPedido({
                     </div>
                 </DialogHeader>
 
-                {/* Conteúdo com Tabela de Cores */}
-                <ScrollArea className="flex-1 max-h-[50vh] min-h-[220px] p-4 bg-slate-50/30">
+                {/* Conteúdo com Tabela de Cores com Barra de Rolagem Visível */}
+                <div className="flex-1 min-h-0 p-4 bg-slate-50/40 flex flex-col">
                     {loadingCores ? (
-                        <div className="flex flex-col items-center justify-center py-14 text-slate-500">
+                        <div className="flex flex-col items-center justify-center py-14 text-slate-500 bg-white rounded-lg border border-slate-200">
                             <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-2" />
                             <span className="text-xs font-medium">Buscando cores do produto...</span>
                         </div>
                     ) : coresFiltradas.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500 text-xs">
+                        <div className="text-center py-12 text-slate-500 text-xs bg-white rounded-lg border border-slate-200">
                             {termoPesquisa ? `Nenhuma cor encontrada para "${termoPesquisa}".` : "Nenhuma cor cadastrada para este produto."}
                         </div>
                     ) : (
-                        <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                            <Table className="text-xs">
-                                <TableHeader className="bg-slate-100/80 sticky top-0 z-10">
-                                    <TableRow>
-                                        <TableHead className="w-[80px] font-bold text-slate-700">CÓD.</TableHead>
-                                        <TableHead className="font-bold text-slate-700">COR</TableHead>
-                                        <TableHead className="w-[110px] text-center font-bold text-slate-700">JÁ NO PEDIDO</TableHead>
-                                        <TableHead className="w-[180px] text-center font-bold text-indigo-900 bg-indigo-50/50">QUANTIDADE</TableHead>
-                                        <TableHead className="w-[120px] text-right font-bold text-slate-700">SUBTOTAL</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {coresFiltradas.map((c, idx) => {
-                                        const desc = c.descricao || `Cor ${idx + 1}`;
-                                        const qtd = Number(quantidades[desc]) || 0;
-                                        const jaTem = mapJaNoPedido[desc.toUpperCase()] || 0;
-                                        const subtotalLinha = qtd * precoComDesconto;
-                                        const temQtd = qtd > 0;
+                        <div className="border border-slate-200 rounded-lg bg-white shadow-sm flex flex-col min-h-0 flex-1 overflow-hidden">
+                            <div
+                                className="overflow-y-auto max-h-[55vh] min-h-[220px] scrollbar-visible pr-1"
+                                style={{
+                                    scrollbarWidth: 'thin',
+                                    scrollbarColor: '#94a3b8 #f1f5f9'
+                                }}
+                            >
+                                <Table className="text-xs relative">
+                                    <TableHeader className="bg-slate-100 sticky top-0 z-20 shadow-xs border-b border-slate-200">
+                                        <TableRow className="hover:bg-transparent">
+                                            <TableHead className="w-[80px] font-bold text-slate-700 bg-slate-100">CÓD.</TableHead>
+                                            <TableHead className="font-bold text-slate-700 bg-slate-100">COR</TableHead>
+                                            <TableHead className="w-[110px] text-center font-bold text-slate-700 bg-slate-100">JÁ NO PEDIDO</TableHead>
+                                            <TableHead className="w-[180px] text-center font-bold text-indigo-900 bg-indigo-50/90">QUANTIDADE</TableHead>
+                                            <TableHead className="w-[120px] text-right font-bold text-slate-700 bg-slate-100">SUBTOTAL</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {coresFiltradas.map((c, idx) => {
+                                            const desc = c.descricao || `Cor ${idx + 1}`;
+                                            const qtd = Number(quantidades[desc]) || 0;
+                                            const jaTem = mapJaNoPedido[desc.toUpperCase()] || 0;
+                                            const subtotalLinha = qtd * precoComDesconto;
+                                            const temQtd = qtd > 0;
 
-                                        return (
-                                            <TableRow
-                                                key={`${desc}_${idx}`}
-                                                className={cn(
-                                                    "transition-colors hover:bg-slate-50/80",
-                                                    temQtd && "bg-emerald-50/50 hover:bg-emerald-50/70 border-emerald-200"
-                                                )}
-                                            >
-                                                <TableCell className="font-mono text-slate-500 font-semibold">
-                                                    {c.codigo && c.codigo !== "-" ? c.codigo : "-"}
-                                                </TableCell>
-                                                <TableCell className="font-medium text-slate-800">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="w-2.5 h-2.5 rounded-full bg-slate-300 border border-slate-400 shrink-0" />
-                                                        <span>{desc}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    {jaTem > 0 ? (
-                                                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 font-bold text-[10px]">
-                                                            {jaTem} un.
-                                                        </Badge>
-                                                    ) : (
-                                                        <span className="text-slate-400 text-[11px]">-</span>
+                                            return (
+                                                <TableRow
+                                                    key={`${desc}_${idx}`}
+                                                    className={cn(
+                                                        "transition-colors hover:bg-slate-50/80",
+                                                        temQtd && "bg-emerald-50/50 hover:bg-emerald-50/70 border-emerald-200"
                                                     )}
-                                                </TableCell>
-                                                <TableCell className="text-center p-2">
-                                                    <div className="flex items-center justify-center gap-1.5">
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="icon"
-                                                            className="h-7 w-7 rounded border-slate-300 hover:bg-slate-100 text-slate-600"
-                                                            onClick={() => handleIncrementar(desc, -1)}
-                                                            disabled={qtd <= 0}
-                                                        >
-                                                            <Minus className="h-3 w-3" />
-                                                        </Button>
+                                                >
+                                                    <TableCell className="font-mono text-slate-500 font-semibold py-2">
+                                                        {c.codigo && c.codigo !== "-" ? c.codigo : "-"}
+                                                    </TableCell>
+                                                    <TableCell className="font-medium text-slate-800 py-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="w-2.5 h-2.5 rounded-full bg-slate-300 border border-slate-400 shrink-0" />
+                                                            <span>{desc}</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-center py-2">
+                                                        {jaTem > 0 ? (
+                                                            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 font-bold text-[10px]">
+                                                                {jaTem} un.
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-slate-400 text-[11px]">-</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-center p-1.5">
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="icon"
+                                                                className="h-7 w-7 rounded border-slate-300 hover:bg-slate-100 text-slate-600"
+                                                                onClick={() => handleIncrementar(desc, -1)}
+                                                                disabled={qtd <= 0}
+                                                            >
+                                                                <Minus className="h-3 w-3" />
+                                                            </Button>
 
-                                                        <Input
-                                                            type="number"
-                                                            min="0"
-                                                            step="1"
-                                                            value={qtd > 0 ? qtd : ""}
-                                                            onChange={e => handleQtdChange(desc, e.target.value)}
-                                                            placeholder="0"
-                                                            className={cn(
-                                                                "h-8 w-20 text-center font-bold text-xs bg-white border-slate-300 transition-all",
-                                                                temQtd && "border-emerald-500 ring-1 ring-emerald-500 text-emerald-800 bg-emerald-50"
-                                                            )}
-                                                        />
+                                                            <Input
+                                                                type="number"
+                                                                min="0"
+                                                                step="1"
+                                                                value={qtd > 0 ? qtd : ""}
+                                                                onChange={e => handleQtdChange(desc, e.target.value)}
+                                                                placeholder="0"
+                                                                className={cn(
+                                                                    "h-8 w-20 text-center font-bold text-xs bg-white border-slate-300 transition-all",
+                                                                    temQtd && "border-emerald-500 ring-1 ring-emerald-500 text-emerald-800 bg-emerald-50"
+                                                                )}
+                                                            />
 
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="icon"
-                                                            className="h-7 w-7 rounded border-slate-300 hover:bg-slate-100 text-slate-600"
-                                                            onClick={() => handleIncrementar(desc, 1)}
-                                                        >
-                                                            <Plus className="h-3 w-3" />
-                                                        </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="icon"
+                                                                className="h-7 w-7 rounded border-slate-300 hover:bg-slate-100 text-slate-600"
+                                                                onClick={() => handleIncrementar(desc, 1)}
+                                                            >
+                                                                <Plus className="h-3 w-3" />
+                                                            </Button>
 
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-7 px-1.5 text-[10px] text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-semibold"
-                                                            onClick={() => handleIncrementar(desc, 10)}
-                                                            title="Adicionar +10"
-                                                        >
-                                                            +10
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right font-bold text-slate-700">
-                                                    {subtotalLinha > 0 ? (
-                                                        <span className="text-emerald-700">
-                                                            {formatCurrency(subtotalLinha)}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-slate-400 font-normal">R$ 0,00</span>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-7 px-1.5 text-[10px] text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-semibold"
+                                                                onClick={() => handleIncrementar(desc, 10)}
+                                                                title="Adicionar +10"
+                                                            >
+                                                                +10
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-bold text-slate-700 py-2">
+                                                        {subtotalLinha > 0 ? (
+                                                            <span className="text-emerald-700">
+                                                                {formatCurrency(subtotalLinha)}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-400 font-normal">R$ 0,00</span>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </div>
                         </div>
                     )}
-                </ScrollArea>
+                </div>
 
                 {/* Footer com Resumo em Tempo Real e Botões de Ação */}
                 <DialogFooter className="p-4 bg-slate-50 border-t border-slate-200 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
