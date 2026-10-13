@@ -36,10 +36,11 @@ import {
 } from "@/components/ui/popover";
 import { useEmpresaId } from "@/hooks/useEmpresaId";
 import { useProdutos } from "@/hooks/useProdutos";
-import { Plus, Trash2, ArrowLeft, Search, Check, ChevronsUpDown, CheckCircle } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Search, Check, ChevronsUpDown, CheckCircle, Palette } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { DialogSelecionarCoresPedido } from "@/components/pedidos/DialogSelecionarCoresPedido";
 
 interface ProdutoTabela {
     id: string; // The item id inside the price table
@@ -123,14 +124,15 @@ export default function NovoPedido() {
     const [descontoGlobal, setDescontoGlobal] = useState<string>("0");
     const [corSelecionada, setCorSelecionada] = useState<string>("");
     const [coresProduto, setCoresProduto] = useState<any[]>([]);
+    const [modalCoresOpen, setModalCoresOpen] = useState(false);
 
     useEffect(() => {
         if (produtoSelecionadoId) {
-            const p = produtosDaTabela?.find(prod => prod.produto_id === produtoSelecionadoId);
-              let parsed: any[] = [];
-              if (p && p.produto_cores) {
-                  parsed = Array.isArray(p.produto_cores) ? [...p.produto_cores] : [];
-              }
+            const p = todosProdutos?.find(prod => prod.id === produtoSelecionadoId);
+            let parsed: any[] = [];
+            if (p && p.produto_cores) {
+                parsed = Array.isArray(p.produto_cores) ? [...p.produto_cores] : [];
+            }
 
             if (empresaId) {
                 const invStr = localStorage.getItem(`estoque_cores_${empresaId}`);
@@ -153,7 +155,7 @@ export default function NovoPedido() {
             setCoresProduto([]);
         }
         setCorSelecionada("");
-    }, [produtoSelecionadoId, empresaId]);
+    }, [produtoSelecionadoId, todosProdutos, empresaId]);
 
     const { data: pedidoData, isLoading: isLoadingPedido } = useQuery({
         queryKey: ["pedido", id],
@@ -400,6 +402,67 @@ export default function NovoPedido() {
         setProdutoSelecionadoId("");
         setQuantidade("1");
         setCorSelecionada("");
+    };
+
+    const handleConfirmarCoresModal = (novosItens: any[]) => {
+        if (!novosItens || novosItens.length === 0) return;
+
+        setItens(prev => {
+            let atualizados = [...prev];
+
+            novosItens.forEach(novo => {
+                const index = atualizados.findIndex(
+                    i => i.produto_id === novo.produto_id && (i.cor || "") === (novo.cor || "")
+                );
+
+                if (index >= 0) {
+                    const itemExistente = atualizados[index];
+                    const novaQtd = Number(itemExistente.quantidade) + Number(novo.quantidade);
+                    const subtotal = calcularSubtotal(
+                        novaQtd,
+                        novo.preco_unitario,
+                        novo.tipo_desconto,
+                        novo.desconto
+                    );
+
+                    atualizados[index] = {
+                        ...itemExistente,
+                        quantidade: novaQtd,
+                        quantidade_falta: (itemExistente.quantidade_falta !== undefined ? itemExistente.quantidade_falta : itemExistente.quantidade) + Number(novo.quantidade),
+                        preco_unitario: novo.preco_unitario,
+                        tipo_desconto: novo.tipo_desconto,
+                        desconto: novo.desconto,
+                        subtotal
+                    };
+                } else {
+                    const subtotal = calcularSubtotal(
+                        novo.quantidade,
+                        novo.preco_unitario,
+                        novo.tipo_desconto,
+                        novo.desconto
+                    );
+
+                    atualizados.push({
+                        produto_id: novo.produto_id,
+                        produto_nome: novo.produto_nome,
+                        produto_sku: novo.produto_sku,
+                        cor: novo.cor,
+                        codigo_cor: novo.codigo_cor,
+                        quantidade: novo.quantidade,
+                        quantidade_falta: novo.quantidade,
+                        preco_unitario: novo.preco_unitario,
+                        tipo_desconto: novo.tipo_desconto,
+                        desconto: novo.desconto,
+                        subtotal
+                    });
+                }
+            });
+
+            return atualizados;
+        });
+
+        const totalQtd = novosItens.reduce((acc, curr) => acc + curr.quantidade, 0);
+        toast.success(`${totalQtd} itens adicionados ao pedido!`);
     };
 
     const handleRemoveItem = (produtoId: string, cor: string = "") => {
@@ -778,8 +841,9 @@ export default function NovoPedido() {
                                                                     key={p.id}
                                                                     value={`${p.sku || ""} ${p.nome}`}
                                                                     onSelect={() => {
-                                                                        setProdutoSelecionadoId(p.id === produtoSelecionadoId ? "" : p.id);
+                                                                        setProdutoSelecionadoId(p.id);
                                                                         setProdutoPopoverOpen(false);
+                                                                        setModalCoresOpen(true);
                                                                     }}
                                                                 >
                                                                     <Check
@@ -844,9 +908,17 @@ export default function NovoPedido() {
                                         onChange={e => setDescontoGlobal(e.target.value)}
                                     />
                                 </div>
-                                <div className="col-span-12 sm:col-span-12 mt-2">
-                                    <Button onClick={handleAddItem} className="w-full sm:w-auto mt-2">
-                                        <Plus className="h-4 w-4 mr-1" /> Adicionar Produto (Salva o desconto na linha)
+                                <div className="col-span-12 sm:col-span-12 mt-2 flex flex-wrap gap-2.5 items-center">
+                                    <Button 
+                                        type="button" 
+                                        onClick={() => setModalCoresOpen(true)} 
+                                        disabled={!produtoSelecionadoId}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
+                                    >
+                                        <Palette className="h-4 w-4 mr-1.5" /> Abrir Grade de Cores e Quantidades
+                                    </Button>
+                                    <Button onClick={handleAddItem} variant="outline" className="text-slate-700">
+                                        <Plus className="h-4 w-4 mr-1" /> Adicionar Cor Individual
                                     </Button>
                                 </div>
                             </div>
@@ -854,6 +926,23 @@ export default function NovoPedido() {
                             <p className="text-muted-foreground text-sm italic py-2">
                                 Selecione uma Tabela de Preço acima para visualizar e adicionar produtos.
                             </p>
+                        )}
+
+                        {/* Modal de Seleção de Cores e Quantidades em Grade */}
+                        {produtoSelecionadoId && (
+                            <DialogSelecionarCoresPedido
+                                open={modalCoresOpen}
+                                onOpenChange={setModalCoresOpen}
+                                produtoId={produtoSelecionadoId}
+                                produtoNome={todosProdutos?.find(p => p.id === produtoSelecionadoId)?.nome || ""}
+                                produtoSku={todosProdutos?.find(p => p.id === produtoSelecionadoId)?.sku}
+                                precoUnitario={produtosDaTabela?.find(t => t.produto_id === produtoSelecionadoId)?.preco || 0}
+                                empresaId={empresaId || ""}
+                                descontoPadraoTipo={descontoGlobalTipo}
+                                descontoPadraoValor={parseFloat(descontoGlobal) || 0}
+                                itensJaNoPedido={itens.filter(i => i.produto_id === produtoSelecionadoId)}
+                                onConfirmar={handleConfirmarCoresModal}
+                            />
                         )}
 
                         {/* Lista de Itens */}
